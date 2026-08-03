@@ -48,7 +48,11 @@ struct SessionRowView: View {
 
     private var cardContent: some View {
         HStack(alignment: .top, spacing: 10) {
-            AgentSprite(status: session.displayStatus, size: 18)
+            AgentSprite(
+                status: session.displayStatus,
+                size: 18,
+                tint: SessionChipStyle.spriteTint(session.agent)
+            )
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {

@@ -75,6 +75,18 @@ enum SessionChipStyle {
         }
     }
 
+    /// Sprite identity color: orange for Claude, blue for Codex.
+    static func spriteTint(_ agent: String) -> Color {
+        switch agent.lowercased() {
+        case "claude", "claude-code":
+            Color(red: 217 / 255, green: 119 / 255, blue: 87 / 255)
+        case "codex", "openai-codex":
+            Color(red: 10 / 255, green: 132 / 255, blue: 255 / 255)
+        default:
+            Color(white: 0.62)
+        }
+    }
+
     static func modelLabel(_ model: String) -> String {
         let lowercased = model.lowercased()
         if lowercased.hasPrefix("gpt-") {
