@@ -53,6 +53,11 @@ struct Session: Identifiable, Sendable {
         status.displayStatus
     }
 
+    /// Single source of truth for "clicking this row can raise something".
+    var canFocus: Bool {
+        terminal?.tty != nil || source == "claude-desktop"
+    }
+
     var elapsed: String {
         elapsed(at: Date())
     }

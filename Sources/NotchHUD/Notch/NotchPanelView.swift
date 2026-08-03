@@ -152,7 +152,7 @@ struct NotchPanelView: View {
     }
 
     private func focus(_ session: Session) {
-        guard session.terminal?.tty != nil else { return }
+        guard session.canFocus else { return }
         feedback[session.id] = nil
 
         Task {

@@ -15,7 +15,7 @@ struct SessionRowView: View {
     @State private var isHovering = false
 
     private var canFocus: Bool {
-        session.terminal?.tty != nil || session.source == "claude-desktop"
+        session.canFocus
     }
 
     var body: some View {
