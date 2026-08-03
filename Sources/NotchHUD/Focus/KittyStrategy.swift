@@ -1,9 +1,9 @@
 struct KittyStrategy: FocusStrategy {
-    func canHandle(_ identity: TerminalIdentity) -> Bool {
+    func canHandle(_ session: Session) -> Bool {
         false
     }
 
-    func focus(_ identity: TerminalIdentity) throws {
+    func focus(_ session: Session) throws {
         throw FocusError.notFound
     }
 }

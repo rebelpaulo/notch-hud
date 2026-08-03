@@ -101,4 +101,13 @@ enum SessionChipStyle {
             termProgram
         }
     }
+
+    static func sourceLabel(_ source: String) -> String? {
+        switch source {
+        case "claude-desktop":
+            "Desktop"
+        default:
+            nil
+        }
+    }
 }

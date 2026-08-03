@@ -37,8 +37,8 @@ final class SessionStore {
             if lhsRank != rhsRank {
                 return lhsRank < rhsRank
             }
-            let lhsCanFocus = lhs.terminal?.tty != nil
-            let rhsCanFocus = rhs.terminal?.tty != nil
+            let lhsCanFocus = lhs.terminal?.tty != nil || lhs.source == "claude-desktop"
+            let rhsCanFocus = rhs.terminal?.tty != nil || rhs.source == "claude-desktop"
             if lhsCanFocus != rhsCanFocus {
                 return lhsCanFocus
             }

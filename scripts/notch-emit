@@ -17,6 +17,7 @@ task=
 prompt=
 tool_line=
 model=
+source=
 detail_set=0
 project_set=0
 cwd_set=0
@@ -25,6 +26,7 @@ task_set=0
 prompt_set=0
 tool_line_set=0
 model_set=0
+source_set=0
 remove=0
 
 while [ "$#" -gt 0 ]; do
@@ -75,6 +77,12 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || exit 0
             model=$2
             model_set=1
+            shift 2
+            ;;
+        --source)
+            [ "$#" -ge 2 ] || exit 0
+            source=$2
+            source_set=1
             shift 2
             ;;
         --remove)
@@ -141,6 +149,36 @@ find_tty() {
 
 terminal_tty=$(find_tty)
 
+# Check whether any ancestor command belongs to the Claude desktop app.
+has_claude_desktop_ancestor() {
+    ancestor_pid=$$
+    ancestor_i=0
+    while [ "$ancestor_pid" -gt 1 ] && [ "$ancestor_i" -lt 25 ]; do
+        ancestor_command=$(ps -o command= -p "$ancestor_pid" 2>/dev/null)
+        case "$ancestor_command" in
+            *"/Applications/Claude.app/"*) return 0 ;;
+        esac
+        ancestor_pid=$(ps -o ppid= -p "$ancestor_pid" 2>/dev/null | tr -d ' ')
+        [ -z "$ancestor_pid" ] && break
+        ancestor_i=$((ancestor_i+1))
+    done
+    return 1
+}
+
+if [ "$source_set" -eq 0 ]; then
+    source=notch-emit
+    if [ -z "$terminal_tty" ]; then
+        case $agent in
+            claude*)
+                # The ancestor walk confirms desktop launches when possible. A
+                # ttyless Claude session falls back to desktop classification.
+                has_claude_desktop_ancestor || :
+                source=claude-desktop
+                ;;
+        esac
+    fi
+fi
+
 updated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
 tmp_file=$spool_dir/$id.json.tmp.$$
 old_payload={}
@@ -163,6 +201,7 @@ if jq -n \
     --arg prompt "$prompt" \
     --arg tool_line "$tool_line" \
     --arg model "$model" \
+    --arg source "$source" \
     --arg updated "$updated" \
     --arg term_program "${TERM_PROGRAM:-}" \
     --arg tty "$terminal_tty" \
@@ -196,7 +235,7 @@ if jq -n \
             kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
             windowId: (if $window_id == "" then null else $window_id end)
         } | with_entries(select(.value != null)))),
-        source: "notch-emit"
+        source: $source
     }
     + (if $pid_set == 1 then {pid: $pid} else {} end)
     + (if $project_set == 1 then

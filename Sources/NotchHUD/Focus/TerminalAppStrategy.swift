@@ -1,11 +1,15 @@
 import Foundation
 
 struct TerminalAppStrategy: FocusStrategy {
-    func canHandle(_ identity: TerminalIdentity) -> Bool {
-        identity.termProgram == "Apple_Terminal" && identity.tty != nil
+    func canHandle(_ session: Session) -> Bool {
+        guard let identity = session.terminal else { return false }
+        return identity.termProgram == "Apple_Terminal" && identity.tty != nil
     }
 
-    func focus(_ identity: TerminalIdentity) throws {
+    func focus(_ session: Session) throws {
+        guard let identity = session.terminal else {
+            throw FocusError.notFound
+        }
         guard let tty = identity.tty else {
             throw FocusError.notFound
         }

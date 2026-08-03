@@ -15,7 +15,7 @@ struct SessionRowView: View {
     @State private var isHovering = false
 
     private var canFocus: Bool {
-        session.terminal?.tty != nil
+        session.terminal?.tty != nil || session.source == "claude-desktop"
     }
 
     var body: some View {
@@ -141,7 +141,10 @@ struct SessionRowView: View {
                     chip(SessionChipStyle.modelLabel(model))
                 }
 
-                if let terminal = session.terminal?.termProgram, !terminal.isEmpty {
+                if let source = session.source,
+                   let sourceLabel = SessionChipStyle.sourceLabel(source) {
+                    chip(sourceLabel)
+                } else if let terminal = session.terminal?.termProgram, !terminal.isEmpty {
                     chip(SessionChipStyle.terminalLabel(terminal))
                 }
 
