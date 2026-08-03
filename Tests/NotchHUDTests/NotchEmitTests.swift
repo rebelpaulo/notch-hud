@@ -6,9 +6,8 @@ import Testing
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
-    let scratch = root
-        .appendingPathComponent(".foreman/scratch/emitter-test", isDirectory: true)
-        .appendingPathComponent("unit-\(UUID().uuidString)", isDirectory: true)
+    let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("notch-emit-test-\(UUID().uuidString)", isDirectory: true)
     defer { try? FileManager.default.removeItem(at: scratch) }
 
     try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
@@ -34,6 +33,7 @@ private func runEmitter(_ script: String, home: URL, arguments: [String]) throws
 
     var environment = ProcessInfo.processInfo.environment
     environment["NOTCH_HUD_HOME"] = home.path
+    environment["NOTCH_HUD_TTY"] = ""
     environment["TERM_PROGRAM"] = nil
     environment["ITERM_SESSION_ID"] = nil
     environment["WEZTERM_PANE"] = nil

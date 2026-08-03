@@ -147,32 +147,25 @@ find_tty() {
     return 0
 }
 
-terminal_tty=$(find_tty)
-
-# Check whether any ancestor command belongs to the Claude desktop app.
-has_claude_desktop_ancestor() {
-    ancestor_pid=$$
-    ancestor_i=0
-    while [ "$ancestor_pid" -gt 1 ] && [ "$ancestor_i" -lt 25 ]; do
-        ancestor_command=$(ps -o command= -p "$ancestor_pid" 2>/dev/null)
-        case "$ancestor_command" in
-            *"/Applications/Claude.app/"*) return 0 ;;
-        esac
-        ancestor_pid=$(ps -o ppid= -p "$ancestor_pid" 2>/dev/null | tr -d ' ')
-        [ -z "$ancestor_pid" ] && break
-        ancestor_i=$((ancestor_i+1))
-    done
-    return 1
-}
+# NOTCH_HUD_TTY (set, possibly empty) overrides detection — tests need a
+# deterministic ttyless run; the ppid walk sees the test terminal's tty.
+if [ -n "${NOTCH_HUD_TTY+x}" ]; then
+    terminal_tty=$NOTCH_HUD_TTY
+else
+    terminal_tty=$(find_tty)
+fi
 
 if [ "$source_set" -eq 0 ]; then
     source=notch-emit
     if [ -z "$terminal_tty" ]; then
         case $agent in
             claude*)
-                # The ancestor walk confirms desktop launches when possible. A
-                # ttyless Claude session falls back to desktop classification.
-                has_claude_desktop_ancestor || :
+                # ponytail: user-approved simplification — every ttyless Claude
+                # session is classified as the desktop app (an /Applications/
+                # Claude.app ppid-walk was verified to work but adds ~50 ps
+                # spawns per emit and makes tests environment-dependent; wire
+                # real detection here if headless claude jobs must stay
+                # background).
                 source=claude-desktop
                 ;;
         esac
