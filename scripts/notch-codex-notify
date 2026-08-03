@@ -1,0 +1,74 @@
+#!/bin/sh
+
+payload=
+for argument do
+    payload=$argument
+done
+
+script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
+emitter=$script_dir/notch-emit
+if [ ! -x "$emitter" ]; then
+    emitter=$notch_home/bin/notch-emit
+fi
+
+payload_type=
+if command -v jq >/dev/null 2>&1; then
+    payload_type=$(printf '%s' "$payload" | jq -r '
+        if type == "object" and (.type | type) == "string" then .type else empty end
+    ' 2>/dev/null)
+fi
+
+status=
+case $payload_type in
+    agent-turn-complete)
+        status=done
+        ;;
+    *[Aa][Pp][Pp][Rr][Oo][Vv][Aa][Ll]*)
+        status=needs_me
+        ;;
+esac
+
+if [ -n "$status" ] && [ -x "$emitter" ]; then
+    session_id=${NOTCH_CODEX_SESSION_ID:-}
+    if [ -z "$session_id" ]; then
+        payload_id=$(printf '%s' "$payload" | jq -r '
+            [
+                .["thread-id"], .thread_id, (try .thread.id),
+                .["conversation-id"], .conversation_id, (try .conversation.id)
+            ]
+            | map(select(type == "string" or type == "number"))
+            | first
+            // empty
+            | tostring
+        ' 2>/dev/null)
+        if [ -n "$payload_id" ]; then
+            session_id=codex-$payload_id
+        else
+            session_id=codex-$PPID
+        fi
+    fi
+
+    "$emitter" "$session_id" codex "$status" --source codex >/dev/null 2>&1 || :
+fi
+
+chain_file=$notch_home/codex-notify-chain.json
+if [ -f "$chain_file" ] && command -v jq >/dev/null 2>&1; then
+    chain_arguments=$(jq -r '
+        if type == "array"
+           and length > 0
+           and all(.[]; type == "string")
+        then @sh
+        else empty
+        end
+    ' "$chain_file" 2>/dev/null)
+    if [ -n "$chain_arguments" ]; then
+        # jq @sh supplies the quoting needed to restore each JSON array element.
+        # shellcheck disable=SC2294
+        eval "set -- $chain_arguments"
+        set -- "$@" "$payload"
+        "$@" || :
+    fi
+fi
+
+exit 0
