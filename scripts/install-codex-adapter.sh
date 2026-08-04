@@ -53,11 +53,21 @@ fi
 if [ "$already_installed" -eq 0 ]; then
     cp "$codex_config" "$codex_config.bak.$timestamp" || exit 1
 
-    if [ -n "$notify_value" ] && printf '%s\n' "$notify_value" | \
-        jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
-            >/dev/null 2>&1
-    then
-        printf '%s\n' "$notify_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+    if [ -n "$notify_value" ]; then
+        if printf '%s\n' "$notify_value" | \
+            jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
+                >/dev/null 2>&1
+        then
+            printf '%s\n' "$notify_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+        else
+            # Refuse loudly rather than silently dropping an existing notify
+            # command we cannot parse (single-quoted TOML, trailing comment,
+            # multiline array...).
+            printf '%s\n' "notch-hud: existing notify has an unsupported format; not touching $codex_config" >&2
+            printf '%s\n' "  value: $notify_value" >&2
+            rm -f "$codex_config.bak.$timestamp"
+            exit 1
+        fi
     else
         rm -f "$install_prefix/codex-notify-chain.json" || exit 1
     fi

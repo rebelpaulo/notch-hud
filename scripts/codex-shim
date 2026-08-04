@@ -1,5 +1,15 @@
 #!/bin/sh
 
+# Recursion breaker: whatever PATH/symlink layout exists, a shim that ends up
+# re-invoking a shim stops here instead of fork-bombing.
+shim_depth=${NOTCH_HUD_SHIM_DEPTH:-0}
+if [ "$shim_depth" -ge 3 ]; then
+    printf '%s\n' 'notch-hud: codex shim recursion detected, aborting' >&2
+    exit 127
+fi
+NOTCH_HUD_SHIM_DEPTH=$((shim_depth + 1))
+export NOTCH_HUD_SHIM_DEPTH
+
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
 notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
 emitter=$script_dir/notch-emit
@@ -21,7 +31,8 @@ while [ -n "$remaining_path" ]; do
     if [ -n "$resolved_entry" ]; then
         if [ "$resolved_entry" != "$shim_dir" ] && \
            { [ -z "$resolved_default_bin" ] || [ "$resolved_entry" != "$resolved_default_bin" ]; } && \
-           [ -x "$resolved_entry/codex" ] && [ ! -d "$resolved_entry/codex" ]
+           [ -x "$resolved_entry/codex" ] && [ ! -d "$resolved_entry/codex" ] && \
+           ! [ "$resolved_entry/codex" -ef "$0" ]
         then
             real_codex=$resolved_entry/codex
             break
