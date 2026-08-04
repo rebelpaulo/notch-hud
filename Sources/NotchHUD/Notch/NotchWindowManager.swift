@@ -121,6 +121,19 @@ final class NotchWindowManager {
         handlePendingTransition(previouslyHadPending: previouslyHadPending)
     }
 
+    private func dismissSession(sessionID: String) {
+        guard !sessionID.isEmpty,
+              !sessionID.contains("/"),
+              sessionID != ".",
+              sessionID != ".."
+        else { return }
+
+        try? FileManager.default.removeItem(
+            at: environment.spoolURL.appendingPathComponent("\(sessionID).json", isDirectory: false)
+        )
+        store.apply(store.sessionsWithoutPendingOverlay.filter { $0.id != sessionID })
+    }
+
     private func handlePendingTransition(previouslyHadPending: Bool) {
         if pendingStore.hasPending {
             pendingAutoExpandActive = true
@@ -269,6 +282,9 @@ final class NotchWindowManager {
             decisionWriter: decisionWriter,
             onApprovalDismiss: { [weak self] sessionID in
                 self?.approvalDidResolve(sessionID: sessionID)
+            },
+            onSessionDismiss: { [weak self] sessionID in
+                self?.dismissSession(sessionID: sessionID)
             },
             onSizeChange: { [weak self] size in
                 self?.updateRenderedPanelSize(size)
