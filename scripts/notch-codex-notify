@@ -49,7 +49,13 @@ if [ -n "$status" ] && [ -x "$emitter" ]; then
         fi
     fi
 
-    "$emitter" "$session_id" codex "$status" --source codex >/dev/null 2>&1 || :
+    # Update-only: notify never CREATES sessions. The shim owns the session
+    # lifecycle; codex fires notify asynchronously, so a late turn-complete
+    # arriving after the shim's exit --remove would otherwise resurrect the
+    # entry as a ghost (and shim-less codex runs would spawn done-only ghosts).
+    if [ -f "$notch_home/sessions/$session_id.json" ]; then
+        "$emitter" "$session_id" codex "$status" --source codex >/dev/null 2>&1 || :
+    fi
 fi
 
 chain_file=$notch_home/codex-notify-chain.json

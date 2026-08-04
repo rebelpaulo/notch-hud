@@ -5,6 +5,13 @@ import Testing
     let scratch = try makeCodexScratch()
     defer { try? FileManager.default.removeItem(at: scratch) }
 
+    // notify is update-only: seed the session the way the shim would.
+    _ = try runCodexScript(
+        "notch-emit",
+        arguments: ["codex-explicit", "codex", "working", "--source", "codex"],
+        home: scratch
+    )
+
     let payload = #"{"type":"agent-turn-complete","thread-id":"thread-ignored"}"#
     let result = try runCodexScript(
         "notch-codex-notify",
@@ -23,6 +30,12 @@ import Testing
 @Test func codexNotifyEmitsNeedsMeForApprovalPayload() throws {
     let scratch = try makeCodexScratch()
     defer { try? FileManager.default.removeItem(at: scratch) }
+
+    _ = try runCodexScript(
+        "notch-emit",
+        arguments: ["codex-approval-thread", "codex", "working", "--source", "codex"],
+        home: scratch
+    )
 
     let payload = #"{"type":"exec-approval-request","conversation_id":"approval-thread"}"#
     let result = try runCodexScript("notch-codex-notify", arguments: [payload], home: scratch)
@@ -46,6 +59,24 @@ import Testing
 
     #expect(result.status == 0)
     #expect(!FileManager.default.fileExists(atPath: scratch.appendingPathComponent("sessions/codex-unknown.json").path))
+}
+
+@Test func codexNotifyNeverCreatesSessions() throws {
+    let scratch = try makeCodexScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    // A late turn-complete after the shim already removed the session (codex
+    // fires notify asynchronously) must not resurrect it as a ghost.
+    let payload = #"{"type":"agent-turn-complete"}"#
+    let result = try runCodexScript(
+        "notch-codex-notify",
+        arguments: [payload],
+        home: scratch,
+        extraEnvironment: ["NOTCH_CODEX_SESSION_ID": "codex-ghost"]
+    )
+
+    #expect(result.status == 0)
+    #expect(!FileManager.default.fileExists(atPath: scratch.appendingPathComponent("sessions/codex-ghost.json").path))
 }
 
 @Test func codexNotifyChainsSavedCommandWithPayloadAppended() throws {
