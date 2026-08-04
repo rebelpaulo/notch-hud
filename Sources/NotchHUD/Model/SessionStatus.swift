@@ -116,7 +116,7 @@ enum SessionChipStyle {
 
     static func sourceLabel(_ source: String) -> String? {
         switch source {
-        case "claude-desktop":
+        case "claude-desktop", "codex-desktop":
             "Desktop"
         default:
             nil

@@ -55,7 +55,7 @@ struct Session: Identifiable, Sendable {
 
     /// Single source of truth for "clicking this row can raise something".
     var canFocus: Bool {
-        terminal?.tty != nil || source == "claude-desktop"
+        terminal?.tty != nil || source == "claude-desktop" || source == "codex-desktop"
     }
 
     var elapsed: String {

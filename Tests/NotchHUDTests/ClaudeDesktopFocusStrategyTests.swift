@@ -30,10 +30,23 @@ import Testing
     }
 }
 
+@Test func codexDesktopStrategyUsesInstalledBundleIdentifier() throws {
+    let application = FakeClaudeDesktopRunningApplication()
+    let workspace = FakeClaudeDesktopWorkspace(applications: [application])
+    let strategy = CodexDesktopFocusStrategy(workspace: workspace)
+
+    #expect(strategy.canHandle(makeFocusSession(source: "codex-desktop")))
+    try strategy.focus(makeFocusSession(source: "codex-desktop"))
+
+    #expect(workspace.requestedBundleIdentifier == "com.openai.codex")
+    #expect(application.wasActivated)
+}
+
 @MainActor
 @Test func dispatcherSelectsDesktopAndTerminalStrategies() {
     let dispatcher = FocusDispatcher()
     let desktop = makeFocusSession(source: "claude-desktop")
+    let codexDesktop = makeFocusSession(source: "codex-desktop")
     let terminal = makeFocusSession(
         source: "notch-emit",
         terminal: TerminalIdentity(
@@ -47,6 +60,7 @@ import Testing
     )
 
     #expect(dispatcher.strategy(for: desktop) is ClaudeDesktopFocusStrategy)
+    #expect(dispatcher.strategy(for: codexDesktop) is CodexDesktopFocusStrategy)
     #expect(dispatcher.strategy(for: terminal) is TerminalAppStrategy)
 }
 
