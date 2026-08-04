@@ -92,6 +92,7 @@ import Testing
     #expect(envelope["status"] as? String == "done")
     #expect(envelope["source"] as? String == "codex-desktop")
     #expect(envelope["project"] as? String == "aquarium")
+    #expect(envelope["cwd"] as? String == "/tmp/projects/aquarium")
 
     // desktop approval requests surface as needs_me on the same entry
     let approval = #"{"type":"exec-approval-request","client":"Codex Desktop","thread-id":"019fca6a-be3f-7ee1-a864-fbf884a1692f","cwd":"/tmp/projects/aquarium"}"#
