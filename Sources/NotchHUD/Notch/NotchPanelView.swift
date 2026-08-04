@@ -156,16 +156,16 @@ struct NotchPanelView: View {
         guard session.canFocus else { return }
         feedback[session.id] = nil
 
-        // Clicking a finished session is an acknowledgment: jump AND clear
-        // the card (otherwise done cards linger until the 15min sweep).
-        if session.displayStatus == .done {
-            onSessionDismiss(session.id)
-        }
-
         Task {
             switch await focusDispatcher.focus(session) {
             case .success:
-                break
+                // Clicking a finished session is an acknowledgment: jump AND
+                // clear the card (otherwise done cards linger until the 15min
+                // sweep). Dismiss only after a successful raise so focus
+                // failures keep the row + feedback visible.
+                if session.displayStatus == .done {
+                    onSessionDismiss(session.id)
+                }
             case .failure(.permissionDenied):
                 show(.permissionDenied, for: session.id, duration: .seconds(10))
             case .failure(.notFound), .failure(.scriptFailed):
