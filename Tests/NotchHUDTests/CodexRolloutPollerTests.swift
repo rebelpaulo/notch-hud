@@ -69,6 +69,66 @@ import Testing
 }
 
 @MainActor
+@Test func idleTicksDoNotInflateSeqAndTransitionBumpsOnce() throws {
+    let fixture = try RolloutFixture()
+    defer { fixture.remove() }
+    let rolloutURL = try fixture.writeRollout(originator: "Codex Desktop")
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-10), for: rolloutURL)
+
+    fixture.poller.poll(now: fixture.now)
+    fixture.poller.poll(now: fixture.now)
+    fixture.poller.poll(now: fixture.now)
+    var envelope = try fixture.envelope()
+    #expect(envelope.seq == 1)
+    #expect(envelope.status == .working)
+
+    // working → done: exactly one more write, started preserved
+    let started = envelope.started
+    fixture.poller.poll(now: fixture.now.addingTimeInterval(60))
+    fixture.poller.poll(now: fixture.now.addingTimeInterval(65))
+    envelope = try fixture.envelope()
+    #expect(envelope.seq == 2)
+    #expect(envelope.status == .done)
+    #expect(envelope.started == started)
+}
+
+@MainActor
+@Test func hostileRolloutIDCannotEscapeSpool() throws {
+    let fixture = try RolloutFixture()
+    defer { fixture.remove() }
+    let directoryURL = fixture.sessionsURL
+        .appendingPathComponent("2026/04/04", isDirectory: true)
+    try fixture.fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+    let hostileURL = directoryURL.appendingPathComponent("rollout-2026-04-04T12-00-00-evil.jsonl")
+    let metadata: [String: Any] = [
+        "type": "session_meta",
+        "payload": [
+            "id": "../decoy",
+            "cwd": "/tmp/projects/notch-hud",
+            "originator": "Codex Desktop",
+        ],
+    ]
+    try JSONSerialization.data(withJSONObject: metadata).write(to: hostileURL)
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-10), for: hostileURL)
+    // hostile line has no trailing newline; add one so metadata parses
+    let handle = try FileHandle(forWritingTo: hostileURL)
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data("\n".utf8))
+    try handle.close()
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-10), for: hostileURL)
+
+    let decoyURL = fixture.rootURL.appendingPathComponent("decoy.json")
+    try Data("{}".utf8).write(to: decoyURL)
+
+    fixture.poller.poll(now: fixture.now)
+
+    // nothing may be written outside the spool dir, and the decoy survives
+    #expect(try Data(contentsOf: decoyURL) == Data("{}".utf8))
+    let spoolContents = (try? fixture.fileManager.contentsOfDirectory(atPath: fixture.spoolURL.path)) ?? []
+    #expect(spoolContents.allSatisfy { $0.hasPrefix("codex-app-") || $0.hasPrefix(".codex-app-") })
+}
+
+@MainActor
 @Test func codexDesktopSessionCanFocus() throws {
     let session = Session(
         envelope: SessionEnvelope(
