@@ -92,21 +92,53 @@ if [ "$status" = working ]; then
     exit 0
 fi
 
+# Sessions launched at a workspace root show the workspace folder as project.
+# When a tool touches a path inside a git repo directly under cwd, that repo
+# is the real project — refine it. (The desktop app's session title lives in
+# its IndexedDB and is not reachable from hook payloads.)
+project_from_path() {
+    candidate=$1
+    [ -n "$candidate" ] || return 1
+    case $candidate in
+        "$cwd"/*) ;;
+        *) return 1 ;;
+    esac
+    relative=${candidate#"$cwd"/}
+    segment=${relative%%/*}
+    [ -n "$segment" ] || return 1
+    [ -e "$cwd/$segment/.git" ] || return 1
+    printf '%s\n' "$segment"
+}
+
 if [ "$status" = tool ]; then
     tool_name=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
     tool_line=
 
+    tool_path=
+
     case $tool_name in
         Bash)
-            command=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null | single_line | cut -c 1-48)
+            full_command=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
+            command=$(printf '%s' "$full_command" | single_line | cut -c 1-48)
             tool_line=Bash
             [ -n "$command" ] && tool_line="Bash $command"
+            case $full_command in
+                cd\ *)
+                    target=${full_command#cd }
+                    target=${target%%'&&'*}
+                    target=${target%%';'*}
+                    # trim whitespace and surrounding quotes
+                    target=$(printf '%s' "$target" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/^[\"']//" -e "s/[\"']\$//")
+                    tool_path=$target
+                    ;;
+            esac
             ;;
         Edit|Write|Read|NotebookEdit)
             file_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
             file_name=${file_path##*/}
             tool_line=$tool_name
             [ -n "$file_name" ] && tool_line="$tool_name $file_name"
+            tool_path=$file_path
             ;;
         Grep|Glob)
             pattern=$(printf '%s' "$payload" | jq -r '.tool_input.pattern // empty' 2>/dev/null | single_line | cut -c 1-32)
@@ -122,11 +154,15 @@ if [ "$status" = tool ]; then
             ;;
     esac
 
+    set --
     if [ -n "$tool_line" ]; then
-        emit_status working --tool-line "$tool_line"
-    else
-        emit_status working
+        set -- --tool-line "$tool_line"
     fi
+    repo_project=$(project_from_path "$tool_path")
+    if [ -n "$repo_project" ]; then
+        set -- "$@" --project "$repo_project"
+    fi
+    emit_status working "$@"
     exit 0
 fi
 
