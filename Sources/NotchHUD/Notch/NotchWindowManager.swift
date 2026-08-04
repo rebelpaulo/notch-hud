@@ -121,6 +121,26 @@ final class NotchWindowManager {
         handlePendingTransition(previouslyHadPending: previouslyHadPending)
     }
 
+    private func dismissSession(sessionID: String) {
+        guard !sessionID.isEmpty,
+              !sessionID.contains("/"),
+              sessionID != ".",
+              sessionID != ".."
+        else { return }
+
+        // Only drop the card once the file is really gone — otherwise the
+        // next spool rescan would resurrect it.
+        let fileURL = environment.spoolURL.appendingPathComponent("\(sessionID).json", isDirectory: false)
+        do {
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try FileManager.default.removeItem(at: fileURL)
+            }
+            store.apply(store.sessionsWithoutPendingOverlay.filter { $0.id != sessionID })
+        } catch {
+            NSLog("NotchHUD could not dismiss session %@: %@", sessionID, error.localizedDescription)
+        }
+    }
+
     private func handlePendingTransition(previouslyHadPending: Bool) {
         if pendingStore.hasPending {
             pendingAutoExpandActive = true
@@ -269,6 +289,9 @@ final class NotchWindowManager {
             decisionWriter: decisionWriter,
             onApprovalDismiss: { [weak self] sessionID in
                 self?.approvalDidResolve(sessionID: sessionID)
+            },
+            onSessionDismiss: { [weak self] sessionID in
+                self?.dismissSession(sessionID: sessionID)
             },
             onSizeChange: { [weak self] size in
                 self?.updateRenderedPanelSize(size)

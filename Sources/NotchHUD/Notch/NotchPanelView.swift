@@ -7,6 +7,7 @@ struct NotchPanelView: View {
     let focusDispatcher: FocusDispatcher
     let decisionWriter: ApprovalDecisionWriter
     let onApprovalDismiss: @MainActor (String) -> Void
+    let onSessionDismiss: @MainActor (String) -> Void
     let onSizeChange: @MainActor (CGSize) -> Void
 
     @State private var feedback: [String: SessionRowFeedback] = [:]
@@ -158,7 +159,13 @@ struct NotchPanelView: View {
         Task {
             switch await focusDispatcher.focus(session) {
             case .success:
-                break
+                // Clicking a finished session is an acknowledgment: jump AND
+                // clear the card (otherwise done cards linger until the 15min
+                // sweep). Dismiss only after a successful raise so focus
+                // failures keep the row + feedback visible.
+                if session.displayStatus == .done {
+                    onSessionDismiss(session.id)
+                }
             case .failure(.permissionDenied):
                 show(.permissionDenied, for: session.id, duration: .seconds(10))
             case .failure(.notFound), .failure(.scriptFailed):
