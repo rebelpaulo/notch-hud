@@ -169,6 +169,40 @@ import Testing
     }
 }
 
+@Test func claudeHookRefinesProjectFromGrepPath() throws {
+    let fixture = try HookFixture()
+    defer { fixture.remove() }
+
+    try initialize("grep", cwd: fixture.workspace.path, fixture: fixture)
+    try runHook(
+        "tool",
+        payload: try hookJSON(
+            sessionID: "grep",
+            cwd: fixture.workspace.path,
+            toolName: "Grep",
+            toolInput: ["pattern": "canFocus", "path": fixture.repo.appendingPathComponent("Sources").path]
+        ),
+        home: fixture.home
+    )
+    let envelope = try hookPayload(id: "claude-grep", home: fixture.home)
+    #expect(envelope["project"] as? String == "my-repo")
+
+    // relative search paths resolve against cwd
+    try initialize("grep-rel", cwd: fixture.workspace.path, fixture: fixture)
+    try runHook(
+        "tool",
+        payload: try hookJSON(
+            sessionID: "grep-rel",
+            cwd: fixture.workspace.path,
+            toolName: "Glob",
+            toolInput: ["pattern": "*.swift", "path": "my-repo/Sources"]
+        ),
+        home: fixture.home
+    )
+    let relative = try hookPayload(id: "claude-grep-rel", home: fixture.home)
+    #expect(relative["project"] as? String == "my-repo")
+}
+
 @Test func claudeHookUsesNotebookPathAndHandlesCwdEdges() throws {
     let fixture = try HookFixture()
     defer { fixture.remove() }

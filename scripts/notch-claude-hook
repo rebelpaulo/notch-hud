@@ -199,6 +199,13 @@ if [ "$status" = tool ]; then
             pattern=$(printf '%s' "$payload" | jq -r '.tool_input.pattern // empty' 2>/dev/null | single_line | cut -c 1-32)
             tool_line=$tool_name
             [ -n "$pattern" ] && tool_line="$tool_name $pattern"
+            # searches often carry an explicit path — refine from it too
+            tool_path=$(printf '%s' "$payload" | jq -r '.tool_input.path // empty' 2>/dev/null)
+            case $tool_path in
+                ""|/*) ;;
+                ./*) tool_path=$cwd/${tool_path#./} ;;
+                *) tool_path=$cwd/$tool_path ;;
+            esac
             ;;
         Task|Agent)
             description=$(printf '%s' "$payload" | jq -r '.tool_input.description // "subtask"' 2>/dev/null | single_line)
