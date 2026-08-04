@@ -6,6 +6,7 @@ final class FocusDispatcher {
 
     init(strategies: [any FocusStrategy] = [
         ClaudeDesktopFocusStrategy(),
+        CodexDesktopFocusStrategy(),
         TerminalAppStrategy(),
         ITerm2Strategy(),
         WezTermStrategy(),

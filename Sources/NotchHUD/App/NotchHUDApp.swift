@@ -22,6 +22,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spoolWatcher: SpoolWatcher?
     private var pendingWatcher: PendingWatcher?
     private var stalenessSweeper: StalenessSweeper?
+    private var codexRolloutPoller: CodexRolloutPoller?
     private var windowManager: NotchWindowManager?
     private var statusItem: NSStatusItem?
 
@@ -33,6 +34,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let pendingStore = PendingStore()
         let focusDispatcher = FocusDispatcher()
         let spoolWatcher = SpoolWatcher(spoolURL: environment.spoolURL, store: sessionStore)
+        let codexRolloutPoller = CodexRolloutPoller(spoolURL: environment.spoolURL)
         let stalenessSweeper = StalenessSweeper(
             spoolURL: environment.spoolURL,
             store: sessionStore,
@@ -56,9 +58,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.spoolWatcher = spoolWatcher
         self.pendingWatcher = pendingWatcher
         self.stalenessSweeper = stalenessSweeper
+        self.codexRolloutPoller = codexRolloutPoller
         self.windowManager = windowManager
 
         spoolWatcher.start()
+        codexRolloutPoller.start()
         pendingWatcher.start()
         stalenessSweeper.start()
         windowManager.boot()
@@ -74,6 +78,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         windowManager?.shutdown()
+        codexRolloutPoller?.stop()
         stalenessSweeper?.stop()
         pendingWatcher?.stop()
         spoolWatcher?.stop()

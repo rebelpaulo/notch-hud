@@ -5,6 +5,7 @@ protocol ClaudeDesktopRunningApplication: Sendable {
     func activate() -> Bool
 }
 
+/// Shared application-activation seam for desktop-agent focus strategies.
 protocol ClaudeDesktopWorkspace: Sendable {
     func runningApplications(bundleIdentifier: String) -> [any ClaudeDesktopRunningApplication]
 }

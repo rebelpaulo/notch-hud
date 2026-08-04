@@ -41,7 +41,7 @@ final class StalenessSweeper {
         timer = nil
     }
 
-    private func sweep(now: Date = Date()) {
+    func sweep(now: Date = Date()) {
         var sessions = store.sessionsWithoutPendingOverlay
         var deletedSessionIDs = Set<String>()
         var didChangeStore = false
@@ -55,9 +55,12 @@ final class StalenessSweeper {
                 didChangeStore = true
             }
 
-            let isTtylessAndFinished = sessions[index].terminal?.tty == nil
+            // Immediate removal is for background noise only. First-class
+            // sessions (tty or desktop-app sources — Session.canFocus) keep
+            // their finished state visible until dropSeconds.
+            let isBackgroundAndFinished = !sessions[index].canFocus
                 && (sessions[index].status == .done || sessions[index].status == .unknown)
-            if age > dropSeconds || isTtylessAndFinished {
+            if age > dropSeconds || isBackgroundAndFinished {
                 removeSpoolFile(for: sessions[index].id)
                 deletedSessionIDs.insert(sessions[index].id)
                 didChangeStore = true
