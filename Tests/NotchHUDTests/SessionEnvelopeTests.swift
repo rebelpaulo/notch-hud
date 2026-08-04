@@ -50,3 +50,25 @@ import Testing
     #expect(envelope.toolLine == nil)
     #expect(envelope.model == nil)
 }
+
+@Test func envelopeSourceMapsToSession() throws {
+    let data = Data(
+        """
+        {
+          "schema": 1,
+          "id": "claude-desktop-session",
+          "agent": "claude-code",
+          "status": "working",
+          "updated": "2026-08-04T12:00:00Z",
+          "seq": 1,
+          "source": "claude-desktop"
+        }
+        """.utf8
+    )
+
+    let envelope = try JSONDecoder().decode(SessionEnvelope.self, from: data)
+    let session = try #require(Session(envelope: envelope))
+
+    #expect(envelope.source == "claude-desktop")
+    #expect(session.source == envelope.source)
+}

@@ -3,6 +3,8 @@ import SwiftUI
 struct AgentSprite: View {
     let status: DisplayStatus
     var size: CGFloat = 18
+    /// Identity color (agent), animation stays status-driven. nil = status color.
+    var tint: Color?
 
     private static let frames: [[UInt8]] = [
         [
@@ -46,7 +48,7 @@ struct AgentSprite: View {
                         )
                         graphicsContext.fill(
                             Path(rect),
-                            with: .color(status.color.opacity(opacity))
+                            with: .color((tint ?? status.color).opacity(opacity))
                         )
                     }
                 }

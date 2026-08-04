@@ -5,6 +5,7 @@ final class FocusDispatcher {
     private let strategies: [any FocusStrategy]
 
     init(strategies: [any FocusStrategy] = [
+        ClaudeDesktopFocusStrategy(),
         TerminalAppStrategy(),
         ITerm2Strategy(),
         WezTermStrategy(),
@@ -13,16 +14,18 @@ final class FocusDispatcher {
         self.strategies = strategies
     }
 
+    func strategy(for session: Session) -> (any FocusStrategy)? {
+        strategies.first(where: { $0.canHandle(session) })
+    }
+
     func focus(_ session: Session) async -> Result<Void, FocusError> {
-        guard let identity = session.terminal,
-              let strategy = strategies.first(where: { $0.canHandle(identity) })
-        else {
+        guard let strategy = strategy(for: session) else {
             return .failure(.notFound)
         }
 
         do {
             try await Task.detached {
-                try strategy.focus(identity)
+                try strategy.focus(session)
             }.value
             return .success(())
         } catch let error as FocusError {

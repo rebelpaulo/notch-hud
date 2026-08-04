@@ -17,6 +17,7 @@ task=
 prompt=
 tool_line=
 model=
+source=
 detail_set=0
 project_set=0
 cwd_set=0
@@ -25,6 +26,7 @@ task_set=0
 prompt_set=0
 tool_line_set=0
 model_set=0
+source_set=0
 remove=0
 
 while [ "$#" -gt 0 ]; do
@@ -75,6 +77,12 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -ge 2 ] || exit 0
             model=$2
             model_set=1
+            shift 2
+            ;;
+        --source)
+            [ "$#" -ge 2 ] || exit 0
+            source=$2
+            source_set=1
             shift 2
             ;;
         --remove)
@@ -139,7 +147,30 @@ find_tty() {
     return 0
 }
 
-terminal_tty=$(find_tty)
+# NOTCH_HUD_TTY (set, possibly empty) overrides detection — tests need a
+# deterministic ttyless run; the ppid walk sees the test terminal's tty.
+if [ -n "${NOTCH_HUD_TTY+x}" ]; then
+    terminal_tty=$NOTCH_HUD_TTY
+else
+    terminal_tty=$(find_tty)
+fi
+
+if [ "$source_set" -eq 0 ]; then
+    source=notch-emit
+    if [ -z "$terminal_tty" ]; then
+        case $agent in
+            claude*)
+                # ponytail: user-approved simplification — every ttyless Claude
+                # session is classified as the desktop app (an /Applications/
+                # Claude.app ppid-walk was verified to work but adds ~50 ps
+                # spawns per emit and makes tests environment-dependent; wire
+                # real detection here if headless claude jobs must stay
+                # background).
+                source=claude-desktop
+                ;;
+        esac
+    fi
+fi
 
 updated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
 tmp_file=$spool_dir/$id.json.tmp.$$
@@ -163,6 +194,7 @@ if jq -n \
     --arg prompt "$prompt" \
     --arg tool_line "$tool_line" \
     --arg model "$model" \
+    --arg source "$source" \
     --arg updated "$updated" \
     --arg term_program "${TERM_PROGRAM:-}" \
     --arg tty "$terminal_tty" \
@@ -196,7 +228,7 @@ if jq -n \
             kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
             windowId: (if $window_id == "" then null else $window_id end)
         } | with_entries(select(.value != null)))),
-        source: "notch-emit"
+        source: $source
     }
     + (if $pid_set == 1 then {pid: $pid} else {} end)
     + (if $project_set == 1 then

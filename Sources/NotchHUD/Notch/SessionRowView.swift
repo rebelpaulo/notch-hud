@@ -15,7 +15,7 @@ struct SessionRowView: View {
     @State private var isHovering = false
 
     private var canFocus: Bool {
-        session.terminal?.tty != nil
+        session.canFocus
     }
 
     var body: some View {
@@ -48,7 +48,11 @@ struct SessionRowView: View {
 
     private var cardContent: some View {
         HStack(alignment: .top, spacing: 10) {
-            AgentSprite(status: session.displayStatus, size: 18)
+            AgentSprite(
+                status: session.displayStatus,
+                size: 18,
+                tint: SessionChipStyle.spriteTint(session.agent)
+            )
                 .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -141,7 +145,10 @@ struct SessionRowView: View {
                     chip(SessionChipStyle.modelLabel(model))
                 }
 
-                if let terminal = session.terminal?.termProgram, !terminal.isEmpty {
+                if let source = session.source,
+                   let sourceLabel = SessionChipStyle.sourceLabel(source) {
+                    chip(sourceLabel)
+                } else if let terminal = session.terminal?.termProgram, !terminal.isEmpty {
                     chip(SessionChipStyle.terminalLabel(terminal))
                 }
 

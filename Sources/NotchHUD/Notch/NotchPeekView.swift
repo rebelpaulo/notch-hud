@@ -24,7 +24,11 @@ struct NotchPeekView: View {
         HStack(spacing: 6) {
             HStack(spacing: 2) {
                 ForEach(Array(store.sessions.prefix(3))) { session in
-                    AgentSprite(status: session.displayStatus, size: 12)
+                    AgentSprite(
+                        status: session.displayStatus,
+                        size: 12,
+                        tint: SessionChipStyle.spriteTint(session.agent)
+                    )
                 }
             }
 

@@ -53,8 +53,13 @@ North star = Vibe Island (vibeisland.app, @edwardluox). References: `assets/refe
 - [ ] StalenessSweeper (90s demote, 15min drop) + pid reconciliation; ttyless sessions dimmed
 - [ ] **GATE M4:** real permission prompt pops the card; Allow Once runs the tool; Deny blocks; timeout falls back; kill -9 demotes ≤90s
 
+## SIDE QUEST 2026-08-04 (Cooper request, via agorch): desktop focus + Codex adapter
+- [x] Claude-desktop sessions: ttyless claude* → `source: "claude-desktop"` (notch-emit `--source` flag added); rows clickable with "Desktop" chip; `ClaudeDesktopFocusStrategy` raises via `/usr/bin/open -b` (NSRunningApplication.activate is a silent no-op for background callers under cooperative activation). COOPER CONFIRMED click raises the app. Root-caused: stale tty guard in NotchPanelView → `Session.canFocus` single source of truth.
+- [x] Sprite tinted by agent (Claude orange, Codex blue); status keeps driving animation.
+- [x] Codex adapter shipped early (see M5 bullet 1): `notch-codex-notify` (done/needs_me, chain-execs prior notify, update-only to prevent post-exit ghost race), `codex` PATH shim (working→remove, exit status preserved, recursion-guarded), idempotent installer with timestamped .baks. Installed on this machine; real `codex exec` verified end-to-end, zero ghosts.
+
 ## M5 — Codex adapter + generic poller + usage meters
-- [ ] `notch-codex-notify` chain-exec wrapper (turn-end → done, SkyComputerUseClient preserved)
+- [x] `notch-codex-notify` chain-exec wrapper (turn-end → done, SkyComputerUseClient preserved) — delivered 2026-08-04 in the side quest (plus `codex` shim for the working state)
 - [ ] `ProcessPoller` (agent regex, source-rank protected, skip ttyless workers)
 - [ ] Claude usage meters (5h/7d) in header if a clean local source exists (probe `claude usage` / OAuth)
 - [ ] **GATE M5:** Codex working→done with computer-use intact; non-hooked agent appears/clears; meters real or cleanly absent

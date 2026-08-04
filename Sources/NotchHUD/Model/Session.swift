@@ -14,6 +14,7 @@ struct Session: Identifiable, Sendable {
     let startedAt: Date?
     let seq: Int
     let terminal: TerminalIdentity?
+    let source: String?
 
     init(envelope: SessionEnvelope, updatedAt: Date) {
         id = envelope.id
@@ -29,6 +30,7 @@ struct Session: Identifiable, Sendable {
         startedAt = envelope.started.flatMap(Self.parseISO8601)
         seq = envelope.seq
         terminal = envelope.terminal
+        source = envelope.source
     }
 
     init?(envelope: SessionEnvelope) {
@@ -49,6 +51,11 @@ struct Session: Identifiable, Sendable {
 
     var displayStatus: DisplayStatus {
         status.displayStatus
+    }
+
+    /// Single source of truth for "clicking this row can raise something".
+    var canFocus: Bool {
+        terminal?.tty != nil || source == "claude-desktop"
     }
 
     var elapsed: String {
