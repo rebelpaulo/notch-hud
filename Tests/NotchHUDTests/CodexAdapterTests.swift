@@ -79,6 +79,32 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: scratch.appendingPathComponent("sessions/codex-ghost.json").path))
 }
 
+@Test func codexNotifyCreatesDesktopSessionsFromAppTurnEnd() throws {
+    let scratch = try makeCodexScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    // Codex Desktop client → creation allowed, keyed like the rollout poller
+    let payload = #"{"type":"agent-turn-complete","client":"Codex Desktop","thread-id":"019fca6a-be3f-7ee1-a864-fbf884a1692f","cwd":"/tmp/projects/aquarium"}"#
+    let result = try runCodexScript("notch-codex-notify", arguments: [payload], home: scratch)
+
+    #expect(result.status == 0)
+    let envelope = try codexPayload(id: "codex-app-019fca6a", home: scratch)
+    #expect(envelope["status"] as? String == "done")
+    #expect(envelope["source"] as? String == "codex-desktop")
+    #expect(envelope["project"] as? String == "aquarium")
+
+    // desktop approval requests surface as needs_me on the same entry
+    let approval = #"{"type":"exec-approval-request","client":"Codex Desktop","thread-id":"019fca6a-be3f-7ee1-a864-fbf884a1692f","cwd":"/tmp/projects/aquarium"}"#
+    _ = try runCodexScript("notch-codex-notify", arguments: [approval], home: scratch)
+    let updated = try codexPayload(id: "codex-app-019fca6a", home: scratch)
+    #expect(updated["status"] as? String == "needs_me")
+
+    // exec client without an existing session still refuses creation
+    let execPayload = #"{"type":"agent-turn-complete","client":"codex_exec","thread-id":"deadbeef-0000-0000-0000-000000000000"}"#
+    _ = try runCodexScript("notch-codex-notify", arguments: [execPayload], home: scratch)
+    #expect(!FileManager.default.fileExists(atPath: scratch.appendingPathComponent("sessions/codex-deadbeef-0000-0000-0000-000000000000.json").path))
+}
+
 @Test func codexNotifyChainsSavedCommandWithPayloadAppended() throws {
     let scratch = try makeCodexScratch()
     defer { try? FileManager.default.removeItem(at: scratch) }
