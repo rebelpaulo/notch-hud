@@ -66,7 +66,8 @@ final class KeepAwakeEngine {
         self.notificationPoster = notificationPoster
         self.userDefaults = userDefaults
         self.assertionLease = KeepAwakeAssertionLease(provider: assertionProvider)
-        self.isOnACPower = powerSourceProvider.isOnACPower
+        self.isOnACPower = powerSourceProvider.snapshot().isOnACPower
+        let restoreTime = Date()
 
         if let data = userDefaults.data(forKey: Self.configKey),
            let restoredConfig = try? JSONDecoder().decode(KeepAwakeConfig.self, from: data) {
@@ -82,9 +83,9 @@ final class KeepAwakeEngine {
         }
 
         if isActive {
-            noAgentSince = hasWorkingAgents ? nil : activeSince
+            noAgentSince = hasWorkingAgents ? nil : restoreTime
         }
-        remainingTime = timerRemainingTime(at: Date())
+        remainingTime = timerRemainingTime(at: restoreTime)
         persistConfig()
         reconcileAssertions()
     }
@@ -132,14 +133,15 @@ final class KeepAwakeEngine {
     }
 
     func tick(now: Date = Date()) {
-        isOnACPower = powerSourceProvider.isOnACPower
+        let powerSource = powerSourceProvider.snapshot()
+        isOnACPower = powerSource.isOnACPower
         guard isActive else {
             releaseAssertions()
             return
         }
 
         if !isOnACPower,
-           let percent = powerSourceProvider.percent,
+           let percent = powerSource.percent,
            percent <= max(10, config.batteryFloorPercent) {
             turnOff(notification: "All-Nighter: bateria baixa, a dormir", now: now)
             return
@@ -158,7 +160,7 @@ final class KeepAwakeEngine {
             remainingTime = until.timeIntervalSince(now)
         case .whileAgentsWork:
             if evaluateGrace(triggerIsActive: hasWorkingAgents, now: now) {
-                turnOff(notification: "All-Nighter ended — all agents done", now: now)
+                turnOff(notification: "All-Nighter terminou — todos os agentes concluíram", now: now)
                 return
             }
         case .whileAppsRunning:
@@ -253,6 +255,12 @@ final class KeepAwakeEngine {
                 type: Self.systemSleepAssertionType,
                 reason: Self.assertionReason
             )
+            if assertionLease.systemSleepAssertionID == nil {
+                NSLog(
+                    "NotchHUD não conseguiu criar a asserção de energia '%@'; o Mac poderá adormecer.",
+                    Self.systemSleepAssertionType
+                )
+            }
         }
 
         if config.allowDisplaySleep {
@@ -265,6 +273,12 @@ final class KeepAwakeEngine {
                 type: Self.displaySleepAssertionType,
                 reason: Self.assertionReason
             )
+            if assertionLease.displaySleepAssertionID == nil {
+                NSLog(
+                    "NotchHUD não conseguiu criar a asserção de energia '%@'; o ecrã poderá adormecer.",
+                    Self.displaySleepAssertionType
+                )
+            }
         }
     }
 

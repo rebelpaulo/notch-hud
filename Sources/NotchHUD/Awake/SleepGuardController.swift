@@ -38,20 +38,27 @@ final class SleepGuardController {
         enqueue("off")
     }
 
-    /// Starts the defensive reset without waiting on the main thread. The child
-    /// process remains able to finish while the application tears down.
+    /// Waits for earlier commands, then launches the defensive reset without
+    /// waiting for the child process to exit.
     func resetForTermination() {
         guard FileManager.default.fileExists(atPath: scriptURL.path) else { return }
-        let process = Process()
-        process.executableURL = scriptURL
-        process.arguments = ["off"]
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            NSLog("NotchHUD não conseguiu repor o sleepguard ao terminar: %@", error.localizedDescription)
+        isObserving = false
+        let scriptPath = scriptURL.path
+        commandQueue.sync {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: scriptPath)
+            process.arguments = ["off"]
+            process.standardInput = FileHandle.nullDevice
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            do {
+                try process.run()
+            } catch {
+                NSLog(
+                    "NotchHUD não conseguiu repor o sleepguard ao terminar: %@",
+                    error.localizedDescription
+                )
+            }
         }
     }
 

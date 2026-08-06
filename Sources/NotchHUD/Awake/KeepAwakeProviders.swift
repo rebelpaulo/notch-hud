@@ -39,10 +39,22 @@ struct SystemRunningApplicationsProvider: RunningApplicationsProviding {
 protocol PowerSourceProviding: Sendable {
     var percent: Int? { get }
     var isOnACPower: Bool { get }
+    func snapshot() -> PowerSourceSnapshot
+}
+
+struct PowerSourceSnapshot: Sendable {
+    let percent: Int?
+    let isOnACPower: Bool
+}
+
+extension PowerSourceProviding {
+    func snapshot() -> PowerSourceSnapshot {
+        PowerSourceSnapshot(percent: percent, isOnACPower: isOnACPower)
+    }
 }
 
 struct SystemPowerSourceProvider: PowerSourceProviding {
-    private var description: [String: Any]? {
+    private var batteryDescription: [String: Any]? {
         guard let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef]
         else { return nil }
@@ -58,16 +70,35 @@ struct SystemPowerSourceProvider: PowerSourceProviding {
     }
 
     var percent: Int? {
-        guard let description,
-              let current = description[kIOPSCurrentCapacityKey] as? Int,
-              let maximum = description[kIOPSMaxCapacityKey] as? Int,
-              maximum > 0
-        else { return nil }
-        return Int((Double(current) / Double(maximum) * 100).rounded())
+        snapshot().percent
     }
 
     var isOnACPower: Bool {
-        description?[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue
+        snapshot().isOnACPower
+    }
+
+    func snapshot() -> PowerSourceSnapshot {
+        let description = batteryDescription
+        let percent: Int?
+        if let description,
+           let current = description[kIOPSCurrentCapacityKey] as? Int,
+           let maximum = description[kIOPSMaxCapacityKey] as? Int,
+           maximum > 0 {
+            percent = Int((Double(current) / Double(maximum) * 100).rounded())
+        } else {
+            percent = nil
+        }
+        return PowerSourceSnapshot(
+            percent: percent,
+            isOnACPower: Self.isOnACPower(batteryDescription: description)
+        )
+    }
+
+    static func isOnACPower(batteryDescription: [String: Any]?) -> Bool {
+        guard let batteryDescription else {
+            return true
+        }
+        return batteryDescription[kIOPSPowerSourceStateKey] as? String == kIOPSACPowerValue
     }
 }
 

@@ -28,7 +28,9 @@ import Testing
     fixture.engine.tick(now: start.addingTimeInterval(20))
     #expect(fixture.engine.mode == .off)
     #expect(fixture.assertions.activeIDs.isEmpty)
-    #expect(fixture.notifications.messages == ["All-Nighter ended — all agents done"])
+    #expect(fixture.notifications.messages == [
+        "All-Nighter terminou — todos os agentes concluíram"
+    ])
 }
 
 @MainActor
@@ -118,16 +120,19 @@ import Testing
         userDefaults: defaults
     )
     first?.config.closedLidMode = true
+    first?.config.reminderAfterIdleSeconds = 3_600
     first?.setMode(.manual, now: Date(timeIntervalSince1970: 4_000_000))
     first = nil
     #expect(firstAssertions.createCount == firstAssertions.releaseCount)
 
+    let notifications = FakeNotificationPoster()
+    let beforeRestore = Date()
     let second = KeepAwakeEngine(
         sessionStore: SessionStore(),
         assertionProvider: FakeSleepAssertionProvider(),
         runningApplicationsProvider: FakeRunningApplications(),
         powerSourceProvider: FakePowerSource(),
-        notificationPoster: FakeNotificationPoster(),
+        notificationPoster: notifications,
         userDefaults: defaults
     )
 
@@ -135,6 +140,14 @@ import Testing
     #expect(second.activeSince == Date(timeIntervalSince1970: 4_000_000))
     #expect(second.config.closedLidMode)
     #expect(second.wantsClosedLidAwake)
+    second.tick(now: beforeRestore.addingTimeInterval(3_599))
+    #expect(notifications.messages.isEmpty)
+    second.tick(now: beforeRestore.addingTimeInterval(3_601))
+    #expect(notifications.messages.count == 1)
+}
+
+@Test func missingInternalBatteryIsTreatedAsACPower() {
+    #expect(SystemPowerSourceProvider.isOnACPower(batteryDescription: nil))
 }
 
 @MainActor

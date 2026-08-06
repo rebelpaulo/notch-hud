@@ -64,14 +64,25 @@ final class AwakeBorderWindow {
         withObservationTracking {
             _ = engine.isActive
         } onChange: { [weak self] in
+            // KeepAwakeEngine is main-actor isolated, so its change callback
+            // arrives on the main actor and can safely re-arm synchronously.
+            let didRearm = MainActor.assumeIsolated {
+                guard let self, self.isObserving else { return false }
+                self.observeActivity()
+                return true
+            }
+            guard didRearm else { return }
             Task { @MainActor [weak self] in
                 guard let self, self.isObserving else { return }
-                let active = self.engine.isActive
-                self.updateVisibility(active: active, pulse: active && !self.lastActive)
-                self.lastActive = active
-                self.observeActivity()
+                self.applyCurrentActivity()
             }
         }
+    }
+
+    private func applyCurrentActivity() {
+        let active = engine.isActive
+        updateVisibility(active: active, pulse: active && !lastActive)
+        lastActive = active
     }
 
     private func updateVisibility(active: Bool, pulse: Bool) {

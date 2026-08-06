@@ -171,7 +171,7 @@ struct NotchPanelView: View {
                 )
                 .disabled(!closedLidModeAvailable)
                 if !closedLidModeAvailable {
-                    Text("corre: sudo scripts/install-all-nighter.sh")
+                    Text("No repo notch-hud, corre install-all-nighter.sh com sudo")
                 }
                 Toggle("Desligar ao desbloquear", isOn: configBinding(\.autoOffOnUnlock))
                 if keepAwakeEngine.isActive {
@@ -188,6 +188,7 @@ struct NotchPanelView: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .help("Opções do All-Nighter")
+            .accessibilityLabel("Opções do All-Nighter")
         }
         .font(.system(size: 10, weight: .medium, design: .monospaced))
     }
