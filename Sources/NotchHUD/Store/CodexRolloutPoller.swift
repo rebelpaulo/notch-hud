@@ -6,7 +6,7 @@ final class CodexRolloutPoller {
     private static let sessionIDPrefix = "codex-app-"
     private static let workingAge: TimeInterval = 25
     private static let removalAge: TimeInterval = 15 * 60
-    private static let maximumMetadataBytes = 64 * 1024
+    private static let maximumMetadataBytes = 256 * 1024
 
     private let sessionsRootURL: URL
     private let spoolURL: URL
@@ -47,8 +47,76 @@ final class CodexRolloutPoller {
 
     /// Runs one bounded scan synchronously. Tests call this directly with a fixed date.
     func poll(now: Date = Date()) {
-        for directoryURL in rolloutDirectories(now: now) {
-            poll(directoryURL: directoryURL, now: now)
+        let rollouts = rolloutDirectories(now: now).flatMap(rollouts(in:))
+        var parentRollouts: [String: Rollout] = [:]
+        var activeSubagents: [String: Int] = [:]
+        var subagentContexts: [String: Rollout] = [:]
+
+        for rollout in rollouts {
+            guard rollout.metadata.originator == "Codex Desktop" else { continue }
+
+            if rollout.metadata.threadSource == "subagent" {
+                if let sessionID = sessionID(for: rollout.metadata.id) {
+                    removeSpoolFile(sessionID: sessionID)
+                }
+                guard let parentID = rollout.metadata.parentThreadID,
+                      sessionID(for: parentID) != nil
+                else { continue }
+
+                if (subagentContexts[parentID]?.modificationDate ?? .distantPast)
+                    < rollout.modificationDate {
+                    subagentContexts[parentID] = rollout
+                }
+                guard rollout.age(at: now) < Self.workingAge else { continue }
+                activeSubagents[parentID, default: 0] += 1
+                continue
+            }
+
+            guard sessionID(for: rollout.metadata.id) != nil else { continue }
+            if (parentRollouts[rollout.metadata.id]?.modificationDate ?? .distantPast)
+                < rollout.modificationDate {
+                parentRollouts[rollout.metadata.id] = rollout
+            }
+        }
+
+        for (parentID, rollout) in parentRollouts {
+            guard let sessionID = sessionID(for: parentID) else { continue }
+            let subagentCount = activeSubagents[parentID, default: 0]
+            let age = rollout.age(at: now)
+            if age > Self.removalAge, subagentCount == 0 {
+                removeSpoolFile(sessionID: sessionID)
+                continue
+            }
+
+            let updatedAt = subagentCount > 0
+                ? subagentContexts[parentID]?.modificationDate ?? rollout.modificationDate
+                : rollout.modificationDate
+            writeSpoolFile(
+                sessionID: sessionID,
+                cwd: rollout.metadata.cwd,
+                status: age < Self.workingAge || subagentCount > 0 ? .working : .done,
+                updatedAt: updatedAt,
+                toolLine: Self.subagentToolLine(count: subagentCount)
+            )
+        }
+
+        for (parentID, context) in subagentContexts where parentRollouts[parentID] == nil {
+            guard let sessionID = sessionID(for: parentID),
+                  activeSubagents[parentID, default: 0] > 0 || spoolFileExists(sessionID: sessionID)
+            else { continue }
+
+            let subagentCount = activeSubagents[parentID, default: 0]
+            if context.age(at: now) > Self.removalAge, subagentCount == 0 {
+                removeSpoolFile(sessionID: sessionID)
+                continue
+            }
+            writeSpoolFile(
+                sessionID: sessionID,
+                cwd: context.metadata.cwd,
+                status: subagentCount > 0 ? .working : .done,
+                updatedAt: context.modificationDate,
+                toolLine: Self.subagentToolLine(count: subagentCount)
+            )
         }
     }
 
@@ -66,40 +134,25 @@ final class CodexRolloutPoller {
         }
     }
 
-    private func poll(directoryURL: URL, now: Date) {
+    private func rollouts(in directoryURL: URL) -> [Rollout] {
         guard let fileURLs = try? fileManager.contentsOfDirectory(
             at: directoryURL,
             includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else { return [] }
 
-        for fileURL in fileURLs where fileURL.pathExtension.lowercased() == "jsonl"
-            && fileURL.lastPathComponent.hasPrefix("rollout-") {
-            guard let metadata = metadata(at: fileURL), metadata.originator == "Codex Desktop" else {
-                continue
-            }
-
-            let sessionID = Self.sessionIDPrefix + String(metadata.id.prefix(8))
-            guard sessionID.count > Self.sessionIDPrefix.count,
+        return fileURLs.compactMap { fileURL in
+            guard fileURL.pathExtension.lowercased() == "jsonl",
+                  fileURL.lastPathComponent.hasPrefix("rollout-"),
+                  let metadata = metadata(at: fileURL),
                   let values = try? fileURL.resourceValues(
                     forKeys: [.contentModificationDateKey, .isRegularFileKey]
                   ),
                   values.isRegularFile == true,
                   let modificationDate = values.contentModificationDate
-            else { continue }
+            else { return nil }
 
-            let age = max(0, now.timeIntervalSince(modificationDate))
-            if age > Self.removalAge {
-                removeSpoolFile(sessionID: sessionID)
-                continue
-            }
-
-            writeSpoolFile(
-                sessionID: sessionID,
-                cwd: metadata.cwd,
-                status: age < Self.workingAge ? .working : .done,
-                updatedAt: modificationDate
-            )
+            return Rollout(metadata: metadata, modificationDate: modificationDate)
         }
     }
 
@@ -119,14 +172,26 @@ final class CodexRolloutPoller {
               let originator = payload["originator"] as? String
         else { return nil }
 
-        return RolloutMetadata(id: id, cwd: cwd, originator: originator)
+        return RolloutMetadata(
+            id: id,
+            cwd: cwd,
+            originator: originator,
+            threadSource: payload["thread_source"] as? String,
+            parentThreadID: payload["parent_thread_id"] as? String
+        )
+    }
+
+    private func sessionID(for rolloutID: String) -> String? {
+        guard UUID(uuidString: rolloutID) != nil else { return nil }
+        return Self.sessionIDPrefix + String(rolloutID.prefix(8))
     }
 
     private func writeSpoolFile(
         sessionID: String,
         cwd: String,
         status: SessionStatus,
-        updatedAt: Date
+        updatedAt: Date,
+        toolLine: String? = nil
     ) {
         do {
             try fileManager.createDirectory(
@@ -140,10 +205,12 @@ final class CodexRolloutPoller {
             let updated = Self.iso8601String(from: updatedAt)
             // Idle rollouts produce identical envelopes — skip the rewrite so
             // seq stays meaningful and the spool watcher doesn't churn.
-            if previous.status == status.rawValue, previous.updated == updated {
+            if previous.status == status.rawValue,
+               previous.updated == updated,
+               previous.toolLine == toolLine {
                 return
             }
-            let envelope: [String: Any] = [
+            var envelope: [String: Any] = [
                 "schema": 1,
                 "id": sessionID,
                 "agent": "codex",
@@ -156,6 +223,9 @@ final class CodexRolloutPoller {
                 "terminal": [String: String](),
                 "source": "codex-desktop"
             ]
+            if let toolLine {
+                envelope["toolLine"] = toolLine
+            }
             var data = try JSONSerialization.data(
                 withJSONObject: envelope,
                 options: [.sortedKeys]
@@ -183,18 +253,19 @@ final class CodexRolloutPoller {
     private func existingEnvelope(
         at fileURL: URL,
         sessionID: String
-    ) -> (seq: Int, started: String?, status: String?, updated: String?) {
+    ) -> (seq: Int, started: String?, status: String?, updated: String?, toolLine: String?) {
         guard fileManager.fileExists(atPath: fileURL.path),
               let data = try? Data(contentsOf: fileURL),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               object["id"] as? String == sessionID
-        else { return (0, nil, nil, nil) }
+        else { return (0, nil, nil, nil, nil) }
 
         return (
             object["seq"] as? Int ?? 0,
             object["started"] as? String,
             object["status"] as? String,
-            object["updated"] as? String
+            object["updated"] as? String,
+            object["toolLine"] as? String
         )
     }
 
@@ -204,10 +275,23 @@ final class CodexRolloutPoller {
         try? fileManager.removeItem(at: fileURL)
     }
 
+    private func spoolFileExists(sessionID: String) -> Bool {
+        fileManager.fileExists(
+            atPath: spoolURL.appendingPathComponent("\(sessionID).json").path
+        )
+    }
+
     private static func iso8601String(from date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter.string(from: date)
+    }
+
+    private static func subagentToolLine(count: Int) -> String? {
+        guard count > 0 else { return nil }
+        return count == 1
+            ? "1 subagente a trabalhar"
+            : "\(count) subagentes a trabalhar"
     }
 }
 
@@ -215,4 +299,15 @@ private struct RolloutMetadata {
     let id: String
     let cwd: String
     let originator: String
+    let threadSource: String?
+    let parentThreadID: String?
+}
+
+private struct Rollout {
+    let metadata: RolloutMetadata
+    let modificationDate: Date
+
+    func age(at date: Date) -> TimeInterval {
+        max(0, date.timeIntervalSince(modificationDate))
+    }
 }
