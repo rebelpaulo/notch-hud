@@ -70,7 +70,11 @@ set_invoking_owner() {
     chown "$invoking_user:$invoking_group" "$@" || exit 1
 }
 
-sudoers_temp=$sudoers_dir/.notch-hud.$$
+# Validate OUTSIDE the sudoers dir: nothing — not even a dot-named temp
+# sudoers(5) would skip — lands there before visudo approves it.
+sudoers_staging=$(mktemp -d "${TMPDIR:-/tmp}/notch-hud-sudoers.XXXXXX") || exit 1
+trap 'rm -rf "$sudoers_staging"' EXIT
+sudoers_temp=$sudoers_staging/notch-hud
 umask 077
 {
     printf '%s\n' '# Installed by NotchHUD All-Nighter.'
@@ -87,8 +91,11 @@ if [ -f "$sudoers_target" ] && cmp -s "$sudoers_temp" "$sudoers_target"; then
     chmod 440 "$sudoers_target" || exit 1
 else
     backup_if_present "$sudoers_target"
-    mv "$sudoers_temp" "$sudoers_target" || exit 1
-    chmod 440 "$sudoers_target" || exit 1
+    # cp (not mv): staging is on another filesystem-safe path; content was
+    # visudo-validated above and perms are set before it becomes active.
+    cp "$sudoers_temp" "$sudoers_target.tmp.$$" || exit 1
+    chmod 440 "$sudoers_target.tmp.$$" || exit 1
+    mv "$sudoers_target.tmp.$$" "$sudoers_target" || exit 1
     sudoers_summary=changed
 fi
 

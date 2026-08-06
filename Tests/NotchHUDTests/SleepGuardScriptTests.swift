@@ -1,6 +1,27 @@
 import Foundation
 import Testing
 
+@Test func sleepguardStatusNeverRoutesThroughSudo() throws {
+    // Regression pin for a critical review finding: the sudoers rule only
+    // covers the two disablesleep writes, so a status read via `sudo -n`
+    // always fails and the crash watchdog silently never restores sleep.
+    // The read path must call pmset directly.
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/notch-sleepguard"),
+        encoding: .utf8
+    )
+    let statusBranch = try #require(script.range(of: "status)").map { String(script[$0.lowerBound...]) })
+    #expect(statusBranch.prefix(200).contains("run_pmset_read"))
+    let readFunction = try #require(
+        script.range(of: "run_pmset_read() {").map { String(script[$0.lowerBound...]) }
+    )
+    #expect(!readFunction.prefix(300).contains("sudo"))
+}
+
 @Test func sleepguardOnOffAndStatusUseOverriddenPmset() throws {
     let fixture = try SleepGuardScriptFixture()
     defer { fixture.remove() }
