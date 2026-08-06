@@ -86,6 +86,27 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeRetriesFailedAckOffUntilItLands() async throws {
+    let fixture = try RemoteBridgeFixture(stateOutput: #"{"keep_awake_enabled":false}"#)
+    defer { fixture.remove() }
+    await fixture.runner.setAckFailures(1)
+
+    // obey: remote off → engine off; ack fails → pending
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(fixture.engine.mode == .off)
+
+    // next tick (engine off): retry lands; inactive guard means no re-kill path
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    var ackCalls = await fixture.runner.recordedCalls().filter { $0 == ["--ack-off"] }
+    #expect(ackCalls.count == 2)
+
+    // once cleared, no further ack attempts
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    ackCalls = await fixture.runner.recordedCalls().filter { $0 == ["--ack-off"] }
+    #expect(ackCalls.count == 2)
+}
+
+@MainActor
 @Test func remoteBridgeMakesNoCallsWhileInitiallyInactive() async throws {
     let fixture = try RemoteBridgeFixture(mode: .off, percent: 10, onAC: false)
     defer { fixture.remove() }
@@ -174,13 +195,22 @@ private final class FakeRemotePowerSource: PowerSourceProviding, @unchecked Send
 private actor FakeRemoteCommandRunner: CommandRunning {
     private var calls: [[String]] = []
     private let stateOutput: String
+    private var ackFailuresRemaining = 0
 
     init(stateOutput: String) {
         self.stateOutput = stateOutput
     }
 
+    func setAckFailures(_ count: Int) {
+        ackFailuresRemaining = count
+    }
+
     func run(arguments: [String]) async -> CommandRunResult {
         calls.append(arguments)
+        if arguments == ["--ack-off"], ackFailuresRemaining > 0 {
+            ackFailuresRemaining -= 1
+            return CommandRunResult(stdout: "", exitCode: 22)
+        }
         return CommandRunResult(
             stdout: arguments == ["--state"] ? stateOutput : "{}",
             exitCode: 0
