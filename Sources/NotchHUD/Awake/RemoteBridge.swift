@@ -97,7 +97,9 @@ final class RemoteBridge {
     }
 
     func start() {
-        guard !isStarted, isConfigured else { return }
+        // isConfigured is checked per tick, so pairing created after launch
+        // starts working within one poll cycle — no restart needed.
+        guard !isStarted else { return }
         isStarted = true
         observeChanges()
 
@@ -123,13 +125,22 @@ final class RemoteBridge {
     func checkNow(pollRemoteState: Bool = false) async {
         guard isConfigured else { return }
 
+        // A failed ack-off would leave the remote state false and re-kill the
+        // engine on the next activation; retry until it lands, even while off.
+        if pendingAckOff {
+            let ack = await run(["--ack-off"])
+            if ack.exitCode == 0 {
+                pendingAckOff = false
+            }
+        }
+
         let currentMode = engine.mode
         let wasActive = previousMode != .off
         let allAgentsFinished = currentMode == .off
             && previousMode == .whileAgentsWork
             && engine.lastOffReason == .whileAgentsWorkGrace
 
-        if engine.isActive || wasActive {
+        if engine.isActive {
             await evaluateBattery()
         }
 
@@ -157,6 +168,8 @@ final class RemoteBridge {
             await pollKillSwitch()
         }
     }
+
+    private var pendingAckOff = false
 
     private var isConfigured: Bool {
         FileManager.default.fileExists(atPath: pairingURL.path)
@@ -243,7 +256,8 @@ final class RemoteBridge {
         else { return }
 
         engine.setMode(.off, now: Date())
-        _ = await run(["--ack-off"])
+        let ack = await run(["--ack-off"])
+        pendingAckOff = ack.exitCode != 0
         await push(
             title: "NotchHUD",
             body: "All-Nighter desligado remotamente ✓",

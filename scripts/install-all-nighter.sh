@@ -99,13 +99,16 @@ else
     sudoers_summary=changed
 fi
 
+if install_executable "$script_dir/notch-remote-push" "$install_bin/notch-remote-push"; then
+    bin_summary=changed
+fi
 if install_executable "$script_dir/notch-sleepguard" "$install_bin/notch-sleepguard"; then
     sleepguard_summary=changed
 fi
 if install_executable "$script_dir/notch-sleepguard-watchdog" "$install_bin/notch-sleepguard-watchdog"; then
     watchdog_summary=changed
 fi
-set_invoking_owner "$install_prefix" "$install_bin" "$install_bin/notch-sleepguard" "$install_bin/notch-sleepguard-watchdog"
+set_invoking_owner "$install_prefix" "$install_bin" "$install_bin/notch-sleepguard" "$install_bin/notch-sleepguard-watchdog" "$install_bin/notch-remote-push"
 
 plist_temp=$launchagents_dir/.notch-hud-sleepguard.$$.plist
 {
