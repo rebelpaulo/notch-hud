@@ -2,6 +2,10 @@ import Foundation
 import IOKit.pwr_mgt
 import Observation
 
+enum KeepAwakeOffReason: Equatable, Sendable {
+    case whileAgentsWorkGrace
+}
+
 @Observable
 @MainActor
 final class KeepAwakeEngine {
@@ -31,6 +35,7 @@ final class KeepAwakeEngine {
     private var didPostIdleReminder = false
 
     private(set) var mode: KeepAwakeMode = .off
+    private(set) var lastOffReason: KeepAwakeOffReason?
     private(set) var activeSince: Date?
     private(set) var isOnACPower: Bool
     private(set) var remainingTime: TimeInterval?
@@ -112,8 +117,17 @@ final class KeepAwakeEngine {
     }
 
     func setMode(_ newMode: KeepAwakeMode, now: Date = Date()) {
+        applyMode(newMode, now: now, offReason: nil)
+    }
+
+    private func applyMode(
+        _ newMode: KeepAwakeMode,
+        now: Date,
+        offReason: KeepAwakeOffReason?
+    ) {
         let wasActive = isActive
         let modeChanged = mode != newMode
+        lastOffReason = newMode == .off ? offReason : nil
         mode = newMode
         graceDeadline = nil
         remainingTime = timerRemainingTime(at: now)
@@ -160,7 +174,11 @@ final class KeepAwakeEngine {
             remainingTime = until.timeIntervalSince(now)
         case .whileAgentsWork:
             if evaluateGrace(triggerIsActive: hasWorkingAgents, now: now) {
-                turnOff(notification: "All-Nighter terminou — todos os agentes concluíram", now: now)
+                turnOff(
+                    notification: "All-Nighter terminou — todos os agentes concluíram",
+                    reason: .whileAgentsWorkGrace,
+                    now: now
+                )
                 return
             }
         case .whileAppsRunning:
@@ -222,8 +240,12 @@ final class KeepAwakeEngine {
         didPostIdleReminder = true
     }
 
-    private func turnOff(notification: String?, now: Date) {
-        setMode(.off, now: now)
+    private func turnOff(
+        notification: String?,
+        reason: KeepAwakeOffReason? = nil,
+        now: Date
+    ) {
+        applyMode(.off, now: now, offReason: reason)
         if let notification {
             notificationPoster.post(notification)
         }

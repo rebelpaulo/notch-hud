@@ -40,6 +40,7 @@ plist_target=$launchagents_dir/com.actionable.notchhud.sleepguard.plist
 sudoers_summary=skipped
 sleepguard_summary=skipped
 watchdog_summary=skipped
+remote_push_summary=skipped
 plist_summary=skipped
 launchctl_summary=skipped
 
@@ -99,13 +100,16 @@ else
     sudoers_summary=changed
 fi
 
+if install_executable "$script_dir/notch-remote-push" "$install_bin/notch-remote-push"; then
+    remote_push_summary=changed
+fi
 if install_executable "$script_dir/notch-sleepguard" "$install_bin/notch-sleepguard"; then
     sleepguard_summary=changed
 fi
 if install_executable "$script_dir/notch-sleepguard-watchdog" "$install_bin/notch-sleepguard-watchdog"; then
     watchdog_summary=changed
 fi
-set_invoking_owner "$install_prefix" "$install_bin" "$install_bin/notch-sleepguard" "$install_bin/notch-sleepguard-watchdog"
+set_invoking_owner "$install_prefix" "$install_bin" "$install_bin/notch-sleepguard" "$install_bin/notch-sleepguard-watchdog" "$install_bin/notch-remote-push"
 
 plist_temp=$launchagents_dir/.notch-hud-sleepguard.$$.plist
 {
@@ -142,6 +146,7 @@ printf '%s\n' 'All-Nighter install summary:'
 printf '  sudoers: %s\n' "$sudoers_summary"
 printf '  notch-sleepguard: %s\n' "$sleepguard_summary"
 printf '  watchdog: %s\n' "$watchdog_summary"
+printf '  notch-remote-push: %s\n' "$remote_push_summary"
 printf '  LaunchAgent plist: %s\n' "$plist_summary"
 printf '  launchctl bootstrap: %s\n' "$launchctl_summary"
 

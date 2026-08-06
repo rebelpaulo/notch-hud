@@ -25,6 +25,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var codexRolloutPoller: CodexRolloutPoller?
     private var keepAwakeEngine: KeepAwakeEngine?
     private var sleepGuardController: SleepGuardController?
+    private var remoteBridge: RemoteBridge?
     private var windowManager: NotchWindowManager?
     private var statusItem: NSStatusItem?
 
@@ -48,6 +49,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             notificationPoster: PortugueseKeepAwakeNotificationPoster()
         )
         let sleepGuardController = SleepGuardController(engine: keepAwakeEngine)
+        let remoteBridge = RemoteBridge(engine: keepAwakeEngine, sessionStore: sessionStore)
         let windowManager = NotchWindowManager(
             environment: environment,
             store: sessionStore,
@@ -70,6 +72,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.codexRolloutPoller = codexRolloutPoller
         self.keepAwakeEngine = keepAwakeEngine
         self.sleepGuardController = sleepGuardController
+        self.remoteBridge = remoteBridge
         self.windowManager = windowManager
 
         spoolWatcher.start()
@@ -78,6 +81,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         stalenessSweeper.start()
         keepAwakeEngine.start()
         sleepGuardController.start()
+        remoteBridge.start()
         windowManager.boot()
         installStatusItem()
 
@@ -92,6 +96,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         windowManager?.shutdown()
         sleepGuardController?.resetForTermination()
+        remoteBridge?.stop()
         keepAwakeEngine?.stop()
         codexRolloutPoller?.stop()
         stalenessSweeper?.stop()
