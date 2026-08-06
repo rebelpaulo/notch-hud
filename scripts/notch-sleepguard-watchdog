@@ -1,0 +1,20 @@
+#!/bin/sh
+
+script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd) || exit 1
+sleepguard=$script_dir/notch-sleepguard
+
+if ! "$sleepguard" status >/dev/null 2>&1; then
+    exit 0
+fi
+
+if [ -n "${NOTCH_SLEEPGUARD_PGREP:-}" ]; then
+    "$NOTCH_SLEEPGUARD_PGREP" -f 'NotchHUD.app/Contents/MacOS/NotchHUD' >/dev/null 2>&1
+else
+    /usr/bin/pgrep -f 'NotchHUD.app/Contents/MacOS/NotchHUD' >/dev/null 2>&1
+fi
+
+if [ "$?" -eq 0 ]; then
+    exit 0
+fi
+
+exec "$sleepguard" off

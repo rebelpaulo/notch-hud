@@ -6,6 +6,8 @@ struct NotchPanelView: View {
     let pendingStore: PendingStore
     let focusDispatcher: FocusDispatcher
     let decisionWriter: ApprovalDecisionWriter
+    @Bindable var keepAwakeEngine: KeepAwakeEngine
+    let closedLidModeAvailable: Bool
     let onApprovalDismiss: @MainActor (String) -> Void
     let onSessionDismiss: @MainActor (String) -> Void
     let onSizeChange: @MainActor (CGSize) -> Void
@@ -110,21 +112,145 @@ struct NotchPanelView: View {
     private var header: some View {
         HStack(alignment: .center) {
             HStack(spacing: 4) {
-                summaryPart(store.counts.working, "working", color: DisplayStatus.working.color)
+                summaryPart(store.counts.working, "a trabalhar", color: DisplayStatus.working.color)
                 summarySeparator
-                summaryPart(store.counts.needsMe, "needs you", color: DisplayStatus.needsMe.color)
+                summaryPart(store.counts.needsMe, "precisam de ti", color: DisplayStatus.needsMe.color)
                 summarySeparator
-                summaryPart(store.counts.done, "done", color: DisplayStatus.done.color)
+                summaryPart(store.counts.done, "concluídos", color: DisplayStatus.done.color)
             }
 
             Spacer()
 
+            allNighterControl
+
             Image(systemName: "gearshape")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.5))
-                .accessibilityLabel("Settings")
+                .accessibilityLabel("Definições")
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
+    }
+
+    private var allNighterControl: some View {
+        HStack(spacing: 2) {
+            Button {
+                if keepAwakeEngine.isActive {
+                    keepAwakeEngine.setMode(.off)
+                } else {
+                    keepAwakeEngine.setMode(safeDefaultMode)
+                }
+            } label: {
+                Image(systemName: "bolt.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        keepAwakeEngine.isActive
+                            ? Color(nsColor: .systemRed)
+                            : .white.opacity(0.38)
+                    )
+                    .frame(width: 22, height: 20)
+                    .background(.white.opacity(keepAwakeEngine.isActive ? 0.09 : 0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help(keepAwakeEngine.isActive ? "Desligar All-Nighter" : "Ligar All-Nighter")
+            .accessibilityLabel(keepAwakeEngine.isActive ? "Desligar All-Nighter" : "Ligar All-Nighter")
+
+            Menu {
+                modeButton("Enquanto os agentes trabalham", mode: .whileAgentsWork)
+                modeButton("Enquanto as apps estiverem abertas", mode: .whileAppsRunning)
+                Divider()
+                timerButton("30 min", seconds: 30 * 60)
+                timerButton("1h", seconds: 60 * 60)
+                timerButton("2h", seconds: 2 * 60 * 60)
+                modeButton("Indefinido", mode: .manual)
+                Divider()
+                Toggle("Permitir ecrã dormir", isOn: configBinding(\.allowDisplaySleep))
+                Toggle(
+                    "Manter acordado de tampa fechada",
+                    isOn: configBinding(\.closedLidMode)
+                )
+                .disabled(!closedLidModeAvailable)
+                if !closedLidModeAvailable {
+                    Text("No repo notch-hud, corre install-all-nighter.sh com sudo")
+                }
+                Toggle("Desligar ao desbloquear", isOn: configBinding(\.autoOffOnUnlock))
+                if keepAwakeEngine.isActive {
+                    Divider()
+                    Text(activeFooter)
+                }
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.38))
+                    .frame(width: 14, height: 20)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .help("Opções do All-Nighter")
+            .accessibilityLabel("Opções do All-Nighter")
+        }
+        .font(.system(size: 10, weight: .medium, design: .monospaced))
+    }
+
+    private var safeDefaultMode: KeepAwakeMode {
+        switch keepAwakeEngine.config.defaultMode {
+        case .off, .timer:
+            return .whileAgentsWork
+        case let mode:
+            return mode
+        }
+    }
+
+    private func modeButton(_ title: String, mode: KeepAwakeMode) -> some View {
+        Button {
+            keepAwakeEngine.config.defaultMode = mode
+            keepAwakeEngine.setMode(mode)
+        } label: {
+            if keepAwakeEngine.mode == mode {
+                Label(title, systemImage: "checkmark")
+            } else {
+                Text(title)
+            }
+        }
+    }
+
+    private func timerButton(_ title: String, seconds: TimeInterval) -> some View {
+        Button(title) {
+            keepAwakeEngine.setMode(.timer(until: Date().addingTimeInterval(seconds)))
+        }
+    }
+
+    private func configBinding<Value>(_ keyPath: WritableKeyPath<KeepAwakeConfig, Value>) -> Binding<Value> {
+        Binding(
+            get: { keepAwakeEngine.config[keyPath: keyPath] },
+            set: { keepAwakeEngine.config[keyPath: keyPath] = $0 }
+        )
+    }
+
+    private var activeFooter: String {
+        let elapsed = max(0, Date().timeIntervalSince(keepAwakeEngine.activeSince ?? Date()))
+        var footer = "ativo há \(compactDuration(elapsed)) · modo \(modeName(keepAwakeEngine.mode))"
+        if let remaining = keepAwakeEngine.remainingTime(at: Date()) {
+            footer += " · faltam \(compactDuration(remaining))"
+        }
+        return footer
+    }
+
+    private func modeName(_ mode: KeepAwakeMode) -> String {
+        switch mode {
+        case .off: "desligado"
+        case .manual: "indefinido"
+        case .timer: "temporizador"
+        case .whileAgentsWork: "agentes"
+        case .whileAppsRunning: "apps"
+        }
+    }
+
+    private func compactDuration(_ interval: TimeInterval) -> String {
+        let minutes = max(0, Int(interval / 60))
+        if minutes >= 60 { return "\(minutes / 60)h\(minutes % 60)m" }
+        return "\(minutes)m"
     }
 
     private func summaryPart(_ count: Int, _ label: String, color: Color) -> some View {
@@ -145,7 +271,7 @@ struct NotchPanelView: View {
     private var emptyState: some View {
         HStack(spacing: 8) {
             AgentSprite(status: .idle, size: 18)
-            Text("No active sessions")
+            Text("Sem sessões ativas")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.48))
         }

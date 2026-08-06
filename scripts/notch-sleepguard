@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# Reads need no root — and MUST NOT go through sudo: the installed sudoers
+# rule only covers the two disablesleep writes, so `sudo -n pmset -g` fails
+# and the watchdog would read "not disabled" forever (the exact failure the
+# watchdog exists to prevent).
+run_pmset_read() {
+    if [ -n "${NOTCH_SLEEPGUARD_PMSET:-}" ]; then
+        "$NOTCH_SLEEPGUARD_PMSET" "$@"
+    else
+        /usr/bin/pmset "$@"
+    fi
+}
+
+case ${1:-} in
+    on)
+        if [ -n "${NOTCH_SLEEPGUARD_PMSET:-}" ]; then
+            exec "$NOTCH_SLEEPGUARD_PMSET" -a disablesleep 1
+        fi
+        exec /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 1
+        ;;
+    off)
+        if [ -n "${NOTCH_SLEEPGUARD_PMSET:-}" ]; then
+            exec "$NOTCH_SLEEPGUARD_PMSET" -a disablesleep 0
+        fi
+        exec /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 0
+        ;;
+    status)
+        run_pmset_read -g | awk '$1 == "SleepDisabled" && $2 == "1" { found = 1 } END { exit !found }'
+        ;;
+    *)
+        printf '%s\n' 'usage: notch-sleepguard on|off|status' >&2
+        exit 64
+        ;;
+esac
