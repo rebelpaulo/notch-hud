@@ -165,6 +165,27 @@ import Testing
 }
 
 @MainActor
+@Test func duplicateSubagentRolloutAcrossDayDirsCountsOnce() throws {
+    let fixture = try RolloutFixture()
+    defer { fixture.remove() }
+    let parentURL = try fixture.writeRollout(originator: "Codex Desktop")
+    let sharedID = "aaaabbbb-e89b-12d3-a456-426614174111"
+    let today = try fixture.writeSubagentRollout(
+        parentID: fixture.parentID, name: "researcher", subagentID: sharedID, day: "04"
+    )
+    let yesterday = try fixture.writeSubagentRollout(
+        parentID: fixture.parentID, name: "researcher", subagentID: sharedID, day: "03"
+    )
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-30), for: parentURL)
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-5), for: today)
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-8), for: yesterday)
+
+    fixture.poller.poll(now: fixture.now)
+
+    #expect(try fixture.envelope().toolLine == "1 subagente a trabalhar")
+}
+
+@MainActor
 @Test func veryOldCodexDesktopRolloutRemovesOnlyItsSpoolEntry() throws {
     let fixture = try RolloutFixture()
     defer { fixture.remove() }
@@ -315,15 +336,19 @@ private final class RolloutFixture {
         return fileURL
     }
 
-    func writeSubagentRollout(parentID: String, name: String) throws -> URL {
+    func writeSubagentRollout(
+        parentID: String,
+        name: String,
+        subagentID: String = UUID().uuidString.lowercased(),
+        day: String = "04"
+    ) throws -> URL {
         let directoryURL = sessionsURL
             .appendingPathComponent("2026", isDirectory: true)
             .appendingPathComponent("04", isDirectory: true)
-            .appendingPathComponent("04", isDirectory: true)
+            .appendingPathComponent(day, isDirectory: true)
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-        let subagentID = UUID().uuidString.lowercased()
         let fileURL = directoryURL.appendingPathComponent(
-            "rollout-2026-04-04T12-00-01-\(subagentID).jsonl"
+            "rollout-2026-04-\(day)T12-00-01-\(subagentID).jsonl"
         )
         let metadata: [String: Any] = [
             "type": "session_meta",

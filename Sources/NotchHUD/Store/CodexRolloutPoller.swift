@@ -51,11 +51,16 @@ final class CodexRolloutPoller {
         var parentRollouts: [String: Rollout] = [:]
         var activeSubagents: [String: Int] = [:]
         var subagentContexts: [String: Rollout] = [:]
+        // Dedupe by subagent uuid: a resume can leave one subagent's rollout
+        // in both scanned day-dirs, which must not inflate the count.
+        var countedSubagentIDs = Set<String>()
+        var subagentIDs = Set<String>()
 
         for rollout in rollouts {
             guard rollout.metadata.originator == "Codex Desktop" else { continue }
 
             if rollout.metadata.threadSource == "subagent" {
+                subagentIDs.insert(rollout.metadata.id)
                 if let sessionID = sessionID(for: rollout.metadata.id) {
                     removeSpoolFile(sessionID: sessionID)
                 }
@@ -67,7 +72,9 @@ final class CodexRolloutPoller {
                     < rollout.modificationDate {
                     subagentContexts[parentID] = rollout
                 }
-                guard rollout.age(at: now) < Self.workingAge else { continue }
+                guard rollout.age(at: now) < Self.workingAge,
+                      countedSubagentIDs.insert(rollout.metadata.id).inserted
+                else { continue }
                 activeSubagents[parentID, default: 0] += 1
                 continue
             }
@@ -89,7 +96,10 @@ final class CodexRolloutPoller {
             }
 
             let updatedAt = subagentCount > 0
-                ? subagentContexts[parentID]?.modificationDate ?? rollout.modificationDate
+                ? max(
+                    subagentContexts[parentID]?.modificationDate ?? .distantPast,
+                    rollout.modificationDate
+                )
                 : rollout.modificationDate
             writeSpoolFile(
                 sessionID: sessionID,
@@ -100,7 +110,10 @@ final class CodexRolloutPoller {
             )
         }
 
-        for (parentID, context) in subagentContexts where parentRollouts[parentID] == nil {
+        // Skip parents that are themselves subagents (nesting): their stray
+        // entry was just removed above — recreating it every poll would churn.
+        for (parentID, context) in subagentContexts
+        where parentRollouts[parentID] == nil && !subagentIDs.contains(parentID) {
             guard let sessionID = sessionID(for: parentID),
                   activeSubagents[parentID, default: 0] > 0 || spoolFileExists(sessionID: sessionID)
             else { continue }
