@@ -23,6 +23,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingWatcher: PendingWatcher?
     private var stalenessSweeper: StalenessSweeper?
     private var codexRolloutPoller: CodexRolloutPoller?
+    private var keepAwakeEngine: KeepAwakeEngine?
     private var windowManager: NotchWindowManager?
     private var statusItem: NSStatusItem?
 
@@ -41,6 +42,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             workingStaleSeconds: environment.workingStaleSeconds,
             dropSeconds: environment.dropSeconds
         )
+        let keepAwakeEngine = KeepAwakeEngine(sessionStore: sessionStore)
         let windowManager = NotchWindowManager(
             environment: environment,
             store: sessionStore,
@@ -59,12 +61,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.pendingWatcher = pendingWatcher
         self.stalenessSweeper = stalenessSweeper
         self.codexRolloutPoller = codexRolloutPoller
+        self.keepAwakeEngine = keepAwakeEngine
         self.windowManager = windowManager
 
         spoolWatcher.start()
         codexRolloutPoller.start()
         pendingWatcher.start()
         stalenessSweeper.start()
+        keepAwakeEngine.start()
         windowManager.boot()
         installStatusItem()
 
@@ -78,6 +82,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         windowManager?.shutdown()
+        keepAwakeEngine?.stop()
         codexRolloutPoller?.stop()
         stalenessSweeper?.stop()
         pendingWatcher?.stop()
