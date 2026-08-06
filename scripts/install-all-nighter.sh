@@ -93,9 +93,9 @@ else
     backup_if_present "$sudoers_target"
     # cp (not mv): staging is on another filesystem-safe path; content was
     # visudo-validated above and perms are set before it becomes active.
-    cp "$sudoers_temp" "$sudoers_target.tmp.$$" || exit 1
-    chmod 440 "$sudoers_target.tmp.$$" || exit 1
-    mv "$sudoers_target.tmp.$$" "$sudoers_target" || exit 1
+    cp "$sudoers_temp" "$sudoers_target.tmp.$$" || { rm -f "$sudoers_target.tmp.$$"; exit 1; }
+    chmod 440 "$sudoers_target.tmp.$$" || { rm -f "$sudoers_target.tmp.$$"; exit 1; }
+    mv "$sudoers_target.tmp.$$" "$sudoers_target" || { rm -f "$sudoers_target.tmp.$$"; exit 1; }
     sudoers_summary=changed
 fi
 
