@@ -43,6 +43,24 @@ import Testing
     ) == nil)
 }
 
+@Test func borderGeometryExpandsForStrokeAndLeavesTopOpen() {
+    let notch = CGRect(x: 918, y: 1291, width: 220, height: 38)
+    let border = NotchGeometry.borderRect(from: notch, strokeWidth: 2)
+    #expect(border == CGRect(x: 917, y: 1290, width: 222, height: 40))
+
+    let path = NotchGeometry.borderPath(
+        in: CGRect(origin: .zero, size: border.size),
+        cornerRadius: 10,
+        strokeWidth: 2
+    )
+    #expect(path.boundingBoxOfPath == CGRect(x: 1, y: 1, width: 220, height: 38))
+    var elements: [CGPathElementType] = []
+    path.applyWithBlock { elements.append($0.pointee.type) }
+    #expect(elements == [.moveToPoint, .addLineToPoint, .addQuadCurveToPoint,
+                         .addLineToPoint, .addQuadCurveToPoint, .addLineToPoint])
+    #expect(elements.contains(.closeSubpath) == false)
+}
+
 @Test func hitRectExpandsAroundNotch() {
     let notchRect = CGRect(x: 918, y: 1291, width: 220, height: 38)
 

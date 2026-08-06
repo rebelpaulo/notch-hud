@@ -24,6 +24,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var stalenessSweeper: StalenessSweeper?
     private var codexRolloutPoller: CodexRolloutPoller?
     private var keepAwakeEngine: KeepAwakeEngine?
+    private var sleepGuardController: SleepGuardController?
     private var windowManager: NotchWindowManager?
     private var statusItem: NSStatusItem?
 
@@ -42,12 +43,18 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             workingStaleSeconds: environment.workingStaleSeconds,
             dropSeconds: environment.dropSeconds
         )
-        let keepAwakeEngine = KeepAwakeEngine(sessionStore: sessionStore)
+        let keepAwakeEngine = KeepAwakeEngine(
+            sessionStore: sessionStore,
+            notificationPoster: PortugueseKeepAwakeNotificationPoster()
+        )
+        let sleepGuardController = SleepGuardController(engine: keepAwakeEngine)
         let windowManager = NotchWindowManager(
             environment: environment,
             store: sessionStore,
             pendingStore: pendingStore,
-            focusDispatcher: focusDispatcher
+            focusDispatcher: focusDispatcher,
+            keepAwakeEngine: keepAwakeEngine,
+            sleepGuardController: sleepGuardController
         )
         let pendingWatcher = PendingWatcher(pendingURL: environment.pendingURL) {
             [weak windowManager] approvals in
@@ -62,6 +69,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.stalenessSweeper = stalenessSweeper
         self.codexRolloutPoller = codexRolloutPoller
         self.keepAwakeEngine = keepAwakeEngine
+        self.sleepGuardController = sleepGuardController
         self.windowManager = windowManager
 
         spoolWatcher.start()
@@ -69,6 +77,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         pendingWatcher.start()
         stalenessSweeper.start()
         keepAwakeEngine.start()
+        sleepGuardController.start()
         windowManager.boot()
         installStatusItem()
 
@@ -82,6 +91,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         windowManager?.shutdown()
+        sleepGuardController?.resetForTermination()
         keepAwakeEngine?.stop()
         codexRolloutPoller?.stop()
         stalenessSweeper?.stop()
@@ -109,7 +119,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         let pauseItem = NSMenuItem(
-            title: "Pause approvals",
+            title: "Pausar aprovações",
             action: #selector(togglePauseApprovals(_:)),
             keyEquivalent: ""
         )
@@ -118,7 +128,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(pauseItem)
 
         let collapseItem = NSMenuItem(
-            title: "Collapse panel",
+            title: "Recolher painel",
             action: #selector(collapsePanel(_:)),
             keyEquivalent: ""
         )
@@ -127,7 +137,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit NotchHUD",
+            title: "Sair do NotchHUD",
             action: #selector(quitNotchHUD(_:)),
             keyEquivalent: "q"
         )

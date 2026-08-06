@@ -17,8 +17,11 @@ final class NotchWindowManager {
     private let store: SessionStore
     private let pendingStore: PendingStore
     private let focusDispatcher: FocusDispatcher
+    private let keepAwakeEngine: KeepAwakeEngine
+    private let sleepGuardController: SleepGuardController
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
+    private var awakeBorderWindow: AwakeBorderWindow?
     private var selectedScreen: NSScreen?
     private var notchedHUD: NotchedHUD?
     private var floatingPeek: FloatingPeek?
@@ -38,12 +41,16 @@ final class NotchWindowManager {
         environment: AppEnvironment,
         store: SessionStore,
         pendingStore: PendingStore,
-        focusDispatcher: FocusDispatcher
+        focusDispatcher: FocusDispatcher,
+        keepAwakeEngine: KeepAwakeEngine,
+        sleepGuardController: SleepGuardController
     ) {
         self.environment = environment
         self.store = store
         self.pendingStore = pendingStore
         self.focusDispatcher = focusDispatcher
+        self.keepAwakeEngine = keepAwakeEngine
+        self.sleepGuardController = sleepGuardController
         decisionWriter = ApprovalDecisionWriter(
             decisionsURL: environment.decisionsURL,
             sessionAllowURL: environment.sessionAllowURL
@@ -56,12 +63,15 @@ final class NotchWindowManager {
 
         let hoverController = HoverController(delegate: self)
         self.hoverController = hoverController
+        awakeBorderWindow = AwakeBorderWindow(engine: keepAwakeEngine)
         installInteractionMonitors()
         repinToBuiltInScreen()
     }
 
     func shutdown() {
         hoverController?.suspend()
+        awakeBorderWindow?.shutdown()
+        awakeBorderWindow = nil
         transitionTask?.cancel()
         watchdogTask?.cancel()
         removeInteractionMonitors()
@@ -76,6 +86,7 @@ final class NotchWindowManager {
 
         hoverController?.suspend()
         selectedScreen = screen
+        awakeBorderWindow?.pin(to: screen)
         resetExpansionState(reason: .manual)
         renderedPanelSize = nil
 
@@ -98,6 +109,7 @@ final class NotchWindowManager {
             guard self.transitionGeneration == generation, !self.isExpanded else { return }
             self.installInteractivePanel()
             self.hoverController?.pin(to: screen)
+            self.awakeBorderWindow?.pin(to: screen)
             if self.pendingStore.hasPending {
                 self.pendingAutoExpandActive = true
                 self.expand(reason: .pending)
@@ -282,11 +294,15 @@ final class NotchWindowManager {
         let pendingStore = pendingStore
         let focusDispatcher = focusDispatcher
         let decisionWriter = decisionWriter
+        let keepAwakeEngine = keepAwakeEngine
+        let closedLidModeAvailable = sleepGuardController.isInstalled
         let rootView = NotchPanelView(
             store: store,
             pendingStore: pendingStore,
             focusDispatcher: focusDispatcher,
             decisionWriter: decisionWriter,
+            keepAwakeEngine: keepAwakeEngine,
+            closedLidModeAvailable: closedLidModeAvailable,
             onApprovalDismiss: { [weak self] sessionID in
                 self?.approvalDidResolve(sessionID: sessionID)
             },
