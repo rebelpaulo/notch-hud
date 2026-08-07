@@ -2,14 +2,24 @@ import SwiftUI
 
 struct NotchPeekTrailingView: View {
     let store: SessionStore
+    var onSizeChange: @MainActor (CGSize) -> Void = { _ in }
 
     var body: some View {
-        if store.total > 0 {
-            Text("\(store.total) sessions")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.52))
-                .monospacedDigit()
-                .fixedSize()
+        Group {
+            if store.total > 0 {
+                Text("\(store.total) sessions")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.52))
+                    .monospacedDigit()
+                    .fixedSize()
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { onSizeChange(proxy.size) }
+                    .onChange(of: proxy.size) { _, size in onSizeChange(size) }
+            }
         }
     }
 }

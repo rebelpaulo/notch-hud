@@ -1,6 +1,44 @@
 import CoreGraphics
 
 enum NotchGeometry {
+    /// Bounds of the compact DynamicNotch pill, including the physical cutout.
+    /// Leading/trailing content is top-aligned with the cutout and extends away
+    /// from its corresponding edge. `sideInset` accounts for the compact
+    /// container's padding outside each rendered content view.
+    static func compactPillRect(
+        from notchRect: CGRect,
+        leadingSize: CGSize,
+        trailingSize: CGSize,
+        sideInset: CGFloat
+    ) -> CGRect {
+        var result = notchRect
+
+        // The compact HUD never grows past the notch band, so the reported
+        // content height (which includes SwiftUI's own slack) must not stretch
+        // the border downwards.
+        let height = notchRect.height
+
+        if leadingSize.width > 0, leadingSize.height > 0 {
+            result = result.union(CGRect(
+                x: notchRect.minX - leadingSize.width - sideInset,
+                y: notchRect.maxY - height,
+                width: leadingSize.width + sideInset,
+                height: height
+            ))
+        }
+
+        if trailingSize.width > 0, trailingSize.height > 0 {
+            result = result.union(CGRect(
+                x: notchRect.maxX,
+                y: notchRect.maxY - height,
+                width: trailingSize.width + sideInset,
+                height: height
+            ))
+        }
+
+        return result
+    }
+
     static func borderRect(from notchRect: CGRect, strokeWidth: CGFloat = 2) -> CGRect {
         notchRect.insetBy(dx: -(strokeWidth / 2), dy: -(strokeWidth / 2))
     }

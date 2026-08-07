@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum KeepAwakeMode: Codable, Equatable, Sendable {
     case off
@@ -68,6 +69,48 @@ struct KeepAwakeConfig: Codable, Equatable, Sendable {
                 TimeInterval.self,
                 forKey: .reminderAfterIdleSeconds
             ) ?? 2_400
+        )
+    }
+}
+
+enum KeepAwakeSettingsLogic {
+    static func normalizedWatchedBundleIDs(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.compactMap { value in
+            let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !normalized.isEmpty, seen.insert(normalized).inserted else { return nil }
+            return normalized
+        }
+    }
+
+    static func addingWatchedBundleID(_ value: String, to values: [String]) -> [String] {
+        normalizedWatchedBundleIDs(values + [value])
+    }
+
+    static func removingWatchedBundleID(_ value: String, from values: [String]) -> [String] {
+        let target = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedWatchedBundleIDs(values).filter { $0 != target }
+    }
+
+    static func clampedBatteryFloor(_ percent: Int) -> Int {
+        min(50, max(10, percent))
+    }
+
+    static func graceMinutes(from seconds: TimeInterval) -> Int {
+        min(60, max(0, Int(seconds / 60)))
+    }
+
+    static func graceSeconds(from minutes: Int) -> TimeInterval {
+        TimeInterval(min(60, max(0, minutes)) * 60)
+    }
+}
+
+@MainActor
+extension KeepAwakeEngine {
+    func configBinding<Value>(_ keyPath: WritableKeyPath<KeepAwakeConfig, Value>) -> Binding<Value> {
+        Binding(
+            get: { self.config[keyPath: keyPath] },
+            set: { self.config[keyPath: keyPath] = $0 }
         )
     }
 }

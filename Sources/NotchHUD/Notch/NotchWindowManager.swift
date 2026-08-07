@@ -22,17 +22,24 @@ final class NotchWindowManager {
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
     private var awakeBorderWindow: AwakeBorderWindow?
+    private var shouldersWindow: NotchShouldersWindow?
     private var selectedScreen: NSScreen?
     private var notchedHUD: NotchedHUD?
     private var floatingPeek: FloatingPeek?
     private var interactivePanel: InteractiveNotchPanel?
     private var panelHostingView: NSHostingView<NotchPanelView>?
+    private var settingsWindowController: SettingsWindowController?
     private var transitionTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var globalMouseDownMonitor: Any?
     private var localEventMonitor: Any?
     private var transitionGeneration = 0
     private var renderedPanelSize: CGSize?
+    private var compactLeadingSize = CGSize.zero
+    private var compactTrailingSize = CGSize.zero
+    // Measured against the rendered pill (screenshot pixel analysis): 14 pt
+    // overshot the black shape by ~8 pt per side.
+    private let compactContentSideInset: CGFloat = 6
     private var pendingAutoExpandActive = false
     private(set) var isExpanded = false
     private(set) var expansionReason: ExpansionReason?
@@ -64,6 +71,7 @@ final class NotchWindowManager {
         let hoverController = HoverController(delegate: self)
         self.hoverController = hoverController
         awakeBorderWindow = AwakeBorderWindow(engine: keepAwakeEngine)
+        shouldersWindow = NotchShouldersWindow()
         installInteractionMonitors()
         repinToBuiltInScreen()
     }
@@ -72,10 +80,14 @@ final class NotchWindowManager {
         hoverController?.suspend()
         awakeBorderWindow?.shutdown()
         awakeBorderWindow = nil
+        shouldersWindow?.shutdown()
+        shouldersWindow = nil
         transitionTask?.cancel()
         watchdogTask?.cancel()
         removeInteractionMonitors()
         removeInteractivePanel()
+        settingsWindowController?.closeSettings()
+        settingsWindowController = nil
     }
 
     func repinToBuiltInScreen() {
@@ -86,6 +98,8 @@ final class NotchWindowManager {
 
         hoverController?.suspend()
         selectedScreen = screen
+        compactLeadingSize = .zero
+        compactTrailingSize = .zero
         awakeBorderWindow?.pin(to: screen)
         resetExpansionState(reason: .manual)
         renderedPanelSize = nil
@@ -219,6 +233,7 @@ final class NotchWindowManager {
         watchdogTask?.cancel()
         watchdogTask = nil
         interactivePanel?.orderOut(nil)
+        updateAwakeBorderFrame(animated: true)
 
         transitionGeneration += 1
         let generation = transitionGeneration
@@ -261,8 +276,23 @@ final class NotchWindowManager {
             hoverBehavior: [],
             style: .notch,
             expanded: { EmptyView() },
-            compactLeading: { NotchPeekView(store: store, pendingStore: pendingStore) },
-            compactTrailing: { NotchPeekTrailingView(store: store) }
+            compactLeading: { [weak self] in
+                NotchPeekView(
+                    store: store,
+                    pendingStore: pendingStore,
+                    onSizeChange: { [weak self] size in
+                        self?.updateCompactLeadingSize(size)
+                    }
+                )
+            },
+            compactTrailing: { [weak self] in
+                NotchPeekTrailingView(
+                    store: store,
+                    onSizeChange: { [weak self] size in
+                        self?.updateCompactTrailingSize(size)
+                    }
+                )
+            }
         )
         notch.transitionConfiguration.skipIntermediateHides = true
         notchedHUD = notch
@@ -303,6 +333,9 @@ final class NotchWindowManager {
             decisionWriter: decisionWriter,
             keepAwakeEngine: keepAwakeEngine,
             closedLidModeAvailable: closedLidModeAvailable,
+            onOpenSettings: { [weak self] in
+                self?.openSettings()
+            },
             onApprovalDismiss: { [weak self] sessionID in
                 self?.approvalDidResolve(sessionID: sessionID)
             },
@@ -349,6 +382,94 @@ final class NotchWindowManager {
         }
     }
 
+    private func openSettings() {
+        NSLog("NotchHUD openSettings entered")
+        collapse(reason: .manual)
+        // Let the SwiftUI Button action finish before ordering a new key window;
+        // collapse synchronously orders out the hosting panel that owns the action.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.settingsWindowController == nil {
+                self.settingsWindowController = SettingsWindowController(
+                    keepAwakeEngine: self.keepAwakeEngine,
+                    closedLidModeAvailable: self.sleepGuardController.isInstalled,
+                    spoolURL: self.environment.spoolURL,
+                    workingStaleSeconds: self.environment.workingStaleSeconds,
+                    dropSeconds: self.environment.dropSeconds
+                )
+                NSLog("NotchHUD openSettings created controller")
+            }
+            self.settingsWindowController?.show()
+            if let window = self.settingsWindowController?.window {
+                NSLog(
+                    "NotchHUD openSettings after show visible=%d key=%d frame=%@",
+                    window.isVisible,
+                    window.isKeyWindow,
+                    NSStringFromRect(window.frame)
+                )
+            }
+        }
+    }
+
+    private func updateCompactLeadingSize(_ size: CGSize) {
+        guard compactLeadingSize != size else { return }
+        compactLeadingSize = size
+        updateAwakeBorderFrame(animated: true)
+    }
+
+    private func updateCompactTrailingSize(_ size: CGSize) {
+        guard compactTrailingSize != size else { return }
+        compactTrailingSize = size
+        updateAwakeBorderFrame(animated: true)
+    }
+
+    private func updateAwakeBorderFrame(animated: Bool) {
+        guard let screen = selectedScreen else { return }
+        let notchRect = NotchGeometry.notchRect(
+            auxLeftMaxX: screen.auxiliaryTopLeftArea?.maxX,
+            auxRightMinX: screen.auxiliaryTopRightArea?.minX,
+            frameMaxY: screen.frame.maxY,
+            safeTop: screen.safeAreaInsets.top
+        ) ?? NotchGeometry.fallbackRect(
+            frameMidX: screen.frame.midX,
+            frameMaxY: screen.frame.maxY,
+            visibleMaxY: screen.visibleFrame.maxY,
+            width: 300
+        )
+        let pillRect = NotchGeometry.compactPillRect(
+            from: notchRect,
+            leadingSize: compactLeadingSize,
+            trailingSize: compactTrailingSize,
+            // DynamicNotchKit adds 8 pt beside compact content and another
+            // 6 pt for the compact shape's top-corner inset.
+            sideInset: compactContentSideInset
+        )
+
+        // Expanded: the HUD *is* the panel, so the border has to hug the whole
+        // thing (union keeps the notch band joined to the panel below it),
+        // otherwise it floats around the old pill while the panel is open.
+        let targetRect: CGRect
+        if isExpanded, let panel = interactivePanel, panel.isVisible {
+            targetRect = pillRect.union(panel.frame)
+            // Paint the notch band beside the cutout black so the expanded HUD
+            // reads as one shape instead of a pill floating over the desktop.
+            let band = CGRect(
+                x: targetRect.minX,
+                y: pillRect.minY,
+                width: targetRect.width,
+                height: max(0, targetRect.maxY - pillRect.minY)
+            )
+            // Carve out only the physical cutout (already black hardware).
+            // Carving the whole pill would leave its transparent flanks blue,
+            // because the compact content is hidden while expanded.
+            shouldersWindow?.show(bandRect: band, pillRect: notchRect)
+        } else {
+            targetRect = pillRect
+            shouldersWindow?.hide()
+        }
+        awakeBorderWindow?.updateFrame(targetRect, animated: animated)
+    }
+
     private func showInteractivePanel() {
         guard isExpanded, let panel = interactivePanel else { return }
 
@@ -366,6 +487,7 @@ final class NotchWindowManager {
         }
         positionInteractivePanel()
         panel.makeKeyAndOrderFront(nil)
+        updateAwakeBorderFrame(animated: true)
     }
 
     private func updateRenderedPanelSize(_ size: CGSize) {
@@ -378,6 +500,7 @@ final class NotchWindowManager {
         if isExpanded, interactivePanel?.isVisible != true {
             showInteractivePanel()
         }
+        updateAwakeBorderFrame(animated: true)
     }
 
     private func positionInteractivePanel() {

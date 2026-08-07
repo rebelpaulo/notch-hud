@@ -8,6 +8,7 @@ struct NotchPanelView: View {
     let decisionWriter: ApprovalDecisionWriter
     @Bindable var keepAwakeEngine: KeepAwakeEngine
     let closedLidModeAvailable: Bool
+    let onOpenSettings: @MainActor () -> Void
     let onApprovalDismiss: @MainActor (String) -> Void
     let onSessionDismiss: @MainActor (String) -> Void
     let onSizeChange: @MainActor (CGSize) -> Void
@@ -123,10 +124,16 @@ struct NotchPanelView: View {
 
             allNighterControl
 
-            Image(systemName: "gearshape")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
-                .accessibilityLabel("Definições")
+            Button(action: onOpenSettings) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .frame(width: 22, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Abrir definições")
+            .accessibilityLabel("Definições")
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
@@ -164,16 +171,16 @@ struct NotchPanelView: View {
                 timerButton("2h", seconds: 2 * 60 * 60)
                 modeButton("Indefinido", mode: .manual)
                 Divider()
-                Toggle("Permitir ecrã dormir", isOn: configBinding(\.allowDisplaySleep))
+                Toggle("Permitir ecrã dormir", isOn: keepAwakeEngine.configBinding(\.allowDisplaySleep))
                 Toggle(
                     "Manter acordado de tampa fechada",
-                    isOn: configBinding(\.closedLidMode)
+                    isOn: keepAwakeEngine.configBinding(\.closedLidMode)
                 )
                 .disabled(!closedLidModeAvailable)
                 if !closedLidModeAvailable {
                     Text("No repo notch-hud, corre install-all-nighter.sh com sudo")
                 }
-                Toggle("Desligar ao desbloquear", isOn: configBinding(\.autoOffOnUnlock))
+                Toggle("Desligar ao desbloquear", isOn: keepAwakeEngine.configBinding(\.autoOffOnUnlock))
                 if keepAwakeEngine.isActive {
                     Divider()
                     Text(activeFooter)
@@ -219,13 +226,6 @@ struct NotchPanelView: View {
         Button(title) {
             keepAwakeEngine.setMode(.timer(until: Date().addingTimeInterval(seconds)))
         }
-    }
-
-    private func configBinding<Value>(_ keyPath: WritableKeyPath<KeepAwakeConfig, Value>) -> Binding<Value> {
-        Binding(
-            get: { keepAwakeEngine.config[keyPath: keyPath] },
-            set: { keepAwakeEngine.config[keyPath: keyPath] = $0 }
-        )
     }
 
     private var activeFooter: String {
