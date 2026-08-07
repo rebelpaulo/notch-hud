@@ -27,6 +27,7 @@ final class NotchWindowManager {
     private var floatingPeek: FloatingPeek?
     private var interactivePanel: InteractiveNotchPanel?
     private var panelHostingView: NSHostingView<NotchPanelView>?
+    private var settingsWindowController: SettingsWindowController?
     private var transitionTask: Task<Void, Never>?
     private var watchdogTask: Task<Void, Never>?
     private var globalMouseDownMonitor: Any?
@@ -76,6 +77,8 @@ final class NotchWindowManager {
         watchdogTask?.cancel()
         removeInteractionMonitors()
         removeInteractivePanel()
+        settingsWindowController?.window?.orderOut(nil)
+        settingsWindowController = nil
     }
 
     func repinToBuiltInScreen() {
@@ -303,6 +306,9 @@ final class NotchWindowManager {
             decisionWriter: decisionWriter,
             keepAwakeEngine: keepAwakeEngine,
             closedLidModeAvailable: closedLidModeAvailable,
+            onOpenSettings: { [weak self] in
+                self?.openSettings()
+            },
             onApprovalDismiss: { [weak self] sessionID in
                 self?.approvalDidResolve(sessionID: sessionID)
             },
@@ -347,6 +353,20 @@ final class NotchWindowManager {
         if fittingSize.width > 0, fittingSize.height > 0 {
             updateRenderedPanelSize(fittingSize)
         }
+    }
+
+    private func openSettings() {
+        collapse(reason: .manual)
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController(
+                keepAwakeEngine: keepAwakeEngine,
+                closedLidModeAvailable: sleepGuardController.isInstalled,
+                spoolURL: environment.spoolURL,
+                workingStaleSeconds: environment.workingStaleSeconds,
+                dropSeconds: environment.dropSeconds
+            )
+        }
+        settingsWindowController?.show()
     }
 
     private func showInteractivePanel() {
