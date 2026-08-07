@@ -410,6 +410,8 @@ struct SettingsView: View {
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+    private var previousActivationPolicy: NSApplication.ActivationPolicy?
+
     init(
         keepAwakeEngine: KeepAwakeEngine,
         closedLidModeAvailable: Bool,
@@ -449,14 +451,42 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func show() {
         guard let window else { return }
+        if previousActivationPolicy == nil {
+            previousActivationPolicy = NSApp.activationPolicy()
+        }
+        let policyChanged = NSApp.activationPolicy() == .regular
+            || NSApp.setActivationPolicy(.regular)
         window.center()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+        window.makeKey()
+        NSLog(
+            "NotchHUD Settings show policyRegular=%d visible=%d key=%d frame=%@",
+            policyChanged,
+            window.isVisible,
+            window.isKeyWindow,
+            NSStringFromRect(window.frame)
+        )
+    }
+
+    func closeSettings() {
+        window?.orderOut(nil)
+        restoreActivationPolicy()
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         sender.orderOut(nil)
+        restoreActivationPolicy()
         return false
+    }
+
+    private func restoreActivationPolicy() {
+        guard let previousActivationPolicy else { return }
+        self.previousActivationPolicy = nil
+        if NSApp.activationPolicy() != previousActivationPolicy {
+            NSApp.setActivationPolicy(previousActivationPolicy)
+        }
     }
 }
 

@@ -4,6 +4,7 @@ import SwiftUI
 struct NotchPeekView: View {
     let store: SessionStore
     let pendingStore: PendingStore
+    var onSizeChange: @MainActor (CGSize) -> Void = { _ in }
 
     var body: some View {
         Group {
@@ -16,6 +17,13 @@ struct NotchPeekView: View {
             }
         }
         .fixedSize()
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { onSizeChange(proxy.size) }
+                    .onChange(of: proxy.size) { _, size in onSizeChange(size) }
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(accessibilitySummary))
     }

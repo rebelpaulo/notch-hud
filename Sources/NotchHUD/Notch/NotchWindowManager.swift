@@ -34,6 +34,9 @@ final class NotchWindowManager {
     private var localEventMonitor: Any?
     private var transitionGeneration = 0
     private var renderedPanelSize: CGSize?
+    private var compactLeadingSize = CGSize.zero
+    private var compactTrailingSize = CGSize.zero
+    private let compactContentSideInset: CGFloat = 14
     private var pendingAutoExpandActive = false
     private(set) var isExpanded = false
     private(set) var expansionReason: ExpansionReason?
@@ -77,7 +80,7 @@ final class NotchWindowManager {
         watchdogTask?.cancel()
         removeInteractionMonitors()
         removeInteractivePanel()
-        settingsWindowController?.window?.orderOut(nil)
+        settingsWindowController?.closeSettings()
         settingsWindowController = nil
     }
 
@@ -89,6 +92,8 @@ final class NotchWindowManager {
 
         hoverController?.suspend()
         selectedScreen = screen
+        compactLeadingSize = .zero
+        compactTrailingSize = .zero
         awakeBorderWindow?.pin(to: screen)
         resetExpansionState(reason: .manual)
         renderedPanelSize = nil
@@ -264,8 +269,23 @@ final class NotchWindowManager {
             hoverBehavior: [],
             style: .notch,
             expanded: { EmptyView() },
-            compactLeading: { NotchPeekView(store: store, pendingStore: pendingStore) },
-            compactTrailing: { NotchPeekTrailingView(store: store) }
+            compactLeading: { [weak self] in
+                NotchPeekView(
+                    store: store,
+                    pendingStore: pendingStore,
+                    onSizeChange: { [weak self] size in
+                        self?.updateCompactLeadingSize(size)
+                    }
+                )
+            },
+            compactTrailing: { [weak self] in
+                NotchPeekTrailingView(
+                    store: store,
+                    onSizeChange: { [weak self] size in
+                        self?.updateCompactTrailingSize(size)
+                    }
+                )
+            }
         )
         notch.transitionConfiguration.skipIntermediateHides = true
         notchedHUD = notch
@@ -356,17 +376,68 @@ final class NotchWindowManager {
     }
 
     private func openSettings() {
+        NSLog("NotchHUD openSettings entered")
         collapse(reason: .manual)
-        if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(
-                keepAwakeEngine: keepAwakeEngine,
-                closedLidModeAvailable: sleepGuardController.isInstalled,
-                spoolURL: environment.spoolURL,
-                workingStaleSeconds: environment.workingStaleSeconds,
-                dropSeconds: environment.dropSeconds
-            )
+        // Let the SwiftUI Button action finish before ordering a new key window;
+        // collapse synchronously orders out the hosting panel that owns the action.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            if self.settingsWindowController == nil {
+                self.settingsWindowController = SettingsWindowController(
+                    keepAwakeEngine: self.keepAwakeEngine,
+                    closedLidModeAvailable: self.sleepGuardController.isInstalled,
+                    spoolURL: self.environment.spoolURL,
+                    workingStaleSeconds: self.environment.workingStaleSeconds,
+                    dropSeconds: self.environment.dropSeconds
+                )
+                NSLog("NotchHUD openSettings created controller")
+            }
+            self.settingsWindowController?.show()
+            if let window = self.settingsWindowController?.window {
+                NSLog(
+                    "NotchHUD openSettings after show visible=%d key=%d frame=%@",
+                    window.isVisible,
+                    window.isKeyWindow,
+                    NSStringFromRect(window.frame)
+                )
+            }
         }
-        settingsWindowController?.show()
+    }
+
+    private func updateCompactLeadingSize(_ size: CGSize) {
+        guard compactLeadingSize != size else { return }
+        compactLeadingSize = size
+        updateAwakeBorderFrame(animated: true)
+    }
+
+    private func updateCompactTrailingSize(_ size: CGSize) {
+        guard compactTrailingSize != size else { return }
+        compactTrailingSize = size
+        updateAwakeBorderFrame(animated: true)
+    }
+
+    private func updateAwakeBorderFrame(animated: Bool) {
+        guard let screen = selectedScreen else { return }
+        let notchRect = NotchGeometry.notchRect(
+            auxLeftMaxX: screen.auxiliaryTopLeftArea?.maxX,
+            auxRightMinX: screen.auxiliaryTopRightArea?.minX,
+            frameMaxY: screen.frame.maxY,
+            safeTop: screen.safeAreaInsets.top
+        ) ?? NotchGeometry.fallbackRect(
+            frameMidX: screen.frame.midX,
+            frameMaxY: screen.frame.maxY,
+            visibleMaxY: screen.visibleFrame.maxY,
+            width: 300
+        )
+        let pillRect = NotchGeometry.compactPillRect(
+            from: notchRect,
+            leadingSize: compactLeadingSize,
+            trailingSize: compactTrailingSize,
+            // DynamicNotchKit adds 8 pt beside compact content and another
+            // 6 pt for the compact shape's top-corner inset.
+            sideInset: compactContentSideInset
+        )
+        awakeBorderWindow?.updateFrame(pillRect, animated: animated)
     }
 
     private func showInteractivePanel() {

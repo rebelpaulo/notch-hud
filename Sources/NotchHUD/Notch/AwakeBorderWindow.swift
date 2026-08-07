@@ -28,6 +28,7 @@ final class AwakeBorderWindow {
         panel.ignoresMouseEvents = true
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        borderView.autoresizingMask = [.width, .height]
         lastActive = engine.isActive
         updateVisibility(active: lastActive, pulse: false)
         observeActivity()
@@ -45,11 +46,25 @@ final class AwakeBorderWindow {
             visibleMaxY: screen.visibleFrame.maxY,
             width: 300
         )
-        let frame = NotchGeometry.borderRect(from: notchRect)
-        panel.setFrame(frame, display: panel.isVisible)
-        borderView.frame = NSRect(origin: .zero, size: frame.size)
+        updateFrame(notchRect, animated: false)
+    }
+
+    func updateFrame(_ contentRect: CGRect, animated: Bool) {
+        let frame = NotchGeometry.borderRect(from: contentRect)
         borderView.needsDisplay = true
-        updateVisibility(active: engine.isActive, pulse: false)
+
+        guard animated, panel.isVisible, panel.frame != frame else {
+            panel.setFrame(frame, display: panel.isVisible)
+            borderView.frame = NSRect(origin: .zero, size: frame.size)
+            updateVisibility(active: engine.isActive, pulse: false)
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.18
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(frame, display: true)
+        }
     }
 
     func shutdown() {
@@ -114,6 +129,11 @@ final class AwakeBorderWindow {
 
 private final class AwakeBorderView: NSView {
     override var isFlipped: Bool { false }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsDisplay = true
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)

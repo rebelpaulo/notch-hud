@@ -61,6 +61,45 @@ import Testing
     #expect(elements.contains(.closeSubpath) == false)
 }
 
+@Test func compactPillRectUnionsRenderedLeadingAndTrailingExtents() {
+    let notch = CGRect(x: 918, y: 1291, width: 220, height: 38)
+
+    let pill = NotchGeometry.compactPillRect(
+        from: notch,
+        leadingSize: CGSize(width: 92, height: 24),
+        trailingSize: CGSize(width: 76, height: 18),
+        sideInset: 14
+    )
+
+    #expect(pill == CGRect(x: 812, y: 1291, width: 416, height: 38))
+    #expect(NotchGeometry.borderRect(from: pill) == CGRect(x: 811, y: 1290, width: 418, height: 40))
+}
+
+@Test func compactPillRectFallsBackToPhysicalNotchAtRest() {
+    let notch = CGRect(x: 918, y: 1291, width: 220, height: 38)
+
+    #expect(NotchGeometry.compactPillRect(
+        from: notch,
+        leadingSize: .zero,
+        trailingSize: .zero,
+        sideInset: 14
+    ) == notch)
+}
+
+@Test func compactPillRectExtendsDownForTallerRenderedContent() {
+    let notch = CGRect(x: 918, y: 1291, width: 220, height: 38)
+
+    let pill = NotchGeometry.compactPillRect(
+        from: notch,
+        leadingSize: CGSize(width: 80, height: 46),
+        trailingSize: .zero,
+        sideInset: 14
+    )
+
+    #expect(pill == CGRect(x: 824, y: 1283, width: 314, height: 46))
+    #expect(pill.maxY == notch.maxY)
+}
+
 @Test func hitRectExpandsAroundNotch() {
     let notchRect = CGRect(x: 918, y: 1291, width: 220, height: 38)
 
