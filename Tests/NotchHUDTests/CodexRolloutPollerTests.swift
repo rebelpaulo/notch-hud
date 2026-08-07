@@ -186,6 +186,24 @@ import Testing
 }
 
 @MainActor
+@Test func malformedSubagentIDNeverCounts() throws {
+    let fixture = try RolloutFixture()
+    defer { fixture.remove() }
+    let parentURL = try fixture.writeRollout(originator: "Codex Desktop")
+    let junkURL = try fixture.writeSubagentRollout(
+        parentID: fixture.parentID, name: "junk", subagentID: "not-a-uuid"
+    )
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-30), for: parentURL)
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-5), for: junkURL)
+
+    fixture.poller.poll(now: fixture.now)
+
+    let envelope = try fixture.envelope()
+    #expect(envelope.status == .done)
+    #expect(envelope.toolLine == nil)
+}
+
+@MainActor
 @Test func veryOldCodexDesktopRolloutRemovesOnlyItsSpoolEntry() throws {
     let fixture = try RolloutFixture()
     defer { fixture.remove() }

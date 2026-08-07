@@ -60,10 +60,11 @@ final class CodexRolloutPoller {
             guard rollout.metadata.originator == "Codex Desktop" else { continue }
 
             if rollout.metadata.threadSource == "subagent" {
+                // Malformed ids must not enter counting/dedupe (parent path
+                // validates via sessionID; mirror it here).
+                guard let straySessionID = sessionID(for: rollout.metadata.id) else { continue }
                 subagentIDs.insert(rollout.metadata.id)
-                if let sessionID = sessionID(for: rollout.metadata.id) {
-                    removeSpoolFile(sessionID: sessionID)
-                }
+                removeSpoolFile(sessionID: straySessionID)
                 guard let parentID = rollout.metadata.parentThreadID,
                       sessionID(for: parentID) != nil
                 else { continue }
