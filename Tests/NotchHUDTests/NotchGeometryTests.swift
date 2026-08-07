@@ -86,7 +86,9 @@ import Testing
     ) == notch)
 }
 
-@Test func compactPillRectExtendsDownForTallerRenderedContent() {
+@Test func compactPillRectKeepsBandHeightForTallerRenderedContent() {
+    // SwiftUI reports slack taller than the band; the pill never grows past
+    // it, so the border must not hang below the rendered black shape.
     let notch = CGRect(x: 918, y: 1291, width: 220, height: 38)
 
     let pill = NotchGeometry.compactPillRect(
@@ -96,8 +98,9 @@ import Testing
         sideInset: 14
     )
 
-    #expect(pill == CGRect(x: 824, y: 1283, width: 314, height: 46))
+    #expect(pill == CGRect(x: 824, y: 1291, width: 314, height: 38))
     #expect(pill.maxY == notch.maxY)
+    #expect(pill.height == notch.height)
 }
 
 @Test func hitRectExpandsAroundNotch() {

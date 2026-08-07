@@ -37,7 +37,9 @@ final class NotchWindowManager {
     private var renderedPanelSize: CGSize?
     private var compactLeadingSize = CGSize.zero
     private var compactTrailingSize = CGSize.zero
-    private let compactContentSideInset: CGFloat = 14
+    // Measured against the rendered pill (screenshot pixel analysis): 14 pt
+    // overshot the black shape by ~8 pt per side.
+    private let compactContentSideInset: CGFloat = 6
     private var pendingAutoExpandActive = false
     private(set) var isExpanded = false
     private(set) var expansionReason: ExpansionReason?

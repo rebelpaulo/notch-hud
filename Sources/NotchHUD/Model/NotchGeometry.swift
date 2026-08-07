@@ -13,8 +13,12 @@ enum NotchGeometry {
     ) -> CGRect {
         var result = notchRect
 
+        // The compact HUD never grows past the notch band, so the reported
+        // content height (which includes SwiftUI's own slack) must not stretch
+        // the border downwards.
+        let height = notchRect.height
+
         if leadingSize.width > 0, leadingSize.height > 0 {
-            let height = max(notchRect.height, leadingSize.height)
             result = result.union(CGRect(
                 x: notchRect.minX - leadingSize.width - sideInset,
                 y: notchRect.maxY - height,
@@ -24,7 +28,6 @@ enum NotchGeometry {
         }
 
         if trailingSize.width > 0, trailingSize.height > 0 {
-            let height = max(notchRect.height, trailingSize.height)
             result = result.union(CGRect(
                 x: notchRect.maxX,
                 y: notchRect.maxY - height,
