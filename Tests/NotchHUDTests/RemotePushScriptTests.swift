@@ -56,9 +56,53 @@ import Testing
     #expect(arguments.element(after: "--data") == #"{"keep_awake_enabled":true}"#)
 }
 
+@Test func remotePushSettingsGetPassesResponseThrough() throws {
+    let fixture = try RemotePushScriptFixture(configured: true)
+    defer { fixture.remove() }
+    fixture.response = #"{"keep_awake_enabled":true,"settings":{"batteryFloorPercent":30},"settings_rev":4}"#
+
+    let result = try fixture.run("--settings-get")
+
+    #expect(result.status == 0)
+    #expect(result.output == fixture.response)
+    let arguments = try fixture.arguments()
+    #expect(arguments.contains("https://remote.example/api/state"))
+    #expect(!arguments.contains("POST"))
+}
+
+@Test func remotePushSettingsPutPostsStdinBodyToSettingsEndpoint() throws {
+    let fixture = try RemotePushScriptFixture(configured: true)
+    defer { fixture.remove() }
+    let body = #"{"settings":{"batteryFloorPercent":30},"base_rev":2}"#
+
+    let result = try fixture.run("--settings-put", stdin: body)
+
+    #expect(result.status == 0)
+    let arguments = try fixture.arguments()
+    #expect(arguments.contains("POST"))
+    #expect(arguments.contains("https://remote.example/api/settings"))
+    #expect(arguments.contains("Content-Type: application/json"))
+    #expect(arguments.contains("--data-binary"))
+    #expect(try fixture.stdinReceivedByCurl() == body)
+}
+
+@Test func remotePushSettingsGetAndPutMissingPairingFileExitZeroSilently() throws {
+    let fixture = try RemotePushScriptFixture(configured: false)
+    defer { fixture.remove() }
+
+    let getResult = try fixture.run("--settings-get")
+    #expect(getResult.status == 0)
+    #expect(getResult.output.isEmpty)
+
+    let putResult = try fixture.run("--settings-put", stdin: "{}")
+    #expect(putResult.status == 0)
+    #expect(putResult.output.isEmpty)
+}
+
 private final class RemotePushScriptFixture {
     let scratch: URL
     let logURL: URL
+    let stdinLogURL: URL
     private let fakeCurl: URL
     private let script: URL
     var response = "{}"
@@ -72,6 +116,7 @@ private final class RemotePushScriptFixture {
         scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("remote-push-tests-\(UUID().uuidString)", isDirectory: true)
         logURL = scratch.appendingPathComponent("curl-arguments.json")
+        stdinLogURL = scratch.appendingPathComponent("curl-stdin.txt")
         fakeCurl = scratch.appendingPathComponent("fake-curl")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 
@@ -89,6 +134,7 @@ private final class RemotePushScriptFixture {
         try """
         #!/bin/sh
         jq -cn --args '$ARGS.positional' -- "$@" > "$FAKE_CURL_LOG"
+        cat > "$FAKE_CURL_STDIN_LOG"
         printf '%s' "$FAKE_CURL_RESPONSE"
         """.write(to: fakeCurl, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
@@ -101,7 +147,7 @@ private final class RemotePushScriptFixture {
         try? FileManager.default.removeItem(at: scratch)
     }
 
-    func run(_ arguments: String...) throws -> (status: Int32, output: String) {
+    func run(_ arguments: String..., stdin: String? = nil) throws -> (status: Int32, output: String) {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [script.path] + arguments
@@ -109,13 +155,19 @@ private final class RemotePushScriptFixture {
         environment["HOME"] = scratch.path
         environment["NOTCH_REMOTE_CURL"] = fakeCurl.path
         environment["FAKE_CURL_LOG"] = logURL.path
+        environment["FAKE_CURL_STDIN_LOG"] = stdinLogURL.path
         environment["FAKE_CURL_RESPONSE"] = response
         process.environment = environment
-        process.standardInput = FileHandle.nullDevice
+        let input = Pipe()
+        process.standardInput = stdin == nil ? FileHandle.nullDevice : input
         let output = Pipe()
         process.standardOutput = output
         process.standardError = output
         try process.run()
+        if let stdin {
+            input.fileHandleForWriting.write(Data(stdin.utf8))
+            try? input.fileHandleForWriting.close()
+        }
         process.waitUntilExit()
         let data = output.fileHandleForReading.readDataToEndOfFile()
         return (process.terminationStatus, String(decoding: data, as: UTF8.self))
@@ -124,6 +176,10 @@ private final class RemotePushScriptFixture {
     func arguments() throws -> [String] {
         let data = try Data(contentsOf: logURL)
         return try #require(JSONSerialization.jsonObject(with: data) as? [String])
+    }
+
+    func stdinReceivedByCurl() throws -> String {
+        String(decoding: try Data(contentsOf: stdinLogURL), as: UTF8.self)
     }
 }
 

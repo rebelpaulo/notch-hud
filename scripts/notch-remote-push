@@ -30,13 +30,28 @@ case ${1:-} in
             -H 'Content-Type: application/json' \
             --data '{"keep_awake_enabled":true}'
         ;;
+    --settings-get)
+        [ "$#" -eq 1 ] || exit 64
+        curl_common \
+            "$url/api/state" \
+            -H "Authorization: Bearer $secret"
+        ;;
+    --settings-put)
+        [ "$#" -eq 1 ] || exit 64
+        curl_common \
+            -X POST \
+            "$url/api/settings" \
+            -H "Authorization: Bearer $secret" \
+            -H 'Content-Type: application/json' \
+            --data-binary @-
+        ;;
     --*)
-        printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off' >&2
+        printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off | --settings-get | --settings-put' >&2
         exit 64
         ;;
     *)
         [ "$#" -eq 2 ] || [ "$#" -eq 3 ] || {
-            printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off' >&2
+            printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off | --settings-get | --settings-put' >&2
             exit 64
         }
         if [ "$#" -eq 3 ]; then

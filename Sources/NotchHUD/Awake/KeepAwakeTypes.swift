@@ -103,6 +103,35 @@ enum KeepAwakeSettingsLogic {
     static func graceSeconds(from minutes: Int) -> TimeInterval {
         TimeInterval(min(60, max(0, minutes)) * 60)
     }
+
+    static func reminderHours(from seconds: TimeInterval) -> Double {
+        min(12, max(0, seconds / 3_600))
+    }
+
+    static func reminderSeconds(from hours: Double) -> TimeInterval {
+        TimeInterval(min(12, max(0, hours)) * 3_600)
+    }
+
+    /// The remote API's three settable default-mode strings. `.off` and
+    /// `.timer` are transient run states, never a stored default — they fall
+    /// back to "whileAgentsWork", matching `KeepAwakeConfig.init` and
+    /// `SettingsView.safeDefaultMode`.
+    static func remoteDefaultModeString(_ mode: KeepAwakeMode) -> String {
+        switch mode {
+        case .whileAppsRunning: "whileAppsRunning"
+        case .manual: "manual"
+        default: "whileAgentsWork"
+        }
+    }
+
+    static func defaultMode(fromRemote value: String) -> KeepAwakeMode? {
+        switch value {
+        case "whileAgentsWork": .whileAgentsWork
+        case "whileAppsRunning": .whileAppsRunning
+        case "manual": .manual
+        default: nil
+        }
+    }
 }
 
 @MainActor

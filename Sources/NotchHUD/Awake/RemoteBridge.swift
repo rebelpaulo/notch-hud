@@ -7,7 +7,13 @@ struct CommandRunResult: Sendable {
 }
 
 protocol CommandRunning: Sendable {
-    func run(arguments: [String]) async -> CommandRunResult
+    func run(arguments: [String], stdin: String?) async -> CommandRunResult
+}
+
+extension CommandRunning {
+    func run(arguments: [String]) async -> CommandRunResult {
+        await run(arguments: arguments, stdin: nil)
+    }
 }
 
 struct RemoteScriptCommandRunner: CommandRunning {
@@ -20,18 +26,26 @@ struct RemoteScriptCommandRunner: CommandRunning {
         )
     }
 
-    func run(arguments: [String]) async -> CommandRunResult {
+    func run(arguments: [String], stdin: String? = nil) async -> CommandRunResult {
         await Task.detached(priority: .utility) {
             let process = Process()
             let output = Pipe()
+            let input = Pipe()
             process.executableURL = scriptURL
             process.arguments = arguments
-            process.standardInput = FileHandle.nullDevice
+            process.standardInput = stdin == nil ? FileHandle.nullDevice : input
             process.standardOutput = output
             process.standardError = FileHandle.nullDevice
 
             do {
                 try process.run()
+                // ponytail: writes the whole (small, <1KB settings JSON) body
+                // before draining stdout; fine at this payload size, would
+                // need concurrent read/write pumps if stdin ever got large.
+                if let stdin {
+                    input.fileHandleForWriting.write(Data(stdin.utf8))
+                    try? input.fileHandleForWriting.close()
+                }
                 process.waitUntilExit()
                 let data = output.fileHandleForReading.readDataToEndOfFile()
                 return CommandRunResult(
@@ -52,6 +66,7 @@ protocol RemoteKeepAwakeEngine: AnyObject {
     var isOnACPower: Bool { get }
     var mode: KeepAwakeMode { get }
     var lastOffReason: KeepAwakeOffReason? { get }
+    var config: KeepAwakeConfig { get set }
     func setMode(_ newMode: KeepAwakeMode, now: Date)
 }
 
@@ -67,12 +82,14 @@ extension SessionStore: RemoteSessionStoring {}
 @MainActor
 final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
+    private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
 
     private let engine: any RemoteKeepAwakeEngine
     private let sessionStore: any RemoteSessionStoring
     private let commandRunner: any CommandRunning
     private let powerSourceProvider: any PowerSourceProviding
     private let pairingURL: URL
+    private let userDefaults: UserDefaults
 
     private var timer: Timer?
     private var isStarted = false
@@ -80,20 +97,32 @@ final class RemoteBridge {
     private var previousBatteryPercent: Int?
     private var sentBatteryThresholds = Set<Int>()
     private var needsMeSessionIDs = Set<String>()
+    // The config snapshot we last know to be in sync with the remote —
+    // either just applied from a newer remote rev, or just pushed up.
+    // Diverging from it locally is what triggers a --settings-put.
+    private var lastSyncedSettingsSnapshot: RemoteSettingsSnapshot
+
+    private var lastAppliedSettingsRev: Int {
+        get { userDefaults.integer(forKey: Self.lastAppliedSettingsRevKey) }
+        set { userDefaults.set(newValue, forKey: Self.lastAppliedSettingsRevKey) }
+    }
 
     init(
         engine: any RemoteKeepAwakeEngine,
         sessionStore: any RemoteSessionStoring,
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
-        homeURL: URL = FileManager.default.homeDirectoryForCurrentUser
+        homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
+        userDefaults: UserDefaults = .standard
     ) {
         self.engine = engine
         self.sessionStore = sessionStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
         self.powerSourceProvider = powerSourceProvider
+        self.userDefaults = userDefaults
         pairingURL = homeURL.appendingPathComponent(".notch-hud/remote.json", isDirectory: false)
         previousMode = engine.mode
+        lastSyncedSettingsSnapshot = RemoteSettingsSnapshot(engine.config)
     }
 
     func start() {
@@ -160,12 +189,19 @@ final class RemoteBridge {
                 sentBatteryThresholds.removeAll()
             }
             needsMeSessionIDs.removeAll()
+            // Settings must sync even while All-Nighter is off — the phone is
+            // for configuring it *before* the next session, not only during.
+            // (Pushes/kill-switch stay active-only, as before.)
+            if pollRemoteState {
+                await reconcileSettings()
+            }
             return
         }
 
         await evaluateNeedsMeSessions()
         if pollRemoteState {
             await pollKillSwitch()
+            await reconcileSettings()
         }
     }
 
@@ -273,9 +309,68 @@ final class RemoteBridge {
         _ = await run(arguments)
     }
 
+    // Remote rev wins on conflict: a newer remote rev always overwrites the
+    // local config and re-baselines the sync snapshot, so the same tick
+    // never also pushes local values back up for that rev. Only once the
+    // rev is caught up do local edits get a chance to push.
+    private func reconcileSettings() async {
+        let result = await run(["--settings-get"])
+        guard result.exitCode == 0,
+              let data = result.stdout.data(using: .utf8),
+              let remote = try? JSONDecoder().decode(RemoteStateWithSettings.self, from: data)
+        else { return }
+
+        let remoteRev = remote.settingsRev ?? 0
+        if remoteRev > lastAppliedSettingsRev {
+            if let settings = remote.settings {
+                applyRemoteSettings(settings)
+            }
+            lastAppliedSettingsRev = remoteRev
+            lastSyncedSettingsSnapshot = RemoteSettingsSnapshot(engine.config)
+            return
+        }
+
+        let currentSnapshot = RemoteSettingsSnapshot(engine.config)
+        guard currentSnapshot != lastSyncedSettingsSnapshot else { return }
+
+        guard let body = try? JSONSerialization.data(withJSONObject: ["settings": currentSnapshot.remoteJSONObject]),
+              let stdin = String(data: body, encoding: .utf8)
+        else { return }
+
+        let pushResult = await run(["--settings-put"], stdin: stdin)
+        if pushResult.exitCode == 0 {
+            // Next poll's --settings-get will see the bumped rev and re-apply
+            // these same values as if they were a remote change — harmless,
+            // since applying them is a no-op once the snapshot already
+            // matches. That one-cycle-lag keeps this side simple.
+            lastSyncedSettingsSnapshot = currentSnapshot
+        }
+    }
+
+    private func applyRemoteSettings(_ settings: RemoteSettingsPayload) {
+        var config = engine.config
+        if let modeString = settings.defaultMode,
+           let mode = KeepAwakeSettingsLogic.defaultMode(fromRemote: modeString) {
+            config.defaultMode = mode
+        }
+        if let value = settings.allowDisplaySleep { config.allowDisplaySleep = value }
+        if let value = settings.closedLidMode { config.closedLidMode = value }
+        if let value = settings.autoOffOnUnlock { config.autoOffOnUnlock = value }
+        if let value = settings.batteryFloorPercent {
+            config.batteryFloorPercent = KeepAwakeSettingsLogic.clampedBatteryFloor(value)
+        }
+        if let value = settings.graceMinutes {
+            config.graceSeconds = KeepAwakeSettingsLogic.graceSeconds(from: value)
+        }
+        if let value = settings.reminderHours {
+            config.reminderAfterIdleSeconds = KeepAwakeSettingsLogic.reminderSeconds(from: value)
+        }
+        engine.config = config
+    }
+
     @discardableResult
-    private func run(_ arguments: [String]) async -> CommandRunResult {
-        let result = await commandRunner.run(arguments: arguments)
+    private func run(_ arguments: [String], stdin: String? = nil) async -> CommandRunResult {
+        let result = await commandRunner.run(arguments: arguments, stdin: stdin)
         if result.exitCode != 0 {
             NSLog(
                 "NotchHUD notch-remote-push %@ terminou com estado %d",
@@ -284,5 +379,60 @@ final class RemoteBridge {
             )
         }
         return result
+    }
+}
+
+/// The seven remote-managed fields of `KeepAwakeConfig`, mapped to the wire
+/// format used by /api/state and /api/settings. Equatable so RemoteBridge
+/// can detect local drift with a plain `!=` against the last-synced value.
+private struct RemoteSettingsSnapshot: Equatable {
+    var defaultMode: String
+    var allowDisplaySleep: Bool
+    var closedLidMode: Bool
+    var autoOffOnUnlock: Bool
+    var batteryFloorPercent: Int
+    var graceMinutes: Int
+    var reminderHours: Double
+
+    init(_ config: KeepAwakeConfig) {
+        defaultMode = KeepAwakeSettingsLogic.remoteDefaultModeString(config.defaultMode)
+        allowDisplaySleep = config.allowDisplaySleep
+        closedLidMode = config.closedLidMode
+        autoOffOnUnlock = config.autoOffOnUnlock
+        batteryFloorPercent = config.batteryFloorPercent
+        graceMinutes = KeepAwakeSettingsLogic.graceMinutes(from: config.graceSeconds)
+        reminderHours = KeepAwakeSettingsLogic.reminderHours(from: config.reminderAfterIdleSeconds)
+    }
+
+    var remoteJSONObject: [String: Any] {
+        [
+            "defaultMode": defaultMode,
+            "allowDisplaySleep": allowDisplaySleep,
+            "closedLidMode": closedLidMode,
+            "autoOffOnUnlock": autoOffOnUnlock,
+            "batteryFloorPercent": batteryFloorPercent,
+            "graceMinutes": graceMinutes,
+            "reminderHours": reminderHours,
+        ]
+    }
+}
+
+private struct RemoteSettingsPayload: Decodable {
+    var defaultMode: String?
+    var allowDisplaySleep: Bool?
+    var closedLidMode: Bool?
+    var autoOffOnUnlock: Bool?
+    var batteryFloorPercent: Int?
+    var graceMinutes: Int?
+    var reminderHours: Double?
+}
+
+private struct RemoteStateWithSettings: Decodable {
+    let settings: RemoteSettingsPayload?
+    let settingsRev: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case settings
+        case settingsRev = "settings_rev"
     }
 }
