@@ -22,6 +22,7 @@ final class NotchWindowManager {
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
     private var awakeBorderWindow: AwakeBorderWindow?
+    private var shouldersWindow: NotchShouldersWindow?
     private var selectedScreen: NSScreen?
     private var notchedHUD: NotchedHUD?
     private var floatingPeek: FloatingPeek?
@@ -68,6 +69,7 @@ final class NotchWindowManager {
         let hoverController = HoverController(delegate: self)
         self.hoverController = hoverController
         awakeBorderWindow = AwakeBorderWindow(engine: keepAwakeEngine)
+        shouldersWindow = NotchShouldersWindow()
         installInteractionMonitors()
         repinToBuiltInScreen()
     }
@@ -76,6 +78,8 @@ final class NotchWindowManager {
         hoverController?.suspend()
         awakeBorderWindow?.shutdown()
         awakeBorderWindow = nil
+        shouldersWindow?.shutdown()
+        shouldersWindow = nil
         transitionTask?.cancel()
         watchdogTask?.cancel()
         removeInteractionMonitors()
@@ -227,6 +231,7 @@ final class NotchWindowManager {
         watchdogTask?.cancel()
         watchdogTask = nil
         interactivePanel?.orderOut(nil)
+        updateAwakeBorderFrame(animated: true)
 
         transitionGeneration += 1
         let generation = transitionGeneration
@@ -437,7 +442,30 @@ final class NotchWindowManager {
             // 6 pt for the compact shape's top-corner inset.
             sideInset: compactContentSideInset
         )
-        awakeBorderWindow?.updateFrame(pillRect, animated: animated)
+
+        // Expanded: the HUD *is* the panel, so the border has to hug the whole
+        // thing (union keeps the notch band joined to the panel below it),
+        // otherwise it floats around the old pill while the panel is open.
+        let targetRect: CGRect
+        if isExpanded, let panel = interactivePanel, panel.isVisible {
+            targetRect = pillRect.union(panel.frame)
+            // Paint the notch band beside the cutout black so the expanded HUD
+            // reads as one shape instead of a pill floating over the desktop.
+            let band = CGRect(
+                x: targetRect.minX,
+                y: pillRect.minY,
+                width: targetRect.width,
+                height: max(0, targetRect.maxY - pillRect.minY)
+            )
+            // Carve out only the physical cutout (already black hardware).
+            // Carving the whole pill would leave its transparent flanks blue,
+            // because the compact content is hidden while expanded.
+            shouldersWindow?.show(bandRect: band, pillRect: notchRect)
+        } else {
+            targetRect = pillRect
+            shouldersWindow?.hide()
+        }
+        awakeBorderWindow?.updateFrame(targetRect, animated: animated)
     }
 
     private func showInteractivePanel() {
@@ -457,6 +485,7 @@ final class NotchWindowManager {
         }
         positionInteractivePanel()
         panel.makeKeyAndOrderFront(nil)
+        updateAwakeBorderFrame(animated: true)
     }
 
     private func updateRenderedPanelSize(_ size: CGSize) {
@@ -469,6 +498,7 @@ final class NotchWindowManager {
         if isExpanded, interactivePanel?.isVisible != true {
             showInteractivePanel()
         }
+        updateAwakeBorderFrame(animated: true)
     }
 
     private func positionInteractivePanel() {
