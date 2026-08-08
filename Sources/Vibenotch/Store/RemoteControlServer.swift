@@ -9,7 +9,13 @@ struct RemoteControlServer: Sendable {
     /// Matched on the argument pair rather than the word "claude" alone: the
     /// machine is full of processes whose command line mentions claude, and
     /// matching those would report the server as running when it is not.
-    static let processPattern = "claude remote-control"
+    ///
+    /// The character class is the old `ps | grep "[c]laude"` trick, and it
+    /// earns its keep here: the pattern no longer matches a command line that
+    /// merely *contains* the pattern — a script or a person grepping for the
+    /// server would otherwise be reported as the server, and a stop request
+    /// would go and kill their grep.
+    static let processPattern = "claude[ ]remote-control"
 
     var runProcess: @Sendable (_ launchPath: String, _ arguments: [String]) -> Int32 = { launchPath, arguments in
         let process = Process()
