@@ -188,6 +188,39 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeNeverWritesTheToggleWhenPublishingTheBattery() async throws {
+    // The Mac reads the flag, then reports its charge. If that report carried
+    // the flag, a toggle made on the phone inside that window would be
+    // overwritten with the value read before it — the phone's request lost
+    // rather than obeyed.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 55, onAC: false)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.lastStatePutBody())
+    #expect(body.contains("\"percent\":55"))
+    #expect(!body.contains("keep_awake_enabled"))
+}
+
+@MainActor
+@Test func remoteBridgeRepublishesTheBatteryAfterRepairing() async throws {
+    // Re-pairing points at a phone that has never seen a reading. At 100% on
+    // AC the value can sit unchanged for hours, so without clearing the cache
+    // the new phone shows no battery at all.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 100, onAC: true)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.recordedCalls().filter { $0 == ["--state-put"] }.count == 1)
+
+    try fixture.repair(url: "https://other.example")
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.recordedCalls().filter { $0 == ["--state-put"] }.count == 2)
+}
+
+@MainActor
 @Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReading() async throws {
     let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
     defer { fixture.remove() }

@@ -366,16 +366,12 @@ final class RemoteBridge {
         let reading = PublishedBattery(percent: percent, isOnACPower: snapshot.isOnACPower)
         guard reading != lastPublishedBattery else { return }
 
-        // Carries the on/off state too: /api/state takes them together, and
-        // sending the value we already agree on keeps this from looking like a
-        // toggle to the reconcile on the other side.
-        let body = """
-        {"keep_awake_enabled":\(engine.isActive),\
-        "battery":{"percent":\(percent),"on_ac":\(snapshot.isOnACPower)}}
-        """
+        // Battery ONLY. Sending the on/off flag alongside would write back a
+        // value read before the poll, so a toggle made on the phone in that
+        // window would be silently overwritten instead of obeyed.
+        let body = #"{"battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}}"#
         if await run(["--state-put"], stdin: body).exitCode == 0 {
             lastPublishedBattery = reading
-            lastSyncedActive = engine.isActive
         }
     }
 
@@ -405,6 +401,11 @@ final class RemoteBridge {
 
         userDefaults.set(url, forKey: Self.pairedRemoteURLKey)
         lastAppliedSettingsRev = 0
+        // Everything cached about the old remote is now wrong. Without this a
+        // newly paired phone shows no charge until the percentage happens to
+        // move — and at 100% on AC that can be hours.
+        lastPublishedBattery = nil
+        lastSyncedActive = nil
     }
 
     private func reconcileSettings(_ remote: RemoteStateWithSettings) async {
