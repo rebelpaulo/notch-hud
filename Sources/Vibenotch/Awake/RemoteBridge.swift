@@ -207,6 +207,16 @@ final class RemoteBridge {
         }
     }
 
+    // The last battery reading published, so the Mac stops re-sending a number
+    // the phone already has. A percent change or a plug/unplug is worth a
+    // write; ten identical readings a minute are not.
+    private var lastPublishedBattery: PublishedBattery?
+
+    private struct PublishedBattery: Equatable {
+        let percent: Int
+        let isOnACPower: Bool
+    }
+
     // nil until the first successful reconcile; then the on/off value both
     // sides last agreed on, so a local toggle can be told apart from a stale
     // remote flag.
@@ -298,6 +308,7 @@ final class RemoteBridge {
             await reconcileDesiredState(desired)
         }
         await reconcileSettings(remote)
+        await publishBatteryIfChanged()
     }
 
     private func reconcileDesiredState(_ desired: Bool) async {
@@ -343,6 +354,28 @@ final class RemoteBridge {
         let result = await run(["--state-put"], stdin: body)
         if result.exitCode == 0 {
             lastSyncedActive = enabled
+        }
+    }
+
+    /// The phone warns about the battery but could never show it. Published on
+    /// change only — the state endpoint is a write, and an unchanged percentage
+    /// is not news.
+    private func publishBatteryIfChanged() async {
+        let snapshot = powerSourceProvider.snapshot()
+        guard let percent = snapshot.percent else { return }
+        let reading = PublishedBattery(percent: percent, isOnACPower: snapshot.isOnACPower)
+        guard reading != lastPublishedBattery else { return }
+
+        // Carries the on/off state too: /api/state takes them together, and
+        // sending the value we already agree on keeps this from looking like a
+        // toggle to the reconcile on the other side.
+        let body = """
+        {"keep_awake_enabled":\(engine.isActive),\
+        "battery":{"percent":\(percent),"on_ac":\(snapshot.isOnACPower)}}
+        """
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedBattery = reading
+            lastSyncedActive = engine.isActive
         }
     }
 

@@ -153,10 +153,48 @@ import Testing
 
     await fixture.bridge.checkNow(pollRemoteState: true)
 
-    // No battery/needs-me pushes while off, but state and settings reconcile
-    // so the phone can both configure and start the next session.
+    // No battery/needs-me *notifications* while off, but state and settings
+    // reconcile so the phone can both configure and start the next session —
+    // and the charge is published so the phone can show it.
     let calls = await fixture.runner.recordedCalls()
-    #expect(calls == [["--state"]])
+    #expect(calls == [["--state"], ["--state-put"]])
+    let body = try #require(await fixture.runner.lastStatePutBody())
+    #expect(body.contains("\"percent\":10"))
+    #expect(body.contains("\"on_ac\":false"))
+}
+
+@MainActor
+@Test func remoteBridgePublishesTheBatteryOnceUntilItChanges() async throws {
+    // /api/state is a write. Ten identical readings a minute is not news, and
+    // the phone already has the number.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: false)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterUnchanged = await fixture.runner.recordedCalls()
+        .filter { $0 == ["--state-put"] }
+        .count
+    #expect(afterUnchanged == 1)
+
+    fixture.power.percent = 79
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let afterChange = await fixture.runner.recordedCalls()
+        .filter { $0 == ["--state-put"] }
+        .count
+    #expect(afterChange == 2)
+    #expect(try #require(await fixture.runner.lastStatePutBody()).contains("\"percent\":79"))
+}
+
+@MainActor
+@Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReading() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.recordedCalls() == [["--state"]])
 }
 
 @MainActor
@@ -281,7 +319,7 @@ private final class RemoteBridgeFixture {
 
     init(
         mode: KeepAwakeMode = .manual,
-        percent: Int? = 100,
+        percent: Int? = nil,
         onAC: Bool = true,
         stateOutput: String = #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#,
         config: KeepAwakeConfig = KeepAwakeConfig()
