@@ -207,6 +207,16 @@ final class RemoteBridge {
         }
     }
 
+    // The last battery reading published, so the Mac stops re-sending a number
+    // the phone already has. A percent change or a plug/unplug is worth a
+    // write; ten identical readings a minute are not.
+    private var lastPublishedBattery: PublishedBattery?
+
+    private struct PublishedBattery: Equatable {
+        let percent: Int
+        let isOnACPower: Bool
+    }
+
     // nil until the first successful reconcile; then the on/off value both
     // sides last agreed on, so a local toggle can be told apart from a stale
     // remote flag.
@@ -298,6 +308,7 @@ final class RemoteBridge {
             await reconcileDesiredState(desired)
         }
         await reconcileSettings(remote)
+        await publishBatteryIfChanged()
     }
 
     private func reconcileDesiredState(_ desired: Bool) async {
@@ -346,6 +357,24 @@ final class RemoteBridge {
         }
     }
 
+    /// The phone warns about the battery but could never show it. Published on
+    /// change only — the state endpoint is a write, and an unchanged percentage
+    /// is not news.
+    private func publishBatteryIfChanged() async {
+        let snapshot = powerSourceProvider.snapshot()
+        guard let percent = snapshot.percent else { return }
+        let reading = PublishedBattery(percent: percent, isOnACPower: snapshot.isOnACPower)
+        guard reading != lastPublishedBattery else { return }
+
+        // Battery ONLY. Sending the on/off flag alongside would write back a
+        // value read before the poll, so a toggle made on the phone in that
+        // window would be silently overwritten instead of obeyed.
+        let body = #"{"battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}}"#
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedBattery = reading
+        }
+    }
+
     private func push(title: String, body: String, tag: String? = nil) async {
         var arguments = [title, body]
         if let tag {
@@ -372,6 +401,11 @@ final class RemoteBridge {
 
         userDefaults.set(url, forKey: Self.pairedRemoteURLKey)
         lastAppliedSettingsRev = 0
+        // Everything cached about the old remote is now wrong. Without this a
+        // newly paired phone shows no charge until the percentage happens to
+        // move — and at 100% on AC that can be hours.
+        lastPublishedBattery = nil
+        lastSyncedActive = nil
     }
 
     private func reconcileSettings(_ remote: RemoteStateWithSettings) async {
