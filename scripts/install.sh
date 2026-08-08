@@ -234,6 +234,19 @@ install_codex_step
 claude_hooks_summary=$([ "$skip_claude_hooks" -eq 1 ] && printf 'skipped' || printf 'see above')
 codex_summary=$([ "$skip_codex" -eq 1 ] && printf 'skipped' || printf 'see above')
 
+# A leftover NotchHUD sleepguard makes `install-gotta-go.sh` mandatory rather
+# than optional: that watchdog looks for the OLD process name every 60s, never
+# finds it, and turns `disablesleep` back off — undoing closed-lid Gotta go!
+# as fast as the app enables it. Only sudo can clear it, so say so loudly.
+# Historical literals: must survive future renames.
+# Only the LaunchAgent can actually run the watchdog. A leftover sudoers rule
+# is a stale privilege grant worth mentioning, but on its own it undoes
+# nothing, so it must not trigger a mandatory sudo remediation.
+legacy_watchdog=""
+legacy_sudoers=""
+[ -f "$HOME/Library/LaunchAgents/com.actionable.notchhud.sleepguard.plist" ] && legacy_watchdog=yes
+[ -f /etc/sudoers.d/notch-hud ] && legacy_sudoers=yes
+
 cat <<SUMMARY
 
 Vibenotch installed.
@@ -242,9 +255,34 @@ Vibenotch installed.
   Claude Code hooks:   $claude_hooks_summary
   Codex adapter:       $codex_summary
 
+SUMMARY
+
+if [ -n "$legacy_watchdog" ]; then
+    cat <<'LEGACY'
+REQUIRED — a previous NotchHUD install is still active:
+  Its sleepguard watchdog still runs every 60s, looks for the old process
+  name, does not find it, and turns `disablesleep` back off. Closed-lid
+  Gotta go! cannot work until it is replaced:
+
+      sudo scripts/install-gotta-go.sh
+
+  (that also removes the old LaunchAgent and sudoers rule)
+LEGACY
+else
+    cat <<'OPTIONAL'
 Optional next steps:
   - Gotta go! (keep the Mac awake with the lid closed; needs sudo):
       sudo scripts/install-gotta-go.sh
+OPTIONAL
+    if [ -n "$legacy_sudoers" ]; then
+        cat <<'STALE'
+      (a stale /etc/sudoers.d/notch-hud rule from the old install is still
+       there — that command replaces it; nothing is broken meanwhile)
+STALE
+    fi
+fi
+
+cat <<'PHONE'
   - Phone companion: see the README ("Phone companion") for the notch-remote
     repository and the pairing steps.
-SUMMARY
+PHONE
