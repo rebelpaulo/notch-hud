@@ -20,6 +20,7 @@ struct TerminalConversationResumer: ConversationResuming {
 
     func resume(_ conversation: ClaudeConversation) -> Bool {
         let command = Self.command(for: conversation)
+        NSLog("Vibenotch resume command: [%@]", command)
         do {
             _ = try runScript("""
             tell application "Terminal"

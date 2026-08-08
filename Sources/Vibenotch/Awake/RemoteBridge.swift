@@ -554,7 +554,12 @@ final class RemoteBridge {
     private func runPendingCommand(_ command: RemoteCommand?) async {
         guard let command, command.action == "resume", let requestedID = command.id else { return }
 
-        guard requestedID != lastExecutedCommandID else { return }
+        // Already done — but the slot still has to be freed, or a repeat jams
+        // it shut and every later request is refused with a conflict.
+        if requestedID == lastExecutedCommandID {
+            _ = await run(["--state-put"], stdin: #"{"clear_command_id":"\#(requestedID)"}"#)
+            return
+        }
 
         let key = sessionIDKey
         let match = await conversations().first {
