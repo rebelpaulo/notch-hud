@@ -304,8 +304,8 @@ final class CodexRolloutPoller {
     private static func subagentToolLine(count: Int) -> String? {
         guard count > 0 else { return nil }
         return count == 1
-            ? "1 subagente a trabalhar"
-            : "\(count) subagentes a trabalhar"
+            ? t("1 subagent working")
+            : t("%d subagents working", count)
     }
 }
 

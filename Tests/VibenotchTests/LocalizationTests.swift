@@ -46,6 +46,30 @@ import Testing
     #expect(untranslated.sorted() == [])
 }
 
+@Test func noPortugueseIsHardcodedOutsideTheStringsTable() throws {
+    // The completeness scan above only sees strings that go through t(), so it
+    // was blind to a literal that skipped it entirely — which is exactly how
+    // "1 subagente a trabalhar" shipped inside an English-source file.
+    let sources = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .appendingPathComponent("Sources/Vibenotch")
+    let portugueseOnly = CharacterSet(charactersIn: "ãõçáéíóúâêôàÃÕÇÁÉÍÓÚÂÊÔÀ")
+    var offenders: [String] = []
+
+    let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+    for case let url as URL in files! where url.pathExtension == "swift" {
+        let text = try String(contentsOf: url, encoding: .utf8)
+        for (number, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
+        where line.rangeOfCharacter(from: portugueseOnly) != nil {
+            offenders.append("\(url.lastPathComponent):\(number + 1) \(line.trimmingCharacters(in: .whitespaces))")
+        }
+    }
+
+    #expect(offenders == [])
+}
+
 private func portugueseBundle() throws -> Bundle {
     let url = try #require(Bundle.module.url(forResource: "pt", withExtension: "lproj"))
     return try #require(Bundle(url: url))
