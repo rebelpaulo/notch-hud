@@ -124,6 +124,33 @@ import Testing
     #expect(second.output.contains("skipped"))
 }
 
+@Test func claudeHooksUninstallLeavesAForeignSettingsFileByteForByte() throws {
+    // Re-serializing on a no-op rewrote a hand-formatted settings.json and
+    // reported "changed", so an uninstall with nothing of ours to remove still
+    // reflowed the user's file and left a backup behind.
+    let scratch = try makeClaudeHooksScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let settings = scratch.appendingPathComponent("settings.json")
+    let original = """
+    {
+        "hooks": {"PreToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "rtk hook claude"}]}]},
+            "otherKey": 1
+    }
+    """
+    try original.write(to: settings, atomically: true, encoding: .utf8)
+
+    let result = try runClaudeHooksInstaller(
+        prefix: scratch.appendingPathComponent("prefix"),
+        settings: settings,
+        uninstall: true
+    )
+
+    #expect(result.status == 0)
+    #expect(result.output.contains("skipped"))
+    #expect(try String(contentsOf: settings, encoding: .utf8) == original)
+    #expect(try claudeHooksBackupNames(nextTo: settings).isEmpty)
+}
+
 private func claudeHooksRepoRoot() -> URL {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

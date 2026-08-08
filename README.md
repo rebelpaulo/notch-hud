@@ -55,7 +55,7 @@ have one you're happy with).
 ## Install
 
 ```sh
-git clone https://github.com/<you>/notch-hud.git
+git clone https://github.com/rebelpaulo/notch-hud.git
 cd notch-hud
 ./scripts/install.sh
 ```
@@ -136,7 +136,7 @@ This installs, each idempotently and with a `.bak` of anything it replaces:
   -c` before it's ever activated (the installer refuses to install anything
   that doesn't pass validation). Its scope is exactly two commands and
   nothing else:
-  ```
+  ```text
   <you> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -a disablesleep 0
   ```
   That's the entire grant — it lets NotchHUD flip macOS's `disablesleep`
@@ -212,7 +212,7 @@ It deliberately does **not** touch:
 - **All-Nighter says it's off but the Mac still won't sleep, or vice
   versa.** Check `pmset -g | grep SleepDisabled` — the watchdog LaunchAgent
   should force this back off within 60 seconds of NotchHUD.app not running;
-  if it doesn't, check `sudo -n pmset -g` works without a password prompt
+  if it doesn't, check `pmset -g` works without a password prompt
   (that's what the sudoers rule grants).
 
 ## Security

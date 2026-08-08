@@ -116,12 +116,17 @@ def uninstall():
         data.pop("hooks", None)
 
 
+original = json.loads(json.dumps(data))
+
 if mode == "uninstall":
     uninstall()
 else:
     install()
 
-print(json.dumps(data, indent=2))
+# Echo the file back byte-for-byte when nothing actually changed:
+# re-serializing would reformat a hand-indented settings.json and the caller
+# would read that as "changed", back it up and rewrite it for no reason.
+print(raw, end="") if data == original and raw else print(json.dumps(data, indent=2))
 PY
 ) || exit 1
 
