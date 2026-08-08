@@ -352,6 +352,41 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeReopensTheSameConversationASecondTime() async throws {
+    // Closing the terminal and asking again is a normal thing to do. The
+    // dedupe existed for a stale read of one request, not to refuse that
+    // conversation for the rest of the session.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    try fixture.writeConversation(
+        sessionID: "aaaaaaaa-1111-2222-3333-444444444444",
+        title: "Revenge ads meta",
+        directory: "/Users/mac/Claude code"
+    )
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let published = try #require(
+        await fixture.runner.statePutBodies().first { $0.contains("resumable") }
+    )
+    let entry = try #require(
+        (JSONSerialization.jsonObject(with: Data(published.utf8)) as? [String: [[String: Any]]])?["resumable"]?.first
+    )
+    let publishedID = try #require(entry["id"] as? String)
+    let request = #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"pending_command":{"action":"resume","id":"\#(publishedID)"}}"#
+
+    await fixture.runner.setStateOutput(request)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.resumer.resumed.count == 1)
+
+    // The Mac sees the slot empty (it cleared it), then the user asks again.
+    await fixture.runner.setStateOutput(#"{"keep_awake_enabled":false,"settings":{},"settings_rev":0}"#)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    await fixture.runner.setStateOutput(request)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.resumer.resumed.count == 2)
+}
+
+@MainActor
 @Test func remoteBridgeDoesNotActOnACommandItCouldNotClear() async throws {
     // This action opens a Terminal window and starts a Claude process. Acting
     // while the request is still sitting in the remote means the next poll

@@ -552,7 +552,16 @@ final class RemoteBridge {
     /// pairing secret buys is reopening a conversation that is already on that
     /// machine, never running something of the attacker's choosing.
     private func runPendingCommand(_ command: RemoteCommand?) async {
-        guard let command, command.action == "resume", let requestedID = command.id else { return }
+        // An empty slot means the request that was here has been retired, so
+        // the dedupe has done its job. Forgetting it now is what lets the same
+        // conversation be reopened again later — closing the terminal and
+        // asking a second time is a normal thing to do, and remembering
+        // forever would refuse it until the app restarted.
+        guard let command else {
+            lastExecutedCommandID = nil
+            return
+        }
+        guard command.action == "resume", let requestedID = command.id else { return }
 
         // Already done — but the slot still has to be freed, or a repeat jams
         // it shut and every later request is refused with a conflict.
