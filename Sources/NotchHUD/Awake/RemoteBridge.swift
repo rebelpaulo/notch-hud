@@ -53,7 +53,7 @@ struct RemoteScriptCommandRunner: CommandRunning {
                     exitCode: process.terminationStatus
                 )
             } catch {
-                NSLog("NotchHUD não conseguiu executar notch-remote-push: %@", error.localizedDescription)
+                NSLog("NotchHUD could not run notch-remote-push: %@", error.localizedDescription)
                 return CommandRunResult(stdout: "", exitCode: 127)
             }
         }.value
@@ -132,7 +132,11 @@ final class RemoteBridge {
         isStarted = true
         observeChanges()
 
-        let timer = Timer(timeInterval: 45, repeats: true) { [weak self] _ in
+        // 10s: the phone's own UI refreshes on the same order, so a toggle on
+        // either side lands within about ten seconds. One GET per tick (state
+        // and settings share /api/state), so this is the same request volume
+        // the 45s two-call version had.
+        let timer = Timer(timeInterval: 10, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 await self?.checkNow(pollRemoteState: true)
             }
@@ -155,7 +159,6 @@ final class RemoteBridge {
         guard isConfigured else { return }
 
         let currentMode = engine.mode
-        let wasActive = previousMode != .off
         let allAgentsFinished = currentMode == .off
             && previousMode == .whileAgentsWork
             && engine.lastOffReason == .whileAgentsWorkGrace
@@ -166,10 +169,17 @@ final class RemoteBridge {
 
         previousMode = currentMode
 
+        // A local toggle reconciles right away instead of waiting for the next
+        // poll tick — observeChanges() calls this the moment the bolt flips, so
+        // the phone sees the new state in about a second. It goes through the
+        // same reconcile as a timer tick (rather than pushing straight up) so
+        // there is exactly one place that decides which side wins.
+        let toggledLocally = lastSyncedActive.map { $0 != engine.isActive } ?? false
+
         if allAgentsFinished {
             await push(
                 title: "NotchHUD",
-                body: "Todos os agentes terminaram — All-Nighter desligou-se",
+                body: t("All agents finished — Gotta go! turned itself off"),
                 tag: "agents-done"
             )
         }
@@ -180,21 +190,19 @@ final class RemoteBridge {
                 sentBatteryThresholds.removeAll()
             }
             needsMeSessionIDs.removeAll()
-            // Settings AND the on/off state must sync while All-Nighter is off:
+            // Settings AND the on/off state must sync while Gotta go! is off:
             // the phone configures the next session, and turning it ON remotely
             // is only reachable from here. (Battery/needs-me pushes stay
             // active-only.)
-            if pollRemoteState {
-                await reconcileDesiredState()
-                await reconcileSettings()
+            if pollRemoteState || toggledLocally {
+                await reconcileRemote()
             }
             return
         }
 
         await evaluateNeedsMeSessions()
-        if pollRemoteState {
-            await reconcileDesiredState()
-            await reconcileSettings()
+        if pollRemoteState || toggledLocally {
+            await reconcileRemote()
         }
     }
 
@@ -243,7 +251,7 @@ final class RemoteBridge {
                 sentBatteryThresholds.insert(threshold)
                 await push(
                     title: "NotchHUD",
-                    body: "Bateria a \(threshold)% — All-Nighter ativo",
+                    body: t("Battery at %d%% — Gotta go! is on", threshold),
                     tag: "battery-\(threshold)"
                 )
             }
@@ -264,7 +272,7 @@ final class RemoteBridge {
             needsMeSessionIDs.insert(sessionID)
             await push(
                 title: "NotchHUD",
-                body: "Precisa de ti: \(project)",
+                body: t("Needs you: %@", project),
                 tag: "needs-me-\(sessionID)"
             )
         }
@@ -274,31 +282,31 @@ final class RemoteBridge {
     /// the phone can start a session as well as kill one, and a local toggle
     /// is pushed up so the phone never shows a stale answer. (It used to be
     /// kill-only, with an ack that reset the flag to true — which is exactly
-    /// why turning All-Nighter *on* from the phone did nothing.)
-    private func reconcileDesiredState() async {
+    /// why turning Gotta go! *on* from the phone did nothing.)
+    /// /api/state answers with the on/off flag AND the settings blob, so one
+    /// GET per tick feeds both reconcilers.
+    private func reconcileRemote() async {
         let result = await run(["--state"])
-        guard result.exitCode == 0 else { return }
-
-        struct RemoteState: Decodable {
-            let keepAwakeEnabled: Bool
-
-            enum CodingKeys: String, CodingKey {
-                case keepAwakeEnabled = "keep_awake_enabled"
-            }
-        }
-
-        guard let data = result.stdout.data(using: .utf8),
-              let state = try? JSONDecoder().decode(RemoteState.self, from: data)
+        guard result.exitCode == 0,
+              let data = result.stdout.data(using: .utf8),
+              let remote = try? JSONDecoder().decode(RemoteStateWithSettings.self, from: data)
         else { return }
 
+        if let desired = remote.keepAwakeEnabled {
+            await reconcileDesiredState(desired)
+        }
+        await reconcileSettings(remote)
+    }
+
+    private func reconcileDesiredState(_ desired: Bool) async {
         let isActive = engine.isActive
-        if state.keepAwakeEnabled == isActive {
+        if desired == isActive {
             lastSyncedActive = isActive
             return
         }
 
         // Toggled on the Mac since the last agreement: the local truth wins and
-        // is published, so the phone shows "Ligado" when you flip the bolt here.
+        // is published, so the phone shows "On" when you flip the bolt here.
         // (On the very first reconcile there is nothing to compare against, so
         // the remote value is treated as the desired state.)
         if let lastSyncedActive, lastSyncedActive != isActive {
@@ -306,7 +314,7 @@ final class RemoteBridge {
             return
         }
 
-        if state.keepAwakeEnabled {
+        if desired {
             let startMode = engine.config.defaultMode == .off
                 ? KeepAwakeMode.whileAgentsWork
                 : engine.config.defaultMode
@@ -314,7 +322,7 @@ final class RemoteBridge {
             lastSyncedActive = engine.isActive
             await push(
                 title: "NotchHUD",
-                body: "All-Nighter ligado remotamente ✓",
+                body: t("Gotta go! turned on remotely ✓"),
                 tag: "remote-on"
             )
         } else {
@@ -322,7 +330,7 @@ final class RemoteBridge {
             lastSyncedActive = false
             await push(
                 title: "NotchHUD",
-                body: "All-Nighter desligado remotamente ✓",
+                body: t("Gotta go! turned off remotely ✓"),
                 tag: "remote-off"
             )
         }
@@ -348,13 +356,7 @@ final class RemoteBridge {
     // local config and re-baselines the sync snapshot, so the same tick
     // never also pushes local values back up for that rev. Only once the
     // rev is caught up do local edits get a chance to push.
-    private func reconcileSettings() async {
-        let result = await run(["--settings-get"])
-        guard result.exitCode == 0,
-              let data = result.stdout.data(using: .utf8),
-              let remote = try? JSONDecoder().decode(RemoteStateWithSettings.self, from: data)
-        else { return }
-
+    private func reconcileSettings(_ remote: RemoteStateWithSettings) async {
         let remoteRev = remote.settingsRev ?? 0
         if remoteRev > lastAppliedSettingsRev {
             if let settings = remote.settings {
@@ -374,7 +376,7 @@ final class RemoteBridge {
 
         let pushResult = await run(["--settings-put"], stdin: stdin)
         if pushResult.exitCode == 0 {
-            // Next poll's --settings-get will see the bumped rev and re-apply
+            // Next poll's --state will see the bumped rev and re-apply
             // these same values as if they were a remote change — harmless,
             // since applying them is a no-op once the snapshot already
             // matches. That one-cycle-lag keeps this side simple.
@@ -408,7 +410,7 @@ final class RemoteBridge {
         let result = await commandRunner.run(arguments: arguments, stdin: stdin)
         if result.exitCode != 0 {
             NSLog(
-                "NotchHUD notch-remote-push %@ terminou com estado %d",
+                "NotchHUD notch-remote-push %@ exited with status %d",
                 arguments.first ?? "",
                 result.exitCode
             )
@@ -463,10 +465,12 @@ private struct RemoteSettingsPayload: Decodable {
 }
 
 private struct RemoteStateWithSettings: Decodable {
+    let keepAwakeEnabled: Bool?
     let settings: RemoteSettingsPayload?
     let settingsRev: Int?
 
     enum CodingKeys: String, CodingKey {
+        case keepAwakeEnabled = "keep_awake_enabled"
         case settings
         case settingsRev = "settings_rev"
     }

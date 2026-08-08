@@ -1,0 +1,105 @@
+/* Portuguese (pt-PT). Keys are the English source strings.
+   "Gotta go!" is the feature name and stays untranslated. */
+
+/* Notch panel — header summary */
+"working" = "a trabalhar";
+"need you" = "precisam de ti";
+"done" = "concluídos";
+"No active sessions" = "Sem sessões ativas";
+"Open settings" = "Abrir definições";
+"Settings" = "Definições";
+
+/* Gotta go! control */
+"Turn on Gotta go!" = "Ligar Gotta go!";
+"Turn off Gotta go!" = "Desligar Gotta go!";
+"Gotta go! options" = "Opções do Gotta go!";
+"While agents are working" = "Enquanto os agentes trabalham";
+"While the apps are open" = "Enquanto as apps estiverem abertas";
+"Indefinitely" = "Indefinido";
+"Let the display sleep" = "Permitir que o ecrã durma";
+"Stay awake with the lid closed" = "Manter acordado com a tampa fechada";
+"Only on AC power when the lid is closed" = "Só com alimentação ligada quando a tampa está fechada";
+"Turn off on unlock" = "Desligar ao desbloquear";
+"In the notch-hud repo, run install-all-nighter.sh with sudo" = "No repo notch-hud, corre install-all-nighter.sh com sudo";
+"on for %@ · %@ mode" = "ativo há %@ · modo %@";
+"On for %@ · %@" = "Ativo há %@ · %@";
+" · %@ left" = " · faltam %@";
+"Gotta go! is off" = "Gotta go! desligado";
+
+/* Mode names, lower case (used inside a sentence) */
+"off" = "desligado";
+"indefinite" = "indefinido";
+"timer" = "temporizador";
+"agents" = "agentes";
+"apps" = "apps";
+"while agents are working" = "enquanto os agentes trabalham";
+"while the apps are open" = "enquanto as apps estão abertas";
+
+/* Settings window */
+"Gotta go!" = "Gotta go!";
+"Sessions" = "Sessões";
+"Remote (phone)" = "Remoto (telemóvel)";
+"About" = "Sobre";
+"Default mode" = "Modo predefinido";
+"QUICK START" = "INÍCIO RÁPIDO";
+"Install first: sudo scripts/install-all-nighter.sh" = "Instala primeiro: sudo scripts/install-all-nighter.sh";
+"Battery floor" = "Limite mínimo da bateria";
+"Grace period" = "Período de tolerância";
+"Remind me while idle" = "Lembrar quando estiver inativo";
+"Remind after" = "Lembrar após";
+"WATCHED APPS" = "APPS VIGIADAS";
+"Remove %@" = "Remover %@";
+"Add" = "Adicionar";
+"No update for" = "Sem atualização";
+"%d s → unknown state" = "%d s → estado desconhecido";
+"Card removal" = "Remoção";
+"Fixed values. Clicking a finished session opens it and removes its card; Desktop chips mark sessions from desktop apps." = "Valores fixos. Clicar numa sessão concluída abre-a e remove o respetivo cartão; os chips Desktop identificam sessões de apps de secretária.";
+"Secret" = "Segredo";
+"Not paired yet. Create ~/.notch-hud/remote.json and see the remote setup docs in the project." = "Ainda não emparelhado. Cria ~/.notch-hud/remote.json e consulta a documentação de configuração remota no projeto.";
+"Remote state" = "Estado remoto";
+"Send test push" = "Enviar push de teste";
+"Version" = "Versão";
+"Sessions directory" = "Diretório de sessões";
+"checking…" = "a verificar…";
+"not configured" = "não configurado";
+"unavailable" = "indisponível";
+"on" = "ligado";
+"Test" = "Teste";
+"Sent ✓" = "Enviado ✓";
+"Failed (%d)" = "Falhou (%d)";
+
+/* Notifications (Mac and phone) */
+"Gotta go!: battery low, going to sleep" = "Gotta go!: bateria baixa, a dormir";
+"Gotta go! finished" = "Gotta go! terminou";
+"Gotta go! finished — all agents done" = "Gotta go! terminou — todos os agentes concluíram";
+"Gotta go! finished — apps closed" = "Gotta go! terminou — apps fechadas";
+"Gotta go! on for %dh with no agents working" = "Gotta go! ativo há %dh sem agentes a trabalhar";
+"All agents finished — Gotta go! turned itself off" = "Todos os agentes terminaram — Gotta go! desligou-se";
+"Battery at %d%% — Gotta go! is on" = "Bateria a %d%% — Gotta go! ativo";
+"Needs you: %@" = "Precisa de ti: %@";
+"Gotta go! turned on remotely ✓" = "Gotta go! ligado remotamente ✓";
+"Gotta go! turned off remotely ✓" = "Gotta go! desligado remotamente ✓";
+
+/* Menu bar */
+"Pause approvals" = "Pausar aprovações";
+"Collapse panel" = "Recolher painel";
+"Quit NotchHUD" = "Sair do NotchHUD";
+
+/* Session cards */
+"Working" = "A trabalhar";
+"Needs me" = "Precisa de mim";
+"Done" = "Concluído";
+"Idle" = "Parado";
+"Raise this session's terminal" = "Trazer o terminal desta sessão para a frente";
+"Background session" = "Sessão em segundo plano";
+"Grant Automation access" = "Dar acesso à Automatização";
+"Open Automation privacy settings" = "Abrir definições de privacidade da Automatização";
+"Terminal window not found" = "Janela de terminal não encontrada";
+"You: %@" = "Tu: %@";
+"Done — click to jump" = "Concluído — clica para saltar";
+
+/* Approval card */
+"Unknown file" = "Ficheiro desconhecido";
+"Deny" = "Negar";
+"Allow Once" = "Permitir uma vez";
+"Bypass" = "Ignorar";

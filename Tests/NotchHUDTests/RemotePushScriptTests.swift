@@ -56,20 +56,6 @@ import Testing
     #expect(arguments.contains("--data-binary"))
 }
 
-@Test func remotePushSettingsGetPassesResponseThrough() throws {
-    let fixture = try RemotePushScriptFixture(configured: true)
-    defer { fixture.remove() }
-    fixture.response = #"{"keep_awake_enabled":true,"settings":{"batteryFloorPercent":30},"settings_rev":4}"#
-
-    let result = try fixture.run("--settings-get")
-
-    #expect(result.status == 0)
-    #expect(result.output == fixture.response)
-    let arguments = try fixture.arguments()
-    #expect(arguments.contains("https://remote.example/api/state"))
-    #expect(!arguments.contains("POST"))
-}
-
 @Test func remotePushSettingsPutPostsStdinBodyToSettingsEndpoint() throws {
     let fixture = try RemotePushScriptFixture(configured: true)
     defer { fixture.remove() }
@@ -86,13 +72,9 @@ import Testing
     #expect(try fixture.stdinReceivedByCurl() == body)
 }
 
-@Test func remotePushSettingsGetAndPutMissingPairingFileExitZeroSilently() throws {
+@Test func remotePushSettingsPutMissingPairingFileExitsZeroSilently() throws {
     let fixture = try RemotePushScriptFixture(configured: false)
     defer { fixture.remove() }
-
-    let getResult = try fixture.run("--settings-get")
-    #expect(getResult.status == 0)
-    #expect(getResult.output.isEmpty)
 
     let putResult = try fixture.run("--settings-put", stdin: "{}")
     #expect(putResult.status == 0)

@@ -16,9 +16,9 @@ import Testing
 
     var calls = await fixture.runner.recordedCalls()
     #expect(calls.map(\.dropTag) == [
-        ["NotchHUD", "Bateria a 50% — All-Nighter ativo"],
-        ["NotchHUD", "Bateria a 30% — All-Nighter ativo"],
-        ["NotchHUD", "Bateria a 20% — All-Nighter ativo"]
+        ["NotchHUD", "Battery at 50% — Gotta go! is on"],
+        ["NotchHUD", "Battery at 30% — Gotta go! is on"],
+        ["NotchHUD", "Battery at 20% — Gotta go! is on"]
     ])
 
     fixture.power.isOnACPower = true
@@ -30,7 +30,7 @@ import Testing
     await fixture.bridge.checkNow()
 
     calls = await fixture.runner.recordedCalls()
-    #expect(calls.last?.dropTag == ["NotchHUD", "Bateria a 50% — All-Nighter ativo"])
+    #expect(calls.last?.dropTag == ["NotchHUD", "Battery at 50% — Gotta go! is on"])
 }
 
 @MainActor
@@ -48,8 +48,8 @@ import Testing
 
     let calls = await fixture.runner.recordedCalls()
     #expect(calls.map(\.dropTag) == [
-        ["NotchHUD", "Precisa de ti: Álbum"],
-        ["NotchHUD", "Precisa de ti: Álbum"]
+        ["NotchHUD", "Needs you: Álbum"],
+        ["NotchHUD", "Needs you: Álbum"]
     ])
 }
 
@@ -66,13 +66,13 @@ import Testing
 
     let calls = await fixture.runner.recordedCalls()
     #expect(calls.map(\.dropTag) == [[
-        "NotchHUD", "Todos os agentes terminaram — All-Nighter desligou-se"
+        "NotchHUD", "All agents finished — Gotta go! turned itself off"
     ]])
 }
 
 @MainActor
 @Test func remoteBridgeObeysRemoteOffAndConfirms() async throws {
-    let fixture = try RemoteBridgeFixture(stateOutput: #"{"keep_awake_enabled":false}"#)
+    let fixture = try RemoteBridgeFixture(stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0}"#)
     defer { fixture.remove() }
 
     await fixture.bridge.checkNow(pollRemoteState: true)
@@ -80,8 +80,7 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(await fixture.runner.recordedCalls() == [
         ["--state"],
-        ["NotchHUD", "All-Nighter desligado remotamente ✓", "remote-off"],
-        ["--settings-get"]
+        ["NotchHUD", "Gotta go! turned off remotely ✓", "remote-off"]
     ])
 }
 
@@ -91,7 +90,7 @@ import Testing
     // must START a session using the configured default mode.
     let fixture = try RemoteBridgeFixture(
         mode: .off,
-        stateOutput: #"{"keep_awake_enabled":true}"#
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#
     )
     defer { fixture.remove() }
 
@@ -99,7 +98,7 @@ import Testing
 
     #expect(fixture.engine.mode == fixture.engine.config.defaultMode)
     #expect(await fixture.runner.recordedCalls().contains(
-        ["NotchHUD", "All-Nighter ligado remotamente ✓", "remote-on"]
+        ["NotchHUD", "Gotta go! turned on remotely ✓", "remote-on"]
     ))
 }
 
@@ -107,7 +106,7 @@ import Testing
 @Test func remoteBridgePublishesLocalToggleSoThePhoneShowsTheTruth() async throws {
     let fixture = try RemoteBridgeFixture(
         mode: .manual,
-        stateOutput: #"{"keep_awake_enabled":true}"#
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#
     )
     defer { fixture.remove() }
 
@@ -125,12 +124,29 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeReconcilesOnALocalToggleWithoutWaitingForTheNextPoll() async throws {
+    // observeChanges() calls checkNow() with pollRemoteState: false. The phone
+    // would still be showing "On" a poll cycle later if that path skipped the
+    // reconcile, which is what the user saw as lag.
+    let fixture = try RemoteBridgeFixture(mode: .manual)
+    defer { fixture.remove() }
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    fixture.engine.mode = .off
+    await fixture.bridge.checkNow()
+
+    let body = try #require(await fixture.runner.lastStatePutBody())
+    #expect(body.contains("\"keep_awake_enabled\":false"))
+    #expect(fixture.engine.mode == .off)
+}
+
+@MainActor
 @Test func remoteBridgeSyncsStateAndSettingsWhileInactiveWithoutPushing() async throws {
     let fixture = try RemoteBridgeFixture(
         mode: .off,
         percent: 10,
         onAC: false,
-        stateOutput: #"{"keep_awake_enabled":false}"#
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0}"#
     )
     defer { fixture.remove() }
     fixture.store.sessions = [remoteSession(id: "s1", project: "Quiet", status: .needs_me)]
@@ -140,13 +156,13 @@ import Testing
     // No battery/needs-me pushes while off, but state and settings reconcile
     // so the phone can both configure and start the next session.
     let calls = await fixture.runner.recordedCalls()
-    #expect(calls == [["--state"], ["--settings-get"]])
+    #expect(calls == [["--state"]])
 }
 
 @MainActor
 @Test func remoteBridgeAppliesConfigWhenRemoteRevIsHigher() async throws {
     let fixture = try RemoteBridgeFixture(
-        settingsGetOutput: #"{"settings":{"defaultMode":"whileAppsRunning","allowDisplaySleep":false,"batteryFloorPercent":30},"settings_rev":1}"#
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{"defaultMode":"whileAppsRunning","allowDisplaySleep":false,"batteryFloorPercent":30},"settings_rev":1}"#
     )
     defer { fixture.remove() }
 
@@ -155,14 +171,14 @@ import Testing
     #expect(fixture.engine.config.defaultMode == .whileAppsRunning)
     #expect(!fixture.engine.config.allowDisplaySleep)
     #expect(fixture.engine.config.batteryFloorPercent == 30)
-    #expect(await fixture.runner.recordedCalls().last == ["--settings-get"])
+    #expect(await fixture.runner.recordedCalls() == [["--state"]])
     #expect(await fixture.runner.recordedCalls().contains(["--settings-put"]) == false)
 }
 
 @MainActor
 @Test func remoteBridgeSameRevIsANoOp() async throws {
     let fixture = try RemoteBridgeFixture(
-        settingsGetOutput: #"{"settings":{"batteryFloorPercent":30},"settings_rev":1}"#
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{"batteryFloorPercent":30},"settings_rev":1}"#
     )
     defer { fixture.remove() }
 
@@ -201,7 +217,7 @@ import Testing
 
 @MainActor
 @Test func remoteBridgeIgnoresMalformedRemoteSettingsWithoutCrashing() async throws {
-    let fixture = try RemoteBridgeFixture(settingsGetOutput: "not json")
+    let fixture = try RemoteBridgeFixture(stateOutput: "not json")
     defer { fixture.remove() }
     let before = fixture.engine.config
 
@@ -214,7 +230,7 @@ import Testing
 @MainActor
 @Test func remoteBridgeIgnoresUnknownDefaultModeStringWithoutCrashing() async throws {
     let fixture = try RemoteBridgeFixture(
-        settingsGetOutput: #"{"settings":{"defaultMode":"bogus","allowDisplaySleep":false},"settings_rev":1}"#
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{"defaultMode":"bogus","allowDisplaySleep":false},"settings_rev":1}"#
     )
     defer { fixture.remove() }
 
@@ -240,8 +256,7 @@ private final class RemoteBridgeFixture {
         mode: KeepAwakeMode = .manual,
         percent: Int? = 100,
         onAC: Bool = true,
-        stateOutput: String = #"{"keep_awake_enabled":true}"#,
-        settingsGetOutput: String = #"{"settings":{},"settings_rev":0}"#,
+        stateOutput: String = #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#,
         config: KeepAwakeConfig = KeepAwakeConfig()
     ) throws {
         scratch = FileManager.default.temporaryDirectory
@@ -255,7 +270,7 @@ private final class RemoteBridgeFixture {
         )
 
         engine = FakeRemoteEngine(mode: mode, isOnACPower: onAC, config: config)
-        runner = FakeRemoteCommandRunner(stateOutput: stateOutput, settingsGetOutput: settingsGetOutput)
+        runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
         power = FakeRemotePowerSource(percent: percent, isOnACPower: onAC)
         suiteName = "RemoteBridgeTests.\(UUID().uuidString)"
         userDefaults = UserDefaults(suiteName: suiteName)!
@@ -314,17 +329,10 @@ private actor FakeRemoteCommandRunner: CommandRunning {
     private var calls: [[String]] = []
     private var stdins: [String?] = []
     private let stateOutput: String
-    private let settingsGetOutput: String
-    private var ackFailuresRemaining = 0
     private var settingsPutExitCode: Int32 = 0
 
-    init(stateOutput: String, settingsGetOutput: String = #"{"settings":{},"settings_rev":0}"#) {
+    init(stateOutput: String) {
         self.stateOutput = stateOutput
-        self.settingsGetOutput = settingsGetOutput
-    }
-
-    func setAckFailures(_ count: Int) {
-        ackFailuresRemaining = count
     }
 
     func setSettingsPutExitCode(_ code: Int32) {
@@ -334,20 +342,13 @@ private actor FakeRemoteCommandRunner: CommandRunning {
     func run(arguments: [String], stdin: String?) async -> CommandRunResult {
         calls.append(arguments)
         stdins.append(stdin)
-        if arguments == ["--ack-off"], ackFailuresRemaining > 0 {
-            ackFailuresRemaining -= 1
-            return CommandRunResult(stdout: "", exitCode: 22)
-        }
         if arguments == ["--settings-put"] {
             return CommandRunResult(stdout: "", exitCode: settingsPutExitCode)
         }
-        let stdout: String
-        switch arguments {
-        case ["--state"]: stdout = stateOutput
-        case ["--settings-get"]: stdout = settingsGetOutput
-        default: stdout = "{}"
-        }
-        return CommandRunResult(stdout: stdout, exitCode: 0)
+        return CommandRunResult(
+            stdout: arguments == ["--state"] ? stateOutput : "{}",
+            exitCode: 0
+        )
     }
 
     func recordedCalls() -> [[String]] {

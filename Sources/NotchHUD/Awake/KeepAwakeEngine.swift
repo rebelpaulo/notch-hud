@@ -11,7 +11,7 @@ enum KeepAwakeOffReason: Equatable, Sendable {
 final class KeepAwakeEngine {
     private static let configKey = "keepAwake.config"
     private static let stateKey = "keepAwake.state"
-    private static let assertionReason = "NotchHUD All-Nighter"
+    private static let assertionReason = "NotchHUD Gotta go!"
     private static let systemSleepAssertionType = kIOPMAssertionTypePreventUserIdleSystemSleep as String
     private static let displaySleepAssertionType = kIOPMAssertionTypePreventUserIdleDisplaySleep as String
 
@@ -157,7 +157,7 @@ final class KeepAwakeEngine {
         if !isOnACPower,
            let percent = powerSource.percent,
            percent <= max(10, config.batteryFloorPercent) {
-            turnOff(notification: "All-Nighter: bateria baixa, a dormir", now: now)
+            turnOff(notification: t("Gotta go!: battery low, going to sleep"), now: now)
             return
         }
 
@@ -168,14 +168,14 @@ final class KeepAwakeEngine {
             break
         case let .timer(until):
             if now >= until {
-                turnOff(notification: "All-Nighter terminou", now: now)
+                turnOff(notification: t("Gotta go! finished"), now: now)
                 return
             }
             remainingTime = until.timeIntervalSince(now)
         case .whileAgentsWork:
             if evaluateGrace(triggerIsActive: hasWorkingAgents, now: now) {
                 turnOff(
-                    notification: "All-Nighter terminou — todos os agentes concluíram",
+                    notification: t("Gotta go! finished — all agents done"),
                     reason: .whileAgentsWorkGrace,
                     now: now
                 )
@@ -185,7 +185,7 @@ final class KeepAwakeEngine {
             let running = runningApplicationsProvider.runningBundleIdentifiers()
             let watched = Set(config.watchedBundleIDs)
             if evaluateGrace(triggerIsActive: !running.isDisjoint(with: watched), now: now) {
-                turnOff(notification: "All-Nighter terminou — apps fechadas", now: now)
+                turnOff(notification: t("Gotta go! finished — apps closed"), now: now)
                 return
             }
         }
@@ -236,7 +236,7 @@ final class KeepAwakeEngine {
         else { return }
 
         let activeHours = max(1, Int(now.timeIntervalSince(activeSince ?? now) / 3_600))
-        notificationPoster.post("All-Nighter ativo há \(activeHours)h sem agentes a trabalhar")
+        notificationPoster.post(t("Gotta go! on for %dh with no agents working", activeHours))
         didPostIdleReminder = true
     }
 
@@ -279,7 +279,7 @@ final class KeepAwakeEngine {
             )
             if assertionLease.systemSleepAssertionID == nil {
                 NSLog(
-                    "NotchHUD não conseguiu criar a asserção de energia '%@'; o Mac poderá adormecer.",
+                    "NotchHUD could not create the power assertion '%@'; the Mac may sleep.",
                     Self.systemSleepAssertionType
                 )
             }
@@ -297,7 +297,7 @@ final class KeepAwakeEngine {
             )
             if assertionLease.displaySleepAssertionID == nil {
                 NSLog(
-                    "NotchHUD não conseguiu criar a asserção de energia '%@'; o ecrã poderá adormecer.",
+                    "NotchHUD could not create the power assertion '%@'; the display may sleep.",
                     Self.displaySleepAssertionType
                 )
             }

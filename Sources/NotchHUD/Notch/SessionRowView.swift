@@ -27,18 +27,18 @@ struct SessionRowView: View {
             }
             .buttonStyle(.plain)
             .disabled(!canFocus)
-            .help(canFocus ? "Raise this session's terminal" : "Background session")
+            .help(canFocus ? t("Raise this session's terminal") : t("Background session"))
 
             if feedback == .permissionDenied {
                 Button(action: onGrantAccess) {
-                    Label("Grant Automation access", systemImage: "gearshape")
+                    Label(t("Grant Automation access"), systemImage: "gearshape")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
                         .foregroundStyle(DisplayStatus.needsMe.color)
                 }
                 .buttonStyle(.plain)
-                .help("Open Automation privacy settings")
+                .help(t("Open Automation privacy settings"))
             } else if feedback == .notFound {
-                Text("Terminal window not found")
+                Text(t("Terminal window not found"))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.45))
             }
@@ -62,7 +62,7 @@ struct SessionRowView: View {
 
                 if let prompt = session.prompt,
                    !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("You: \(prompt)")
+                    Text(t("You: %@", prompt))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
@@ -113,7 +113,7 @@ struct SessionRowView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
         } else if session.displayStatus == .done {
-            Text("Done — click to jump")
+            Text(t("Done — click to jump"))
                 .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(DisplayStatus.done.color)
                 .lineLimit(1)

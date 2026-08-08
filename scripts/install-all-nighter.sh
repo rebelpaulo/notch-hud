@@ -4,7 +4,7 @@ set -u
 
 effective_uid=${NOTCH_AN_EUID:-$(id -u)}
 if [ "$effective_uid" != 0 ]; then
-    printf '%s\n' 'notch-hud: execute este instalador com sudo: sudo scripts/install-all-nighter.sh' >&2
+    printf '%s\n' 'notch-hud: run this installer with sudo: sudo scripts/install-all-nighter.sh' >&2
     exit 1
 fi
 
@@ -142,7 +142,7 @@ elif [ -z "${NOTCH_AN_PREFIX:-}${NOTCH_AN_LAUNCHAGENTS_DIR:-}${NOTCH_AN_SUDOERS_
     fi
 fi
 
-printf '%s\n' 'All-Nighter install summary:'
+printf '%s\n' 'Gotta go! install summary:'
 printf '  sudoers: %s\n' "$sudoers_summary"
 printf '  notch-sleepguard: %s\n' "$sleepguard_summary"
 printf '  watchdog: %s\n' "$watchdog_summary"

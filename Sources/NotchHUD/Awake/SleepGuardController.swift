@@ -55,7 +55,7 @@ final class SleepGuardController {
                 try process.run()
             } catch {
                 NSLog(
-                    "NotchHUD não conseguiu repor o sleepguard ao terminar: %@",
+                    "NotchHUD could not reset the sleepguard on shutdown: %@",
                     error.localizedDescription
                 )
             }
@@ -99,22 +99,8 @@ final class SleepGuardController {
                     NSLog("NotchHUD sleepguard '%@' terminou com estado %d", action, process.terminationStatus)
                 }
             } catch {
-                NSLog("NotchHUD não conseguiu executar o sleepguard: %@", error.localizedDescription)
+                NSLog("NotchHUD could not run the sleepguard: %@", error.localizedDescription)
             }
         }
-    }
-}
-
-struct PortugueseKeepAwakeNotificationPoster: NotificationPosting, Sendable {
-    private let system = SystemNotificationPoster()
-
-    func post(_ message: String) {
-        let localized = switch message {
-        case "All-Nighter ended — all agents done":
-            "All-Nighter terminou — todos os agentes concluíram"
-        default:
-            message
-        }
-        system.post(localized)
     }
 }

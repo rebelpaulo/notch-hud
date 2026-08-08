@@ -122,7 +122,7 @@ struct ApprovalCardView: View {
     }
 
     private func fileHeader(_ file: String?) -> some View {
-        Text(file.flatMap { $0.isEmpty ? nil : $0 } ?? "Unknown file")
+        Text(file.flatMap { $0.isEmpty ? nil : $0 } ?? t("Unknown file"))
             .font(.system(size: 11, weight: .semibold, design: .monospaced))
             .foregroundStyle(.white.opacity(0.67))
             .lineLimit(1)
@@ -135,14 +135,14 @@ struct ApprovalCardView: View {
 
     private var buttons: some View {
         HStack(spacing: 8) {
-            approvalButton("Deny", background: .white.opacity(0.10), foreground: .white) {
+            approvalButton(t("Deny"), background: .white.opacity(0.10), foreground: .white) {
                 decide(.deny, scope: .once)
             }
-            approvalButton("Allow Once", background: .white.opacity(0.94), foreground: .black) {
+            approvalButton(t("Allow Once"), background: .white.opacity(0.94), foreground: .black) {
                 decide(.allow, scope: .once)
             }
             approvalButton(
-                "Bypass",
+                t("Bypass"),
                 background: Color(red: 0.78, green: 0.10, blue: 0.20),
                 foreground: .white
             ) {
