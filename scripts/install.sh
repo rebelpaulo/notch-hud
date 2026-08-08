@@ -239,9 +239,13 @@ codex_summary=$([ "$skip_codex" -eq 1 ] && printf 'skipped' || printf 'see above
 # finds it, and turns `disablesleep` back off — undoing closed-lid Gotta go!
 # as fast as the app enables it. Only sudo can clear it, so say so loudly.
 # Historical literals: must survive future renames.
+# Only the LaunchAgent can actually run the watchdog. A leftover sudoers rule
+# is a stale privilege grant worth mentioning, but on its own it undoes
+# nothing, so it must not trigger a mandatory sudo remediation.
 legacy_watchdog=""
+legacy_sudoers=""
 [ -f "$HOME/Library/LaunchAgents/com.actionable.notchhud.sleepguard.plist" ] && legacy_watchdog=yes
-[ -f /etc/sudoers.d/notch-hud ] && legacy_watchdog=yes
+[ -f /etc/sudoers.d/notch-hud ] && legacy_sudoers=yes
 
 cat <<SUMMARY
 
@@ -270,6 +274,12 @@ Optional next steps:
   - Gotta go! (keep the Mac awake with the lid closed; needs sudo):
       sudo scripts/install-gotta-go.sh
 OPTIONAL
+    if [ -n "$legacy_sudoers" ]; then
+        cat <<'STALE'
+      (a stale /etc/sudoers.d/notch-hud rule from the old install is still
+       there — that command replaces it; nothing is broken meanwhile)
+STALE
+    fi
 fi
 
 cat <<'PHONE'
