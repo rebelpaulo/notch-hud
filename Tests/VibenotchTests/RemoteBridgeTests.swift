@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import Vibenotch
@@ -190,6 +191,39 @@ import Testing
     #expect(published != "s1")
     #expect(published.count == 16)
     #expect(published.allSatisfy { $0.isHexDigit })
+
+    // An unkeyed digest of a low-entropy id (Codex terminal sessions are
+    // "codex-<PID>") is recoverable by anyone who can enumerate the space, so
+    // the plain SHA-256 of the id must NOT be what we published.
+    let unkeyed = SHA256.hash(data: Data("s1".utf8))
+        .prefix(8)
+        .map { String(format: "%02x", $0) }
+        .joined()
+    #expect(published != unkeyed)
+}
+
+@MainActor
+@Test func remoteBridgeKeepsTheSessionDigestStableAcrossTicks() async throws {
+    // Stable or the phone re-keys every row on every poll; per-installation or
+    // two Macs publish the same digest for the same session id.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .working)]
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let first = try #require(await fixture.runner.statePutBodies().first { $0.contains("sessions") })
+
+    fixture.store.sessions = [
+        remoteSession(id: "s1", project: "vibenotch", status: .needs_me)
+    ]
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let second = try #require(await fixture.runner.statePutBodies().last { $0.contains("sessions") })
+
+    func digest(_ body: String) throws -> String {
+        let json = try JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: [[String: Any]]]
+        return try #require(json?["sessions"]?.first?["id"] as? String)
+    }
+    #expect(try digest(first) == digest(second))
 }
 
 @MainActor
