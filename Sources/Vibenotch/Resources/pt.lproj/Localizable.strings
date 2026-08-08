@@ -86,6 +86,8 @@
 
 "Remote control starting on the Mac — pick it in the Claude app" = "Controlo remoto a arrancar no Mac — escolhe-o na app Claude";
 
+"No project to start remote control in — open one on the Mac first" = "Sem projeto onde arrancar o controlo remoto — abre um no Mac primeiro";
+
 /* Menu bar */
 "Pause approvals" = "Pausar aprovações";
 "Collapse panel" = "Recolher painel";

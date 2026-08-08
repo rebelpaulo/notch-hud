@@ -63,6 +63,32 @@ import Testing
     #expect(ClaudeConversationIndex(homeURL: fixture.home).recentConversations().isEmpty)
 }
 
+@Test func mostRecentDirectoryIgnoresTheTitleFilter() throws {
+    // The resumable list hides untitled conversations because their
+    // auto-generated names mean nothing to a reader. "Where was I working"
+    // has no such requirement — and taking the directory from the filtered
+    // list left a fresh install with no project to start in at all.
+    let fixture = try ConversationFixture()
+    defer { fixture.remove() }
+    try fixture.write(
+        directoryName: "-Users-mac-fresh",
+        sessionID: "ffffffff-1111-2222-3333-444444444444",
+        lines: [#"{"type":"user","cwd":"/Users/mac/fresh"}"#]
+    )
+
+    let index = ClaudeConversationIndex(homeURL: fixture.home)
+
+    #expect(index.recentConversations().isEmpty)
+    #expect(index.mostRecentDirectory() == "/Users/mac/fresh")
+}
+
+@Test func mostRecentDirectoryIsNilWithNoTranscriptsAtAll() throws {
+    let fixture = try ConversationFixture()
+    defer { fixture.remove() }
+
+    #expect(ClaudeConversationIndex(homeURL: fixture.home).mostRecentDirectory() == nil)
+}
+
 @Test func indexReturnsMostRecentlyTouchedFirst() throws {
     let fixture = try ConversationFixture()
     defer { fixture.remove() }

@@ -649,7 +649,13 @@ final class RemoteBridge {
     /// serves sessions from its own directory, and the last place the user was
     /// working is the best guess available without asking them to pick one.
     private func changeRemoteControl(starting: Bool, requestID: String) async {
-        let directory = starting ? await conversations().first?.directory : nil
+        // NOT taken from the resumable list: that one hides untitled
+        // conversations, so a fresh install or anyone who never renames one
+        // would have had the button silently do nothing.
+        let index = conversationIndex
+        let directory = starting
+            ? await Task.detached(priority: .utility) { index.mostRecentDirectory() }.value
+            : nil
         guard await run(["--state-put"], stdin: #"{"clear_command_id":"\#(requestID)"}"#).exitCode == 0
         else {
             NSLog("Vibenotch left a remote-control request in place: could not clear it")
@@ -666,7 +672,16 @@ final class RemoteBridge {
             return
         }
 
-        guard let directory else { return }
+        guard let directory else {
+            // Say so rather than fail silently: the tap has to produce
+            // something, and "there is no project to start in" is the answer.
+            await push(
+                title: "Vibenotch",
+                body: t("No project to start remote control in — open one on the Mac first"),
+                tag: "remote-control-empty"
+            )
+            return
+        }
         if resumer.startRemoteControl(in: directory) {
             await push(
                 title: "Vibenotch",
