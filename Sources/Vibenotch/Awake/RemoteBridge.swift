@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -83,6 +84,7 @@ extension SessionStore: RemoteSessionStoring {}
 final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
     private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
+    private static let sessionIDKeyKey = "remoteBridge.sessionIDKey"
     private static let pairedRemoteURLKey = "remoteBridge.pairedRemoteURL"
 
     private let engine: any RemoteKeepAwakeEngine
@@ -102,6 +104,21 @@ final class RemoteBridge {
     // either just applied from a newer remote rev, or just pushed up.
     // Diverging from it locally is what triggers a --settings-put.
     private var lastSyncedSettingsSnapshot: RemoteSettingsSnapshot
+
+    /// Per-installation, generated once and never published. An UNKEYED digest
+    /// would have achieved nothing: anyone holding a candidate id could
+    /// recompute it and confirm the match, and Codex terminal sessions are
+    /// `codex-<PID>` — a space small enough to enumerate outright.
+    private var sessionIDKey: SymmetricKey {
+        if let stored = userDefaults.data(forKey: Self.sessionIDKeyKey), stored.count == 32 {
+            return SymmetricKey(data: stored)
+        }
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        let data = Data(bytes)
+        userDefaults.set(data, forKey: Self.sessionIDKeyKey)
+        return SymmetricKey(data: data)
+    }
 
     private var lastAppliedSettingsRev: Int {
         get { userDefaults.integer(forKey: Self.lastAppliedSettingsRevKey) }
@@ -238,8 +255,20 @@ final class RemoteBridge {
             case startedAt = "started_at"
         }
 
-        init(_ session: Session, formatter: ISO8601DateFormatter) {
-            id = session.id
+        static func opaqueID(_ sessionID: String, key: SymmetricKey) -> String {
+            HMAC<SHA256>.authenticationCode(for: Data(sessionID.utf8), using: key)
+                .prefix(8)
+                .map { String(format: "%02x", $0) }
+                .joined()
+        }
+
+        init(_ session: Session, formatter: ISO8601DateFormatter, key: SymmetricKey) {
+            // The phone only needs something stable to key a row on, and the
+            // real value is the Claude session UUID — an identifier that can
+            // be correlated elsewhere. A truncated digest gives the phone
+            // exactly the uniqueness it needs and nothing it can trace back,
+            // and the Mac can still match a row by recomputing it.
+            id = Self.opaqueID(session.id, key: key)
             project = session.project
             agent = session.agent
             status = switch session.displayStatus {
@@ -420,8 +449,9 @@ final class RemoteBridge {
         formatter.formatOptions = [.withInternetDateTime]
         // Capped to match the server's own limit, so the two agree on what a
         // full snapshot is rather than the server silently truncating.
+        let key = sessionIDKey
         let snapshot = sessionStore.sessions.prefix(20).map {
-            PublishedSession($0, formatter: formatter)
+            PublishedSession($0, formatter: formatter, key: key)
         }
         guard Array(snapshot) != lastPublishedSessions else { return }
 
