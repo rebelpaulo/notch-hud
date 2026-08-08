@@ -62,19 +62,19 @@ run_uninstall() {
     bin_summary=skipped
     if [ -d "$install_bin" ]; then
         rm -rf "$install_bin" || exit 1
-        bin_summary=removido
+        bin_summary=removed
     fi
 
-    hooks_summary=ignorado
+    hooks_summary=skipped
     if [ "$skip_claude_hooks" -eq 0 ]; then
         VIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-claude-hooks.sh" --uninstall
-        hooks_summary="ver acima"
+        hooks_summary="see above"
     fi
 
     app_summary=skipped
     if [ -d "$app_target" ]; then
         rm -rf "$app_target" || exit 1
-        app_summary=removida
+        app_summary=removed
     fi
 
     cat <<SUMMARY
@@ -112,7 +112,7 @@ preflight() {
             ;;
     esac
     if [ "$macos_major" -lt 14 ]; then
-        printf '%s\n' "vibenotch: é necessário macOS 14 ou superior (detetado: $macos_version)." >&2
+        printf '%s\n' "vibenotch: macOS 14 or later is required (found: $macos_version)." >&2
         exit 1
     fi
 
@@ -215,7 +215,7 @@ install_claude_hooks_step() {
 
 install_codex_step() {
     if [ "$skip_codex" -eq 1 ]; then
-        printf '%s\n' "Adaptador Codex: ignorado (--skip-codex)"
+        printf '%s\n' "Codex adapter: skipped (--skip-codex)"
         return 0
     fi
     VIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-codex-adapter.sh"

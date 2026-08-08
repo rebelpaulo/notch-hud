@@ -192,11 +192,15 @@ See [notch-remote](https://github.com/rebelpaulo/notch-remote) for deploying
 your own instance. Pairing is a single file:
 
 ```bash
-mkdir -p ~/.vibenotch
-cat > ~/.vibenotch/remote.json <<'JSON'
+mkdir -p -m 700 ~/.vibenotch
+(umask 077; cat > ~/.vibenotch/remote.json <<'JSON'
 {"url": "https://your-deployment.vercel.app", "secret": "your-shared-secret"}
 JSON
+)
 ```
+
+That file holds the bearer credential for your deployment — the `umask` keeps
+it out of reach of other accounts on the machine.
 
 Open the same URL on your phone, paste the same secret, and add it to the home
 screen.

@@ -157,7 +157,7 @@ legacy_sudoers=$sudoers_dir/notch-hud
 legacy_marker='# Installed by NotchHUD All-Nighter.'
 legacy_summary=absent
 
-if [ -f "$legacy_plist" ] && grep -q "$legacy_label" "$legacy_plist"; then
+if [ -f "$legacy_plist" ] && grep -qF -- "$legacy_label" "$legacy_plist"; then
     if [ -n "${VIBENOTCH_GG_LAUNCHCTL:-}" ]; then
         "$VIBENOTCH_GG_LAUNCHCTL" bootout "gui/$invoking_uid/$legacy_label" >/dev/null 2>&1
     elif [ -z "${VIBENOTCH_GG_PREFIX:-}${VIBENOTCH_GG_LAUNCHAGENTS_DIR:-}${VIBENOTCH_GG_SUDOERS_DIR:-}" ]; then
@@ -168,7 +168,7 @@ if [ -f "$legacy_plist" ] && grep -q "$legacy_label" "$legacy_plist"; then
     legacy_summary=removed
 fi
 
-if [ -f "$legacy_sudoers" ] && grep -qF "$legacy_marker" "$legacy_sudoers"; then
+if [ -f "$legacy_sudoers" ] && grep -qF -- "$legacy_marker" "$legacy_sudoers"; then
     backup_if_present "$legacy_sudoers"
     rm -f "$legacy_sudoers"
     legacy_summary=removed
