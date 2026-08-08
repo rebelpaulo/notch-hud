@@ -9,6 +9,7 @@ struct Session: Identifiable, Sendable {
     let task: String?
     let prompt: String?
     let toolLine: String?
+    let subagents: Int
     let model: String?
     let updatedAt: Date
     let startedAt: Date?
@@ -25,6 +26,7 @@ struct Session: Identifiable, Sendable {
         task = envelope.task
         prompt = envelope.prompt
         toolLine = envelope.toolLine
+        subagents = max(0, envelope.subagents ?? 0)
         model = envelope.model
         self.updatedAt = updatedAt
         startedAt = envelope.started.flatMap(Self.parseISO8601)

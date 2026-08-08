@@ -107,7 +107,8 @@ final class CodexRolloutPoller {
                 cwd: rollout.metadata.cwd,
                 status: age < Self.workingAge || subagentCount > 0 ? .working : .done,
                 updatedAt: updatedAt,
-                toolLine: Self.subagentToolLine(count: subagentCount)
+                toolLine: Self.subagentToolLine(count: subagentCount),
+                subagents: subagentCount
             )
         }
 
@@ -129,7 +130,8 @@ final class CodexRolloutPoller {
                 cwd: context.metadata.cwd,
                 status: subagentCount > 0 ? .working : .done,
                 updatedAt: context.modificationDate,
-                toolLine: Self.subagentToolLine(count: subagentCount)
+                toolLine: Self.subagentToolLine(count: subagentCount),
+                subagents: subagentCount
             )
         }
     }
@@ -205,7 +207,8 @@ final class CodexRolloutPoller {
         cwd: String,
         status: SessionStatus,
         updatedAt: Date,
-        toolLine: String? = nil
+        toolLine: String? = nil,
+        subagents: Int = 0
     ) {
         do {
             try fileManager.createDirectory(
@@ -239,6 +242,9 @@ final class CodexRolloutPoller {
             ]
             if let toolLine {
                 envelope["toolLine"] = toolLine
+            }
+            if subagents > 0 {
+                envelope["subagents"] = subagents
             }
             var data = try JSONSerialization.data(
                 withJSONObject: envelope,
