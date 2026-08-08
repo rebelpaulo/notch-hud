@@ -100,12 +100,29 @@ def is_legacy_hook(entry):
 
 
 def drop_legacy():
+    """Strip the legacy command, keeping anything sharing the same entry.
+
+    An entry's "hooks" array can hold several commands. Dropping the whole
+    entry because one of them is ours would silently delete the others.
+    """
     for event in list(hooks.keys()):
         entries = hooks.get(event)
         if not isinstance(entries, list):
             continue
-        remaining = [entry for entry in entries if not is_legacy_hook(entry)]
-        if len(remaining) == len(entries):
+        remaining = []
+        for entry in entries:
+            if not is_legacy_hook(entry):
+                remaining.append(entry)
+                continue
+            kept = [
+                h for h in entry.get("hooks", [])
+                if not (isinstance(h, dict) and LEGACY_HOOK_PATH in str(h.get("command", "")))
+            ]
+            if kept:
+                remaining.append({**entry, "hooks": kept})
+        if len(remaining) == len(entries) and all(
+            a is b for a, b in zip(remaining, entries)
+        ):
             continue
         if remaining:
             hooks[event] = remaining

@@ -31,6 +31,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Before anything reads UserDefaults: the bundle-id rename moved us to
+        // an empty domain, so the previous install's settings live elsewhere.
+        LegacyDefaults.adopt()
 
         let environment = AppEnvironment()
         let sessionStore = SessionStore()

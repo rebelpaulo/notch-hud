@@ -184,6 +184,31 @@ import Testing
     #expect(text.components(separatedBy: "/bin/vibenotch-claude-hook").count - 1 == 5)
 }
 
+@Test func claudeHooksLegacyRemovalKeepsNeighbouringCommandsInTheSameEntry() throws {
+    // One entry can hold several commands. Dropping the whole entry because
+    // one of them is ours silently deletes the others.
+    let scratch = try makeClaudeHooksScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let settings = scratch.appendingPathComponent("settings.json")
+    try """
+    {"hooks": {"Stop": [{"hooks": [
+      {"type": "command", "command": "/Users/x/.notch-hud/bin/notch-claude-hook done"},
+      {"type": "command", "command": "say finished"}
+    ]}]}}
+    """.write(to: settings, atomically: true, encoding: .utf8)
+
+    let result = try runClaudeHooksInstaller(
+        prefix: scratch.appendingPathComponent("prefix"),
+        settings: settings,
+        uninstall: false
+    )
+    #expect(result.status == 0)
+
+    let text = try String(contentsOf: settings, encoding: .utf8)
+    #expect(!text.contains(".notch-hud/bin/notch-claude-hook"))
+    #expect(text.contains("say finished"))
+}
+
 private func claudeHooksRepoRoot() -> URL {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()

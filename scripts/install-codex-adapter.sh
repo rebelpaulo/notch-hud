@@ -58,7 +58,18 @@ if [ "$already_installed" -eq 0 ]; then
             jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
                 >/dev/null 2>&1
         then
-            printf '%s\n' "$notify_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+            # An upgrade finds notify pointing at OUR pre-rename notifier.
+            # Chaining that would keep the obsolete wrapper running forever,
+            # writing into a spool the app no longer reads — so drop it
+            # instead of adopting it as somebody else's notifier.
+            # Historical literal: must survive future renames.
+            chain_value=$(printf '%s\n' "$notify_value" | \
+                jq -c 'map(select(test("/\\.notch-hud/bin/notch-codex-notify$") | not))') || exit 1
+            if [ "$chain_value" = "[]" ]; then
+                rm -f "$install_prefix/codex-notify-chain.json" || exit 1
+            else
+                printf '%s\n' "$chain_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+            fi
         else
             # Refuse loudly rather than silently dropping an existing notify
             # command we cannot parse (single-quoted TOML, trailing comment,

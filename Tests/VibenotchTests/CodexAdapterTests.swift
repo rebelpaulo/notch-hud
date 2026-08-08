@@ -185,6 +185,62 @@ import Testing
     #expect(arguments == ["--model", "gpt-test", "prompt with spaces"])
 }
 
+@Test func codexInstallerDoesNotChainItsOwnPreRenameNotifier() throws {
+    // On upgrade `notify` points at OUR old notifier. Adopting it as "someone
+    // else's notifier" would keep the obsolete wrapper running forever,
+    // writing into a spool the app no longer reads.
+    let scratch = try makeCodexScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    let home = scratch.appendingPathComponent("home", isDirectory: true)
+    let prefix = scratch.appendingPathComponent("installed-vibenotch", isDirectory: true)
+    let config = scratch.appendingPathComponent("codex/config.toml")
+    try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: config.deletingLastPathComponent(), withIntermediateDirectories: true
+    )
+    try "export PATH=/usr/bin\n".write(
+        to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8
+    )
+    try #"notify = ["/Users/x/.notch-hud/bin/notch-codex-notify"]"#
+        .write(to: config, atomically: true, encoding: .utf8)
+
+    #expect(try runInstaller(home: home, prefix: prefix, config: config).status == 0)
+
+    #expect(!FileManager.default.fileExists(
+        atPath: prefix.appendingPathComponent("codex-notify-chain.json").path
+    ))
+    let text = try String(contentsOf: config, encoding: .utf8)
+    #expect(!text.contains(".notch-hud/bin/notch-codex-notify"))
+    #expect(text.contains("vibenotch-codex-notify"))
+}
+
+@Test func codexInstallerKeepsAThirdPartyNotifierWhileDroppingOurOwn() throws {
+    let scratch = try makeCodexScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    let home = scratch.appendingPathComponent("home", isDirectory: true)
+    let prefix = scratch.appendingPathComponent("installed-vibenotch", isDirectory: true)
+    let config = scratch.appendingPathComponent("codex/config.toml")
+    try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(
+        at: config.deletingLastPathComponent(), withIntermediateDirectories: true
+    )
+    try "export PATH=/usr/bin\n".write(
+        to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8
+    )
+    try #"notify = ["/Users/x/.notch-hud/bin/notch-codex-notify", "/opt/theirs/notify"]"#
+        .write(to: config, atomically: true, encoding: .utf8)
+
+    #expect(try runInstaller(home: home, prefix: prefix, config: config).status == 0)
+
+    let chainData = try Data(
+        contentsOf: prefix.appendingPathComponent("codex-notify-chain.json")
+    )
+    let chain = try #require(JSONSerialization.jsonObject(with: chainData) as? [String])
+    #expect(chain == ["/opt/theirs/notify"])
+}
+
 @Test func codexInstallerIsIdempotentAndPreservesExistingNotifyChain() throws {
     let scratch = try makeCodexScratch()
     defer { try? FileManager.default.removeItem(at: scratch) }
