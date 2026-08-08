@@ -71,7 +71,7 @@ import Testing
 }
 
 @MainActor
-@Test func remoteBridgeObeysKillSwitchThenAcknowledgesBeforeConfirming() async throws {
+@Test func remoteBridgeObeysRemoteOffAndConfirms() async throws {
     let fixture = try RemoteBridgeFixture(stateOutput: #"{"keep_awake_enabled":false}"#)
     defer { fixture.remove() }
 
@@ -80,45 +80,67 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(await fixture.runner.recordedCalls() == [
         ["--state"],
-        ["--ack-off"],
         ["NotchHUD", "All-Nighter desligado remotamente ✓", "remote-off"],
         ["--settings-get"]
     ])
 }
 
 @MainActor
-@Test func remoteBridgeRetriesFailedAckOffUntilItLands() async throws {
-    let fixture = try RemoteBridgeFixture(stateOutput: #"{"keep_awake_enabled":false}"#)
+@Test func remoteBridgeTurnsAllNighterOnFromThePhone() async throws {
+    // The whole point of the bidirectional contract: engine off + remote true
+    // must START a session using the configured default mode.
+    let fixture = try RemoteBridgeFixture(
+        mode: .off,
+        stateOutput: #"{"keep_awake_enabled":true}"#
+    )
     defer { fixture.remove() }
-    await fixture.runner.setAckFailures(1)
 
-    // obey: remote off → engine off; ack fails → pending
     await fixture.bridge.checkNow(pollRemoteState: true)
-    #expect(fixture.engine.mode == .off)
 
-    // next tick (engine off): retry lands; inactive guard means no re-kill path
-    await fixture.bridge.checkNow(pollRemoteState: true)
-    var ackCalls = await fixture.runner.recordedCalls().filter { $0 == ["--ack-off"] }
-    #expect(ackCalls.count == 2)
-
-    // once cleared, no further ack attempts
-    await fixture.bridge.checkNow(pollRemoteState: true)
-    ackCalls = await fixture.runner.recordedCalls().filter { $0 == ["--ack-off"] }
-    #expect(ackCalls.count == 2)
+    #expect(fixture.engine.mode == fixture.engine.config.defaultMode)
+    #expect(await fixture.runner.recordedCalls().contains(
+        ["NotchHUD", "All-Nighter ligado remotamente ✓", "remote-on"]
+    ))
 }
 
 @MainActor
-@Test func remoteBridgePushesNothingWhileInactiveButStillSyncsSettings() async throws {
-    let fixture = try RemoteBridgeFixture(mode: .off, percent: 10, onAC: false)
+@Test func remoteBridgePublishesLocalToggleSoThePhoneShowsTheTruth() async throws {
+    let fixture = try RemoteBridgeFixture(
+        mode: .manual,
+        stateOutput: #"{"keep_awake_enabled":true}"#
+    )
+    defer { fixture.remove() }
+
+    // First reconcile agrees: both sides on.
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    // Toggled off ON THE MAC: local truth wins and is pushed up, and the
+    // stale remote "true" must NOT switch it back on.
+    fixture.engine.mode = .off
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.lastStatePutBody())
+    #expect(body.contains("\"keep_awake_enabled\":false"))
+    #expect(fixture.engine.mode == .off)
+}
+
+@MainActor
+@Test func remoteBridgeSyncsStateAndSettingsWhileInactiveWithoutPushing() async throws {
+    let fixture = try RemoteBridgeFixture(
+        mode: .off,
+        percent: 10,
+        onAC: false,
+        stateOutput: #"{"keep_awake_enabled":false}"#
+    )
     defer { fixture.remove() }
     fixture.store.sessions = [remoteSession(id: "s1", project: "Quiet", status: .needs_me)]
 
     await fixture.bridge.checkNow(pollRemoteState: true)
 
-    // No pushes, no kill-switch poll while off — but settings still reconcile,
-    // so the phone can configure All-Nighter before the next session.
+    // No battery/needs-me pushes while off, but state and settings reconcile
+    // so the phone can both configure and start the next session.
     let calls = await fixture.runner.recordedCalls()
-    #expect(calls == [["--settings-get"]])
+    #expect(calls == [["--state"], ["--settings-get"]])
 }
 
 @MainActor
@@ -334,6 +356,11 @@ private actor FakeRemoteCommandRunner: CommandRunning {
 
     func lastSettingsPutBody() -> String? {
         guard let index = calls.lastIndex(of: ["--settings-put"]) else { return nil }
+        return stdins[index]
+    }
+
+    func lastStatePutBody() -> String? {
+        guard let index = calls.lastIndex(of: ["--state-put"]) else { return nil }
         return stdins[index]
     }
 }

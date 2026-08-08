@@ -44,16 +44,16 @@ import Testing
     #expect(!arguments.contains("POST"))
 }
 
-@Test func remotePushAckOffPostsRearmedState() throws {
+@Test func remotePushStatePutPublishesTheMacState() throws {
     let fixture = try RemotePushScriptFixture(configured: true)
     defer { fixture.remove() }
 
-    #expect(try fixture.run("--ack-off").status == 0)
+    #expect(try fixture.run("--state-put", stdin: #"{"keep_awake_enabled":false}"#).status == 0)
 
     let arguments = try fixture.arguments()
     #expect(arguments.contains("POST"))
     #expect(arguments.contains("https://remote.example/api/state"))
-    #expect(arguments.element(after: "--data") == #"{"keep_awake_enabled":true}"#)
+    #expect(arguments.contains("--data-binary"))
 }
 
 @Test func remotePushSettingsGetPassesResponseThrough() throws {

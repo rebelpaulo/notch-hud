@@ -21,14 +21,15 @@ case ${1:-} in
             "$url/api/state" \
             -H "Authorization: Bearer $secret"
         ;;
-    --ack-off)
+    --state-put)
+        # Publishes the Mac's own on/off state so the phone shows the truth.
         [ "$#" -eq 1 ] || exit 64
         curl_common \
             -X POST \
             "$url/api/state" \
             -H "Authorization: Bearer $secret" \
             -H 'Content-Type: application/json' \
-            --data '{"keep_awake_enabled":true}'
+            --data-binary @-
         ;;
     --settings-get)
         [ "$#" -eq 1 ] || exit 64
@@ -46,12 +47,12 @@ case ${1:-} in
             --data-binary @-
         ;;
     --*)
-        printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off | --settings-get | --settings-put' >&2
+        printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --state-put | --settings-get | --settings-put' >&2
         exit 64
         ;;
     *)
         [ "$#" -eq 2 ] || [ "$#" -eq 3 ] || {
-            printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --ack-off | --settings-get | --settings-put' >&2
+            printf '%s\n' 'usage: notch-remote-push <title> <body> [tag] | --state | --state-put | --settings-get | --settings-put' >&2
             exit 64
         }
         if [ "$#" -eq 3 ]; then

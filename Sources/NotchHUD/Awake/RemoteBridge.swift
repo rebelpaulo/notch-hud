@@ -154,15 +154,6 @@ final class RemoteBridge {
     func checkNow(pollRemoteState: Bool = false) async {
         guard isConfigured else { return }
 
-        // A failed ack-off would leave the remote state false and re-kill the
-        // engine on the next activation; retry until it lands, even while off.
-        if pendingAckOff {
-            let ack = await run(["--ack-off"])
-            if ack.exitCode == 0 {
-                pendingAckOff = false
-            }
-        }
-
         let currentMode = engine.mode
         let wasActive = previousMode != .off
         let allAgentsFinished = currentMode == .off
@@ -189,10 +180,12 @@ final class RemoteBridge {
                 sentBatteryThresholds.removeAll()
             }
             needsMeSessionIDs.removeAll()
-            // Settings must sync even while All-Nighter is off — the phone is
-            // for configuring it *before* the next session, not only during.
-            // (Pushes/kill-switch stay active-only, as before.)
+            // Settings AND the on/off state must sync while All-Nighter is off:
+            // the phone configures the next session, and turning it ON remotely
+            // is only reachable from here. (Battery/needs-me pushes stay
+            // active-only.)
             if pollRemoteState {
+                await reconcileDesiredState()
                 await reconcileSettings()
             }
             return
@@ -200,12 +193,15 @@ final class RemoteBridge {
 
         await evaluateNeedsMeSessions()
         if pollRemoteState {
-            await pollKillSwitch()
+            await reconcileDesiredState()
             await reconcileSettings()
         }
     }
 
-    private var pendingAckOff = false
+    // nil until the first successful reconcile; then the on/off value both
+    // sides last agreed on, so a local toggle can be told apart from a stale
+    // remote flag.
+    private var lastSyncedActive: Bool?
 
     private var isConfigured: Bool {
         FileManager.default.fileExists(atPath: pairingURL.path)
@@ -274,7 +270,12 @@ final class RemoteBridge {
         }
     }
 
-    private func pollKillSwitch() async {
+    /// The remote flag is the DESIRED state, reconciled in both directions:
+    /// the phone can start a session as well as kill one, and a local toggle
+    /// is pushed up so the phone never shows a stale answer. (It used to be
+    /// kill-only, with an ack that reset the flag to true — which is exactly
+    /// why turning All-Nighter *on* from the phone did nothing.)
+    private func reconcileDesiredState() async {
         let result = await run(["--state"])
         guard result.exitCode == 0 else { return }
 
@@ -287,18 +288,52 @@ final class RemoteBridge {
         }
 
         guard let data = result.stdout.data(using: .utf8),
-              let state = try? JSONDecoder().decode(RemoteState.self, from: data),
-              !state.keepAwakeEnabled
+              let state = try? JSONDecoder().decode(RemoteState.self, from: data)
         else { return }
 
-        engine.setMode(.off, now: Date())
-        let ack = await run(["--ack-off"])
-        pendingAckOff = ack.exitCode != 0
-        await push(
-            title: "NotchHUD",
-            body: "All-Nighter desligado remotamente ✓",
-            tag: "remote-off"
-        )
+        let isActive = engine.isActive
+        if state.keepAwakeEnabled == isActive {
+            lastSyncedActive = isActive
+            return
+        }
+
+        // Toggled on the Mac since the last agreement: the local truth wins and
+        // is published, so the phone shows "Ligado" when you flip the bolt here.
+        // (On the very first reconcile there is nothing to compare against, so
+        // the remote value is treated as the desired state.)
+        if let lastSyncedActive, lastSyncedActive != isActive {
+            await pushDesiredState(isActive)
+            return
+        }
+
+        if state.keepAwakeEnabled {
+            let startMode = engine.config.defaultMode == .off
+                ? KeepAwakeMode.whileAgentsWork
+                : engine.config.defaultMode
+            engine.setMode(startMode, now: Date())
+            lastSyncedActive = engine.isActive
+            await push(
+                title: "NotchHUD",
+                body: "All-Nighter ligado remotamente ✓",
+                tag: "remote-on"
+            )
+        } else {
+            engine.setMode(.off, now: Date())
+            lastSyncedActive = false
+            await push(
+                title: "NotchHUD",
+                body: "All-Nighter desligado remotamente ✓",
+                tag: "remote-off"
+            )
+        }
+    }
+
+    private func pushDesiredState(_ enabled: Bool) async {
+        let body = #"{"keep_awake_enabled":\#(enabled)}"#
+        let result = await run(["--state-put"], stdin: body)
+        if result.exitCode == 0 {
+            lastSyncedActive = enabled
+        }
     }
 
     private func push(title: String, body: String, tag: String? = nil) async {
