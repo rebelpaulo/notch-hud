@@ -66,6 +66,8 @@
 "on" = "ligado";
 "Test" = "Teste";
 "Sent ✓" = "Enviado ✓";
+"Sent to %d ✓" = "Enviado para %d ✓";
+"No phone registered" = "Nenhum telefone registado";
 "Failed (%d)" = "Falhou (%d)";
 
 /* Notifications (Mac and phone) */

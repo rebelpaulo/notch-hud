@@ -401,9 +401,9 @@ struct SettingsView: View {
         pushResult = nil
         Task {
             let result = await commandRunner.run(arguments: ["Vibenotch", t("Test")])
-            pushResult = RemoteActionResult(
-                succeeded: result.exitCode == 0,
-                message: result.exitCode == 0 ? t("Sent ✓") : t("Failed (%d)", result.exitCode)
+            pushResult = TestPushOutcome.describe(
+                exitCode: result.exitCode,
+                output: result.stdout
             )
             isSendingTestPush = false
         }
@@ -546,9 +546,34 @@ private enum RemoteKillSwitchState {
     }
 }
 
-private struct RemoteActionResult {
+// Internal, not private: the outcome logic below is unit-tested.
+struct RemoteActionResult {
     let succeeded: Bool
     let message: String
+}
+
+/// "Sent ✓" used to mean nothing more than "the server took the request".
+/// With no phone registered the server had nobody to push to and still
+/// answered 200, so the button cheerfully confirmed a push that went nowhere.
+/// The count is now read back and reported.
+enum TestPushOutcome {
+    static func describe(exitCode: Int32, output: String) -> RemoteActionResult {
+        let body = (try? JSONSerialization.jsonObject(with: Data(output.utf8))) as? [String: Any]
+
+        if body?["error"] as? String == "no_subscriptions" {
+            return RemoteActionResult(succeeded: false, message: t("No phone registered"))
+        }
+        guard exitCode == 0 else {
+            return RemoteActionResult(succeeded: false, message: t("Failed (%d)", exitCode))
+        }
+        guard let sent = body?["sent"] as? Int else {
+            return RemoteActionResult(succeeded: true, message: t("Sent ✓"))
+        }
+        return RemoteActionResult(
+            succeeded: sent > 0,
+            message: sent > 0 ? t("Sent to %d ✓", sent) : t("No phone registered")
+        )
+    }
 }
 
 private extension View {
