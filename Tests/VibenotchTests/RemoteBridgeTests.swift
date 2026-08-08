@@ -401,7 +401,7 @@ import Testing
     // Cleared regardless, or an unmatched request retries every ten seconds
     // for the rest of the session.
     let bodies = await fixture.runner.statePutBodies()
-    #expect(bodies.contains { $0.contains("\"command\":null") })
+    #expect(bodies.contains { $0.contains("\"clear_command_id\":\"deadbeefdeadbeef\"") })
 }
 
 @MainActor

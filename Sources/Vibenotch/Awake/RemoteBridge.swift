@@ -565,7 +565,11 @@ final class RemoteBridge {
         // still sitting in the remote means the next poll sees it again — and
         // this action opens a Terminal window and starts a Claude process, so
         // "retry until it works" would be a new window every ten seconds.
-        guard await run(["--state-put"], stdin: #"{"command":null}"#).exitCode == 0 else {
+        // Names the id being acknowledged so the server can make the clear
+        // conditional: an unconditional one would discard a request the phone
+        // wrote after this poll read.
+        let acknowledgement = #"{"clear_command_id":"\#(requestedID)"}"#
+        guard await run(["--state-put"], stdin: acknowledgement).exitCode == 0 else {
             NSLog("Vibenotch left a resume request in place: could not clear it")
             return
         }
