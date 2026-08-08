@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.144.1
 --------
-workdir: /Users/coopersimson/Desktop/AI Projects/notch-hud
+workdir: /Users/coopersimson/Desktop/AI Projects/vibenotch
 model: gpt-5.6-sol
 provider: openai
 approval: never
@@ -11,27 +11,27 @@ reasoning summaries: none
 session id: 019f8115-1cb2-7b30-abf6-41eb9d293037
 --------
 user
-You are the worker. Implement specs/M2-click-to-focus.md EXACTLY. Read the current SessionRowView.swift, NotchPanelView.swift, NotchWindowManager.swift, NotchHUDApp.swift, Model/Session.swift, Model/TerminalIdentity.swift, and scripts/notch-emit first so wiring + field names match. Fix the tty capture in notch-emit per the spec, create the Focus module, make rows clickable, add the Info.plist key. DO NOT touch HoverController/NotchGeometry/SpoolWatcher logic. DO NOT run swift build/test. Only write files. Print files created/modified.
+You are the worker. Implement specs/M2-click-to-focus.md EXACTLY. Read the current SessionRowView.swift, NotchPanelView.swift, NotchWindowManager.swift, VibenotchApp.swift, Model/Session.swift, Model/TerminalIdentity.swift, and scripts/vibenotch-emit first so wiring + field names match. Fix the tty capture in vibenotch-emit per the spec, create the Focus module, make rows clickable, add the Info.plist key. DO NOT touch HoverController/NotchGeometry/SpoolWatcher logic. DO NOT run swift build/test. Only write files. Print files created/modified.
 codex
 I’ll first read the milestone spec and the exact integration files you named, then make only the scoped edits. I’ll avoid the protected logic and won’t run builds or tests.
 codex
 The spec loaded, but the repository paths differ from the spec’s shorthand, so the chained read stopped at the first missing path. I’m locating the actual files now, then I’ll read every required file before editing.
 exec
-/bin/zsh -lc "rg --files | rg '("'^|/)(SessionRowView'"\\.swift|NotchPanelView\\.swift|NotchWindowManager\\.swift|NotchHUDApp\\.swift|Session\\.swift|TerminalIdentity\\.swift|notch-emit|Info\\.plist|Package\\.swift|project\\.pbxproj)"'$'"'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "rg --files | rg '("'^|/)(SessionRowView'"\\.swift|NotchPanelView\\.swift|NotchWindowManager\\.swift|VibenotchApp\\.swift|Session\\.swift|TerminalIdentity\\.swift|vibenotch-emit|Info\\.plist|Package\\.swift|project\\.pbxproj)"'$'"'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 Package.swift
-scripts/notch-emit
-Sources/NotchHUD/Info.plist
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Model/TerminalIdentity.swift
-Sources/NotchHUD/Model/Session.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
+scripts/vibenotch-emit
+Sources/Vibenotch/Info.plist
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Model/TerminalIdentity.swift
+Sources/Vibenotch/Model/Session.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
 vendor/DynamicNotchKit/Package.swift
 
 exec
-/bin/zsh -lc "sed -n '1,320p' Sources/NotchHUD/Notch/SessionRowView.swift; sed -n '1,360p' Sources/NotchHUD/Notch/NotchPanelView.swift; sed -n '1,420p' Sources/NotchHUD/Notch/NotchWindowManager.swift; sed -n '1,320p' Sources/NotchHUD/App/NotchHUDApp.swift; sed -n '1,320p' Sources/NotchHUD/Model/Session.swift; sed -n '1,320p' Sources/NotchHUD/Model/TerminalIdentity.swift; sed -n '1,320p' scripts/notch-emit; sed -n '1,240p' Sources/NotchHUD/Info.plist; sed -n '1,280p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,320p' Sources/Vibenotch/Notch/SessionRowView.swift; sed -n '1,360p' Sources/Vibenotch/Notch/NotchPanelView.swift; sed -n '1,420p' Sources/Vibenotch/Notch/NotchWindowManager.swift; sed -n '1,320p' Sources/Vibenotch/App/VibenotchApp.swift; sed -n '1,320p' Sources/Vibenotch/Model/Session.swift; sed -n '1,320p' Sources/Vibenotch/Model/TerminalIdentity.swift; sed -n '1,320p' scripts/vibenotch-emit; sed -n '1,240p' Sources/Vibenotch/Info.plist; sed -n '1,280p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import SwiftUI
 
@@ -150,7 +150,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -170,7 +170,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -349,7 +349,7 @@ import SwiftUI
 
 @main
 @MainActor
-struct NotchHUDApp: App {
+struct VibenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -520,7 +520,7 @@ case $id in
         ;;
 esac
 
-notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
+notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 spool_dir=$notch_home/sessions
 seq_dir=$notch_home/seq
 session_file=$spool_dir/$id.json
@@ -600,7 +600,7 @@ if jq -n \
             kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
             windowId: (if $window_id == "" then null else $window_id end)
         },
-        source: "notch-emit"
+        source: "vibenotch-emit"
     }' > "$tmp_file" 2>/dev/null
 then
     mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -614,9 +614,9 @@ exit 0
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.actionable.notchhud</string>
+    <string>com.rebelpaulo.vibenotch</string>
     <key>CFBundleName</key>
-    <string>NotchHUD</string>
+    <string>Vibenotch</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
@@ -628,7 +628,7 @@ exit 0
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -637,25 +637,25 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         ),
         .testTarget(
-            name: "NotchHUDTests",
-            dependencies: ["NotchHUD"],
-            path: "Tests/NotchHUDTests"
+            name: "VibenotchTests",
+            dependencies: ["Vibenotch"],
+            path: "Tests/VibenotchTests"
         )
     ]
 )
@@ -663,70 +663,70 @@ let package = Package(
 codex
 I’ve finished the required reads. The implementation needs one careful concurrency boundary: strategies should remain synchronous, while the dispatcher executes them on a detached task and the AppleScript runner hops back to the main actor. I’m checking existing call sites and project conventions before applying the patch.
 exec
-/bin/zsh -lc "rg -n \"SessionRowView\\(|NotchPanelView\\(|NotchWindowManager\\(\" Sources Tests; find Sources/NotchHUD -maxdepth 2 -type f -name '*.swift' -print | sort; rg -n \"NSWorkspace|open\\(|Result<Void|Task\\.detached|withChecked|@MainActor\" Sources/NotchHUD Tests" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "rg -n \"SessionRowView\\(|NotchPanelView\\(|NotchWindowManager\\(\" Sources Tests; find Sources/Vibenotch -maxdepth 2 -type f -name '*.swift' -print | sort; rg -n \"NSWorkspace|open\\(|Result<Void|Task\\.detached|withChecked|@MainActor\" Sources/Vibenotch Tests" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-Sources/NotchHUD/Notch/NotchPanelView.swift:32:                        SessionRowView(session: session)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:157:            expanded: { NotchPanelView(store: store) },
-Sources/NotchHUD/Notch/NotchWindowManager.swift:178:            expanded: { NotchPanelView(store: store) }
-Sources/NotchHUD/App/NotchHUDApp.swift:29:        let windowManager = NotchWindowManager(environment: environment, store: sessionStore)
-Sources/NotchHUD/App/AppEnvironment.swift
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Model/NotchGeometry.swift
-Sources/NotchHUD/Model/Session.swift
-Sources/NotchHUD/Model/SessionEnvelope.swift
-Sources/NotchHUD/Model/SessionStatus.swift
-Sources/NotchHUD/Model/TerminalIdentity.swift
-Sources/NotchHUD/Notch/HoverController.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
-Sources/NotchHUD/Notch/NotchPeekView.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
-Sources/NotchHUD/Store/SessionStore.swift
-Sources/NotchHUD/Store/SpoolReader.swift
-Sources/NotchHUD/Store/SpoolWatcher.swift
-Sources/NotchHUD/Store/SpoolWatcher.swift:54:            scheduleReopen()
-Sources/NotchHUD/Store/SpoolWatcher.swift:60:            return Darwin.open(path, O_EVTONLY)
-Sources/NotchHUD/Store/SpoolWatcher.swift:63:            scheduleReopen()
-Sources/NotchHUD/Store/SpoolWatcher.swift:91:            scheduleReopen()
-Sources/NotchHUD/Store/SpoolWatcher.swift:119:            scheduleReopen()
-Sources/NotchHUD/Store/SpoolWatcher.swift:158:        Task { @MainActor [weak store = store] in
-Sources/NotchHUD/Store/SpoolWatcher.swift:183:    private func scheduleReopen() {
-Sources/NotchHUD/Store/SessionStore.swift:4:@MainActor
-Sources/NotchHUD/App/NotchHUDApp.swift:5:@MainActor
-Sources/NotchHUD/App/NotchHUDApp.swift:16:@MainActor
-Sources/NotchHUD/Notch/NotchWindowManager.swift:5:@MainActor
-Sources/NotchHUD/Notch/HoverController.swift:3:@MainActor
-Sources/NotchHUD/Notch/HoverController.swift:10:@MainActor
-Sources/NotchHUD/Notch/HoverController.swift:84:            Task { @MainActor [weak self] in
-Sources/NotchHUD/Notch/HoverController.swift:121:            enterTask = Task { @MainActor [weak self] in
-Sources/NotchHUD/Notch/HoverController.swift:137:            exitTask = Task { @MainActor [weak self] in
-Sources/NotchHUD/Notch/HoverController.swift:180:@MainActor
-Sources/NotchHUD/Notch/HoverController.swift:186:@MainActor
+Sources/Vibenotch/Notch/NotchPanelView.swift:32:                        SessionRowView(session: session)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:157:            expanded: { NotchPanelView(store: store) },
+Sources/Vibenotch/Notch/NotchWindowManager.swift:178:            expanded: { NotchPanelView(store: store) }
+Sources/Vibenotch/App/VibenotchApp.swift:29:        let windowManager = NotchWindowManager(environment: environment, store: sessionStore)
+Sources/Vibenotch/App/AppEnvironment.swift
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Model/NotchGeometry.swift
+Sources/Vibenotch/Model/Session.swift
+Sources/Vibenotch/Model/SessionEnvelope.swift
+Sources/Vibenotch/Model/SessionStatus.swift
+Sources/Vibenotch/Model/TerminalIdentity.swift
+Sources/Vibenotch/Notch/HoverController.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
+Sources/Vibenotch/Notch/NotchPeekView.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
+Sources/Vibenotch/Store/SessionStore.swift
+Sources/Vibenotch/Store/SpoolReader.swift
+Sources/Vibenotch/Store/SpoolWatcher.swift
+Sources/Vibenotch/Store/SpoolWatcher.swift:54:            scheduleReopen()
+Sources/Vibenotch/Store/SpoolWatcher.swift:60:            return Darwin.open(path, O_EVTONLY)
+Sources/Vibenotch/Store/SpoolWatcher.swift:63:            scheduleReopen()
+Sources/Vibenotch/Store/SpoolWatcher.swift:91:            scheduleReopen()
+Sources/Vibenotch/Store/SpoolWatcher.swift:119:            scheduleReopen()
+Sources/Vibenotch/Store/SpoolWatcher.swift:158:        Task { @MainActor [weak store = store] in
+Sources/Vibenotch/Store/SpoolWatcher.swift:183:    private func scheduleReopen() {
+Sources/Vibenotch/Store/SessionStore.swift:4:@MainActor
+Sources/Vibenotch/App/VibenotchApp.swift:5:@MainActor
+Sources/Vibenotch/App/VibenotchApp.swift:16:@MainActor
+Sources/Vibenotch/Notch/NotchWindowManager.swift:5:@MainActor
+Sources/Vibenotch/Notch/HoverController.swift:3:@MainActor
+Sources/Vibenotch/Notch/HoverController.swift:10:@MainActor
+Sources/Vibenotch/Notch/HoverController.swift:84:            Task { @MainActor [weak self] in
+Sources/Vibenotch/Notch/HoverController.swift:121:            enterTask = Task { @MainActor [weak self] in
+Sources/Vibenotch/Notch/HoverController.swift:137:            exitTask = Task { @MainActor [weak self] in
+Sources/Vibenotch/Notch/HoverController.swift:180:@MainActor
+Sources/Vibenotch/Notch/HoverController.swift:186:@MainActor
 
 codex
 The scoped wiring is clear. I’m applying the implementation now: six Focus files, row/panel interaction state, shared dispatcher injection, the tty ancestor walk, and the Automation usage description. No protected controller/geometry/watcher code will be changed.
 exec
-/bin/zsh -lc 'mkdir -p Sources/NotchHUD/Focus' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'mkdir -p Sources/Vibenotch/Focus' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/AppleScriptRunner.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusDispatcher.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusStrategy.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/ITerm2Strategy.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/KittyStrategy.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/WezTermStrategy.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Info.plist
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-emit
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/AppleScriptRunner.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusDispatcher.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusStrategy.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/ITerm2Strategy.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/KittyStrategy.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/WezTermStrategy.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Info.plist
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-emit
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -753,11 +753,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -799,11 +799,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -837,11 +837,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -853,11 +853,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -868,11 +868,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -883,11 +883,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -924,11 +924,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -939,23 +939,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -1023,10 +1023,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -1077,10 +1077,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf71022a4f6
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,69 @@
  import SwiftUI
  
@@ -1167,10 +1167,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf7
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -1206,10 +1206,10 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
  updated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
  tmp_file=$spool_dir/$id.json.tmp.$$
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -1236,11 +1236,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -1282,11 +1282,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -1320,11 +1320,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -1336,11 +1336,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -1351,11 +1351,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -1366,11 +1366,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -1407,11 +1407,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -1422,23 +1422,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -1506,10 +1506,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -1560,10 +1560,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf71022a4f6
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,69 @@
  import SwiftUI
  
@@ -1650,10 +1650,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf7
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -1692,7 +1692,7 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
 codex
 The patch is in place. I’m doing a read-only review of the resulting diff and file contents—no build or test—to catch any wiring, syntax, or scope mistakes before handing it back.
 exec
-/bin/zsh -lc "git status --short && git diff -- Sources/NotchHUD/Focus Sources/NotchHUD/Notch/SessionRowView.swift Sources/NotchHUD/Notch/NotchPanelView.swift Sources/NotchHUD/Notch/NotchWindowManager.swift Sources/NotchHUD/App/NotchHUDApp.swift Sources/NotchHUD/Info.plist scripts/notch-emit && for f in Sources/NotchHUD/Focus/*.swift; do sed -n '1,260p' \""'$f"; done' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "git status --short && git diff -- Sources/Vibenotch/Focus Sources/Vibenotch/Notch/SessionRowView.swift Sources/Vibenotch/Notch/NotchPanelView.swift Sources/Vibenotch/Notch/NotchWindowManager.swift Sources/Vibenotch/App/VibenotchApp.swift Sources/Vibenotch/Info.plist scripts/vibenotch-emit && for f in Sources/Vibenotch/Focus/*.swift; do sed -n '1,260p' \""'$f"; done' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 ?? .codex/
 ?? .eval-run.log
@@ -1862,10 +1862,10 @@ struct WezTermStrategy: FocusStrategy {
     }
 }
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -1892,11 +1892,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -1938,11 +1938,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -1976,11 +1976,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -1992,11 +1992,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2007,11 +2007,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2022,11 +2022,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2063,11 +2063,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2078,23 +2078,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -2162,10 +2162,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -2216,10 +2216,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf71022a4f6
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,69 @@
  import SwiftUI
  
@@ -2306,10 +2306,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..75d50eec62a1783226ee70a7f39fbdf7
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -2347,11 +2347,11 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
 
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -2378,11 +2378,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -2424,11 +2424,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -2462,11 +2462,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -2478,11 +2478,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2493,11 +2493,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2508,11 +2508,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2549,11 +2549,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2564,23 +2564,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -2648,10 +2648,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -2702,10 +2702,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -2794,10 +2794,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -2833,10 +2833,10 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
  updated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
  tmp_file=$spool_dir/$id.json.tmp.$$
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -2863,11 +2863,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -2909,11 +2909,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -2947,11 +2947,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -2963,11 +2963,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2978,11 +2978,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -2993,11 +2993,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -3034,11 +3034,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -3049,23 +3049,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -3133,10 +3133,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -3187,10 +3187,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -3279,10 +3279,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -3321,7 +3321,7 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
 codex
 The read-only review found one layout issue from turning the row into a button: without an explicit flexible frame, only the text-sized area would reliably be clickable. I corrected that so the row’s main area remains full-width while the grant-access control stays independently clickable. I’m doing the final file-list and protected-file check now.
 exec
-/bin/zsh -lc "sed -n '1,260p' Sources/NotchHUD/Notch/SessionRowView.swift; sed -n '1,320p' Sources/NotchHUD/Notch/NotchPanelView.swift; sed -n '1,250p' Sources/NotchHUD/Notch/NotchWindowManager.swift; sed -n '1,120p' Sources/NotchHUD/App/NotchHUDApp.swift; sed -n '45,140p' scripts/notch-emit; sed -n '1,100p' Sources/NotchHUD/Info.plist; find Sources/NotchHUD/Focus -maxdepth 1 -type f -print | sort" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,260p' Sources/Vibenotch/Notch/SessionRowView.swift; sed -n '1,320p' Sources/Vibenotch/Notch/NotchPanelView.swift; sed -n '1,250p' Sources/Vibenotch/Notch/NotchWindowManager.swift; sed -n '1,120p' Sources/Vibenotch/App/VibenotchApp.swift; sed -n '45,140p' scripts/vibenotch-emit; sed -n '1,100p' Sources/Vibenotch/Info.plist; find Sources/Vibenotch/Focus -maxdepth 1 -type f -print | sort" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import SwiftUI
 
@@ -3523,7 +3523,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -3543,7 +3543,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -3724,7 +3724,7 @@ import SwiftUI
 
 @main
 @MainActor
-struct NotchHUDApp: App {
+struct VibenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -3792,7 +3792,7 @@ case $id in
         ;;
 esac
 
-notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
+notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 spool_dir=$notch_home/sessions
 seq_dir=$notch_home/seq
 session_file=$spool_dir/$id.json
@@ -3882,29 +3882,29 @@ if jq -n \
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.actionable.notchhud</string>
+    <string>com.rebelpaulo.vibenotch</string>
     <key>CFBundleName</key>
-    <string>NotchHUD</string>
+    <string>Vibenotch</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>NotchHUD raises the terminal window of the agent session you click.</string>
+    <string>Vibenotch raises the terminal window of the agent session you click.</string>
     <key>LSUIElement</key>
     <true/>
 </dict>
 </plist>
-Sources/NotchHUD/Focus/AppleScriptRunner.swift
-Sources/NotchHUD/Focus/FocusDispatcher.swift
-Sources/NotchHUD/Focus/FocusStrategy.swift
-Sources/NotchHUD/Focus/ITerm2Strategy.swift
-Sources/NotchHUD/Focus/KittyStrategy.swift
-Sources/NotchHUD/Focus/TerminalAppStrategy.swift
-Sources/NotchHUD/Focus/WezTermStrategy.swift
+Sources/Vibenotch/Focus/AppleScriptRunner.swift
+Sources/Vibenotch/Focus/FocusDispatcher.swift
+Sources/Vibenotch/Focus/FocusStrategy.swift
+Sources/Vibenotch/Focus/ITerm2Strategy.swift
+Sources/Vibenotch/Focus/KittyStrategy.swift
+Sources/Vibenotch/Focus/TerminalAppStrategy.swift
+Sources/Vibenotch/Focus/WezTermStrategy.swift
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -3931,11 +3931,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -3977,11 +3977,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a49256602a
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,32 @@
 +@MainActor
 +final class FocusDispatcher {
@@ -4015,11 +4015,11 @@ index 0000000000000000000000000000000000000000..8a6438f1b1e215027a911572b703a6a4
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -4031,11 +4031,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4046,11 +4046,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4061,11 +4061,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec7370a86e906
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,35 @@
 +struct TerminalAppStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4102,11 +4102,11 @@ index 0000000000000000000000000000000000000000..b23c775f10829b4b63fa440c630ec737
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4117,23 +4117,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -4201,10 +4201,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -4255,10 +4255,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -4347,10 +4347,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -4388,12 +4388,12 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
 
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusDispatcher.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusDispatcher.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -4420,11 +4420,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -4466,11 +4466,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9866d734b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,34 @@
 +import Foundation
 +
@@ -4506,11 +4506,11 @@ index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -4522,11 +4522,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4537,11 +4537,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4552,11 +4552,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e005439c6c2884
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,37 @@
 +import Foundation
 +
@@ -4595,11 +4595,11 @@ index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e00543
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -4610,23 +4610,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -4694,10 +4694,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -4748,10 +4748,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -4840,10 +4840,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -4879,10 +4879,10 @@ index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d9
  updated=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
  tmp_file=$spool_dir/$id.json.tmp.$$
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -4909,11 +4909,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -4955,11 +4955,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9866d734b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,34 @@
 +import Foundation
 +
@@ -4995,11 +4995,11 @@ index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -5011,11 +5011,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5026,11 +5026,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5041,11 +5041,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e005439c6c2884
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,37 @@
 +import Foundation
 +
@@ -5084,11 +5084,11 @@ index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e00543
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5099,23 +5099,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -5183,10 +5183,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -5237,10 +5237,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -5329,10 +5329,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -5373,26 +5373,26 @@ Implemented `specs/M2-click-to-focus.md` without running Swift build/tests. Prot
 
 Created:
 
-- [AppleScriptRunner.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/AppleScriptRunner.swift>)
-- [FocusDispatcher.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusDispatcher.swift>)
-- [FocusStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusStrategy.swift>)
-- [TerminalAppStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/TerminalAppStrategy.swift>)
-- [ITerm2Strategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/ITerm2Strategy.swift>)
-- [WezTermStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/WezTermStrategy.swift>)
-- [KittyStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/KittyStrategy.swift>)
+- [AppleScriptRunner.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/AppleScriptRunner.swift>)
+- [FocusDispatcher.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusDispatcher.swift>)
+- [FocusStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusStrategy.swift>)
+- [TerminalAppStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/TerminalAppStrategy.swift>)
+- [ITerm2Strategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/ITerm2Strategy.swift>)
+- [WezTermStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/WezTermStrategy.swift>)
+- [KittyStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/KittyStrategy.swift>)
 
 Modified:
 
-- [SessionRowView.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift>)
-- [NotchPanelView.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift>)
-- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift>)
-- [NotchHUDApp.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift>)
-- [Info.plist](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Info.plist>)
-- [notch-emit](</Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-emit>)
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+- [SessionRowView.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift>)
+- [NotchPanelView.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift>)
+- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift>)
+- [VibenotchApp.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift>)
+- [Info.plist](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Info.plist>)
+- [vibenotch-emit](</Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-emit>)
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274176d9fd6
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -17,6 +17,7 @@
  private final class AppDelegate: NSObject, NSApplicationDelegate {
      private var environment: AppEnvironment?
@@ -5419,11 +5419,11 @@ index d56b5c7b841e66b653f746118ecc36b07fe2b8c3..2ef92b94f236fb6eb25b17ba78e93274
          self.spoolWatcher = spoolWatcher
          self.windowManager = windowManager
  
-diff --git a/Sources/NotchHUD/Focus/AppleScriptRunner.swift b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
+diff --git a/Sources/Vibenotch/Focus/AppleScriptRunner.swift b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7b6c76d15
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/AppleScriptRunner.swift
++++ b/Sources/Vibenotch/Focus/AppleScriptRunner.swift
 @@ -0,0 +1,40 @@
 +import AppKit
 +import Foundation
@@ -5465,11 +5465,11 @@ index 0000000000000000000000000000000000000000..08b2ef78b514f10800cda70efa4309c7
 +        return output.stringValue
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusDispatcher.swift b/Sources/NotchHUD/Focus/FocusDispatcher.swift
+diff --git a/Sources/Vibenotch/Focus/FocusDispatcher.swift b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9866d734b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusDispatcher.swift
++++ b/Sources/Vibenotch/Focus/FocusDispatcher.swift
 @@ -0,0 +1,34 @@
 +import Foundation
 +
@@ -5505,11 +5505,11 @@ index 0000000000000000000000000000000000000000..3cfe56c9e4bc03227b0b9393b619b7c9
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/FocusStrategy.swift b/Sources/NotchHUD/Focus/FocusStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/FocusStrategy.swift b/Sources/Vibenotch/Focus/FocusStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd465c2f0144
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/FocusStrategy.swift
++++ b/Sources/Vibenotch/Focus/FocusStrategy.swift
 @@ -0,0 +1,10 @@
 +protocol FocusStrategy: Sendable {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool
@@ -5521,11 +5521,11 @@ index 0000000000000000000000000000000000000000..d19e238438f7fe49c73664d04209fd46
 +    case permissionDenied(String)
 +    case scriptFailed(String)
 +}
-diff --git a/Sources/NotchHUD/Focus/ITerm2Strategy.swift b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
+diff --git a/Sources/Vibenotch/Focus/ITerm2Strategy.swift b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8e7fe1314
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/ITerm2Strategy.swift
++++ b/Sources/Vibenotch/Focus/ITerm2Strategy.swift
 @@ -0,0 +1,9 @@
 +struct ITerm2Strategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5536,11 +5536,11 @@ index 0000000000000000000000000000000000000000..74cd60377b64a6324a5dc83dc3a564a8
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/KittyStrategy.swift b/Sources/NotchHUD/Focus/KittyStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/KittyStrategy.swift b/Sources/Vibenotch/Focus/KittyStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfdf9186d5b
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/KittyStrategy.swift
++++ b/Sources/Vibenotch/Focus/KittyStrategy.swift
 @@ -0,0 +1,9 @@
 +struct KittyStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5551,11 +5551,11 @@ index 0000000000000000000000000000000000000000..ed42fd64840051d0648600b706d53dfd
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/TerminalAppStrategy.swift b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/TerminalAppStrategy.swift b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e005439c6c2884
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/TerminalAppStrategy.swift
++++ b/Sources/Vibenotch/Focus/TerminalAppStrategy.swift
 @@ -0,0 +1,37 @@
 +import Foundation
 +
@@ -5594,11 +5594,11 @@ index 0000000000000000000000000000000000000000..f09cf959be3e8236f3977f1cd0e00543
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Focus/WezTermStrategy.swift b/Sources/NotchHUD/Focus/WezTermStrategy.swift
+diff --git a/Sources/Vibenotch/Focus/WezTermStrategy.swift b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5ab30132db
 --- /dev/null
-+++ b/Sources/NotchHUD/Focus/WezTermStrategy.swift
++++ b/Sources/Vibenotch/Focus/WezTermStrategy.swift
 @@ -0,0 +1,9 @@
 +struct WezTermStrategy: FocusStrategy {
 +    func canHandle(_ identity: TerminalIdentity) -> Bool {
@@ -5609,23 +5609,23 @@ index 0000000000000000000000000000000000000000..0c1c5596992efec5d1f0efbcb8232f5a
 +        throw FocusError.notFound
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 index 86a96c73d1ea0b71601a1f3f2a5e630cb3791588..8ac3db30052b92d4ed928ab3635ee16376bc0990
---- a/Sources/NotchHUD/Info.plist
-+++ b/Sources/NotchHUD/Info.plist
+--- a/Sources/Vibenotch/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -8,6 +8,8 @@
-     <string>NotchHUD</string>
+     <string>Vibenotch</string>
      <key>LSMinimumSystemVersion</key>
      <string>14.0</string>
 +    <key>NSAppleEventsUsageDescription</key>
-+    <string>NotchHUD raises the terminal window of the agent session you click.</string>
++    <string>Vibenotch raises the terminal window of the agent session you click.</string>
      <key>LSUIElement</key>
      <true/>
  </dict>
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977cf88bec9
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,7 +1,11 @@
 +import AppKit
  import SwiftUI
@@ -5693,10 +5693,10 @@ index a231e3d40ad22c8c7ed3174f70acc22d47f485c7..8aa641784dcff0b057bd494a45fd4977
 +        NSWorkspace.shared.open(url)
 +    }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90d51e30af
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -10,6 +10,7 @@
  
      private let environment: AppEnvironment
@@ -5747,10 +5747,10 @@ index addee4bd9097c2a90d55ce2f9c699331d573a37a..231fc4c05cbc21175450b2a027a51b90
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e418085949eb9a48
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,35 +1,71 @@
  import SwiftUI
  
@@ -5839,10 +5839,10 @@ index edbff2c293b0276d7c836e3e887cbfc0c00137fc..4cf12a876bfaae60e9dbfff7e4180859
 +        .onHover { isHovering = $0 }
      }
  }
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 index 67c87e97dee99efc22bcb20675b8c706660c4b91..c0aba8654a5fbc658597d0b79af488d94a892cb4
---- a/scripts/notch-emit
-+++ b/scripts/notch-emit
+--- a/scripts/vibenotch-emit
++++ b/scripts/vibenotch-emit
 @@ -83,16 +83,23 @@
      *) pid_json=$pid ;;
  esac
@@ -5884,19 +5884,19 @@ Implemented `specs/M2-click-to-focus.md` without running Swift build/tests. Prot
 
 Created:
 
-- [AppleScriptRunner.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/AppleScriptRunner.swift>)
-- [FocusDispatcher.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusDispatcher.swift>)
-- [FocusStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/FocusStrategy.swift>)
-- [TerminalAppStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/TerminalAppStrategy.swift>)
-- [ITerm2Strategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/ITerm2Strategy.swift>)
-- [WezTermStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/WezTermStrategy.swift>)
-- [KittyStrategy.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Focus/KittyStrategy.swift>)
+- [AppleScriptRunner.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/AppleScriptRunner.swift>)
+- [FocusDispatcher.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusDispatcher.swift>)
+- [FocusStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/FocusStrategy.swift>)
+- [TerminalAppStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/TerminalAppStrategy.swift>)
+- [ITerm2Strategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/ITerm2Strategy.swift>)
+- [WezTermStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/WezTermStrategy.swift>)
+- [KittyStrategy.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Focus/KittyStrategy.swift>)
 
 Modified:
 
-- [SessionRowView.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift>)
-- [NotchPanelView.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift>)
-- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift>)
-- [NotchHUDApp.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift>)
-- [Info.plist](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Info.plist>)
-- [notch-emit](</Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-emit>)
+- [SessionRowView.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift>)
+- [NotchPanelView.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift>)
+- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift>)
+- [VibenotchApp.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift>)
+- [Info.plist](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Info.plist>)
+- [vibenotch-emit](</Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-emit>)

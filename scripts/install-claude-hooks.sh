@@ -1,20 +1,20 @@
 #!/bin/sh
 
-# Additively merges NotchHUD's five Claude Code hooks into settings.json.
+# Additively merges Vibenotch's five Claude Code hooks into settings.json.
 # Never touches unrelated keys or unrelated hook entries (e.g. an existing
 # `rtk hook claude` PreToolUse matcher). Idempotent: re-running detects our
-# entries by the notch-claude-hook path and skips. `--uninstall` reverses
+# entries by the vibenotch-claude-hook path and skips. `--uninstall` reverses
 # it by removing only entries whose command contains that path.
 #
 # Env overrides (used by tests so they never touch the real files):
-#   NOTCH_HUD_INSTALL_PREFIX      default $HOME/.notch-hud
-#   NOTCH_INSTALL_CLAUDE_SETTINGS default $HOME/.claude/settings.json
+#   VIBEVIBENOTCH_INSTALL_PREFIX      default $HOME/.vibenotch
+#   VIBENOTCH_INSTALL_CLAUDE_SETTINGS default $HOME/.claude/settings.json
 
 set -eu
 
-install_prefix=${NOTCH_HUD_INSTALL_PREFIX:-"$HOME/.notch-hud"}
-settings_path=${NOTCH_INSTALL_CLAUDE_SETTINGS:-"$HOME/.claude/settings.json"}
-hook_path=$install_prefix/bin/notch-claude-hook
+install_prefix=${VIBEVIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
+settings_path=${VIBENOTCH_INSTALL_CLAUDE_SETTINGS:-"$HOME/.claude/settings.json"}
+hook_path=$install_prefix/bin/vibenotch-claude-hook
 timestamp=$(date -u +%Y%m%d%H%M%S)
 
 mode=install
@@ -22,13 +22,13 @@ case ${1:-} in
     --uninstall) mode=uninstall ;;
     "") ;;
     *)
-        printf '%s\n' "notch-hud: opção desconhecida para install-claude-hooks.sh: $1" >&2
+        printf '%s\n' "vibenotch: opção desconhecida para install-claude-hooks.sh: $1" >&2
         exit 64
         ;;
 esac
 
 command -v python3 >/dev/null 2>&1 || {
-    printf '%s\n' "notch-hud: 'python3' em falta; não é possível atualizar $settings_path" >&2
+    printf '%s\n' "vibenotch: 'python3' em falta; não é possível atualizar $settings_path" >&2
     exit 1
 }
 
@@ -53,10 +53,10 @@ if raw.strip():
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"notch-hud: {path} não é JSON válido ({exc}); não foi tocado", file=sys.stderr)
+        print(f"vibenotch: {path} não é JSON válido ({exc}); não foi tocado", file=sys.stderr)
         sys.exit(1)
     if not isinstance(data, dict):
-        print(f"notch-hud: {path} não contém um objeto JSON; não foi tocado", file=sys.stderr)
+        print(f"vibenotch: {path} não contém um objeto JSON; não foi tocado", file=sys.stderr)
         sys.exit(1)
 else:
     data = {}
@@ -65,7 +65,7 @@ hooks = data.get("hooks")
 if hooks is None:
     hooks = {}
 elif not isinstance(hooks, dict):
-    print(f"notch-hud: {path} tem uma chave \"hooks\" que não é um objeto; não foi tocado", file=sys.stderr)
+    print(f"vibenotch: {path} tem uma chave \"hooks\" que não é um objeto; não foi tocado", file=sys.stderr)
     sys.exit(1)
 data["hooks"] = hooks
 

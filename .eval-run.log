@@ -1,17 +1,17 @@
 [0/1] Planning build
 Building for debugging...
 [0/3] Write swift-version--1AB21518FC5DEDBE.txt
-Build of product 'NotchHUD' complete! (0.15s)
-2026-07-22 08:58:17.614 NotchHUD[33799:11503957] [HoverDiag] PIN notchRect=(918.0, 1291.0, 220.0, 38.0) hitRect=(768.0, 1275.0, 520.0, 54.0) screenFrame=(0.0, 0.0, 2056.0, 1329.0) monitors=true/true
-2026-07-22 08:58:21.503 NotchHUD[33799:11503957] [HoverDiag] ENTER delivered -> expand()
-2026-07-22 08:58:21.503 NotchHUD[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
-2026-07-22 08:58:23.536 NotchHUD[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
-2026-07-22 08:58:23.537 NotchHUD[33799:11503957] [HoverDiag] collapse(reason: hover)
-2026-07-22 08:58:25.399 NotchHUD[33799:11503957] [HoverDiag] ENTER delivered -> expand()
-2026-07-22 08:58:25.399 NotchHUD[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
-2026-07-22 08:58:27.434 NotchHUD[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
-2026-07-22 08:58:27.434 NotchHUD[33799:11503957] [HoverDiag] collapse(reason: hover)
-2026-07-22 08:58:29.234 NotchHUD[33799:11503957] [HoverDiag] ENTER delivered -> expand()
-2026-07-22 08:58:29.235 NotchHUD[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
-2026-07-22 08:58:31.322 NotchHUD[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
-2026-07-22 08:58:31.323 NotchHUD[33799:11503957] [HoverDiag] collapse(reason: hover)
+Build of product 'Vibenotch' complete! (0.15s)
+2026-07-22 08:58:17.614 Vibenotch[33799:11503957] [HoverDiag] PIN notchRect=(918.0, 1291.0, 220.0, 38.0) hitRect=(768.0, 1275.0, 520.0, 54.0) screenFrame=(0.0, 0.0, 2056.0, 1329.0) monitors=true/true
+2026-07-22 08:58:21.503 Vibenotch[33799:11503957] [HoverDiag] ENTER delivered -> expand()
+2026-07-22 08:58:21.503 Vibenotch[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
+2026-07-22 08:58:23.536 Vibenotch[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
+2026-07-22 08:58:23.537 Vibenotch[33799:11503957] [HoverDiag] collapse(reason: hover)
+2026-07-22 08:58:25.399 Vibenotch[33799:11503957] [HoverDiag] ENTER delivered -> expand()
+2026-07-22 08:58:25.399 Vibenotch[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
+2026-07-22 08:58:27.434 Vibenotch[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
+2026-07-22 08:58:27.434 Vibenotch[33799:11503957] [HoverDiag] collapse(reason: hover)
+2026-07-22 08:58:29.234 Vibenotch[33799:11503957] [HoverDiag] ENTER delivered -> expand()
+2026-07-22 08:58:29.235 Vibenotch[33799:11503957] [HoverDiag] expand(reason: hover) isExpanded=false selectedScreen=true notchedHUD=true
+2026-07-22 08:58:31.322 Vibenotch[33799:11503957] [HoverDiag] EXIT delivered -> collapse()
+2026-07-22 08:58:31.323 Vibenotch[33799:11503957] [HoverDiag] collapse(reason: hover)

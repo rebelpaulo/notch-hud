@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.144.1
 --------
-workdir: /Users/coopersimson/Desktop/AI Projects/notch-hud
+workdir: /Users/coopersimson/Desktop/AI Projects/vibenotch
 model: gpt-5.6-sol
 provider: openai
 approval: never
@@ -11,7 +11,7 @@ reasoning summaries: none
 session id: 019f80f7-1146-70e2-8138-4a07ab46efa7
 --------
 user
-You are the worker. Implement specs/M1-live-claude-sessions.md EXACTLY. Read the current NotchWindowManager.swift, NotchPeekView.swift, NotchPanelView.swift, SessionRowView.swift, AppEnvironment.swift, NotchHUDApp.swift first so the store wiring matches the existing code. Create the model/store/watcher Swift files and the shell scripts, and wire the views to the live SessionStore. DO NOT touch HoverController or NotchGeometry. DO NOT change hover behavior. DO NOT run swift build/test (sandbox). Only write files. Print files created/modified.
+You are the worker. Implement specs/M1-live-claude-sessions.md EXACTLY. Read the current NotchWindowManager.swift, NotchPeekView.swift, NotchPanelView.swift, SessionRowView.swift, AppEnvironment.swift, VibenotchApp.swift first so the store wiring matches the existing code. Create the model/store/watcher Swift files and the shell scripts, and wire the views to the live SessionStore. DO NOT touch HoverController or NotchGeometry. DO NOT change hover behavior. DO NOT run swift build/test (sandbox). Only write files. Print files created/modified.
 codex
 I’ll first read the milestone spec and the six named Swift files, then map the existing view/environment wiring before making only the requested file edits. I’ll leave hover and geometry code untouched and won’t run builds or tests.
   → Read the milestone spec and required existing Swift files
@@ -20,27 +20,27 @@ I’ll first read the milestone spec and the six named Swift files, then map the
   • Wire existing app and views to the live SessionStore
   • Review diffs and report files created or modified
 exec
-/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M1-live-claude-sessions.md' -g 'NotchWindowManager.swift' -g 'NotchPeekView.swift' -g 'NotchPanelView.swift' -g 'SessionRowView.swift' -g 'AppEnvironment.swift' -g 'NotchHUDApp.swift'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M1-live-claude-sessions.md' -g 'NotchWindowManager.swift' -g 'NotchPeekView.swift' -g 'NotchPanelView.swift' -g 'SessionRowView.swift' -g 'AppEnvironment.swift' -g 'VibenotchApp.swift'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-/Users/coopersimson/Desktop/AI Projects/notch-hud
-Sources/NotchHUD/App/AppEnvironment.swift
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Notch/NotchPeekView.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch
+Sources/Vibenotch/App/AppEnvironment.swift
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Notch/NotchPeekView.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
 specs/M1-live-claude-sessions.md
 
 exec
-/bin/zsh -lc "wc -l specs/M1-live-claude-sessions.md Sources/NotchHUD/Notch/NotchWindowManager.swift Sources/NotchHUD/Notch/NotchPeekView.swift Sources/NotchHUD/Notch/NotchPanelView.swift Sources/NotchHUD/Notch/SessionRowView.swift Sources/NotchHUD/App/AppEnvironment.swift Sources/NotchHUD/App/NotchHUDApp.swift && sed -n '1,260p' specs/M1-live-claude-sessions.md && sed -n '1,260p' Sources/NotchHUD/Notch/NotchWindowManager.swift && sed -n '1,220p' Sources/NotchHUD/Notch/NotchPeekView.swift && sed -n '1,260p' Sources/NotchHUD/Notch/NotchPanelView.swift && sed -n '1,240p' Sources/NotchHUD/Notch/SessionRowView.swift && sed -n '1,240p' Sources/NotchHUD/App/AppEnvironment.swift && sed -n '1,240p' Sources/NotchHUD/App/NotchHUDApp.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "wc -l specs/M1-live-claude-sessions.md Sources/Vibenotch/Notch/NotchWindowManager.swift Sources/Vibenotch/Notch/NotchPeekView.swift Sources/Vibenotch/Notch/NotchPanelView.swift Sources/Vibenotch/Notch/SessionRowView.swift Sources/Vibenotch/App/AppEnvironment.swift Sources/Vibenotch/App/VibenotchApp.swift && sed -n '1,260p' specs/M1-live-claude-sessions.md && sed -n '1,260p' Sources/Vibenotch/Notch/NotchWindowManager.swift && sed -n '1,220p' Sources/Vibenotch/Notch/NotchPeekView.swift && sed -n '1,260p' Sources/Vibenotch/Notch/NotchPanelView.swift && sed -n '1,240p' Sources/Vibenotch/Notch/SessionRowView.swift && sed -n '1,240p' Sources/Vibenotch/App/AppEnvironment.swift && sed -n '1,240p' Sources/Vibenotch/App/VibenotchApp.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
       86 specs/M1-live-claude-sessions.md
-     226 Sources/NotchHUD/Notch/NotchWindowManager.swift
-      35 Sources/NotchHUD/Notch/NotchPeekView.swift
-      42 Sources/NotchHUD/Notch/NotchPanelView.swift
-      31 Sources/NotchHUD/Notch/SessionRowView.swift
-      27 Sources/NotchHUD/App/AppEnvironment.swift
-      47 Sources/NotchHUD/App/NotchHUDApp.swift
+     226 Sources/Vibenotch/Notch/NotchWindowManager.swift
+      35 Sources/Vibenotch/Notch/NotchPeekView.swift
+      42 Sources/Vibenotch/Notch/NotchPanelView.swift
+      31 Sources/Vibenotch/Notch/SessionRowView.swift
+      27 Sources/Vibenotch/App/AppEnvironment.swift
+      47 Sources/Vibenotch/App/VibenotchApp.swift
      494 total
 # M1 spec — Real Claude session status end-to-end (for GPT-5.6 Sol)
 
@@ -53,7 +53,7 @@ Scope for M1: Claude Code only, two events (working on prompt submit, done on st
 - DO NOT change HoverController / NotchGeometry / hover behavior. Additive work + wiring only.
 - Keep everything compiling under Command Line Tools (no `@Entry`/`#Preview` macros; `@Observable` is fine).
 
-## 1. Model files (Sources/NotchHUD/Model/)
+## 1. Model files (Sources/Vibenotch/Model/)
 
 ### `SessionStatus.swift`
 ```swift
@@ -74,7 +74,7 @@ Use a decoder that tolerates missing optional keys.
 ### `Session.swift`
 The in-memory model the UI uses: `id`, `agent`, `project` (fallback to basename of cwd, else id), `status`, `detail`, `updatedAt: Date`, `seq`, `terminal`. Init from a `SessionEnvelope`. Provide `displayStatus`.
 
-## 2. Store + watcher (Sources/NotchHUD/Store/)
+## 2. Store + watcher (Sources/Vibenotch/Store/)
 
 ### `SpoolReader.swift`
 Reads one `<id>.json` file: `Data(contentsOf:)`, JSON-decode to `SessionEnvelope`, return `Session?` (nil on decode failure — caller retries next tick). ISO8601 parsing via `ISO8601DateFormatter` (with fractional seconds).
@@ -93,17 +93,17 @@ Reads one `<id>.json` file: `Data(contentsOf:)`, JSON-decode to `SessionEnvelope
 - Computed summary for the peek: `counts: (working: Int, needsMe: Int, done: Int)` and `total`.
 
 ## 3. Wire the UI to live data
-- `AppEnvironment` already owns `spoolURL`. Create a single `SessionStore` and `SpoolWatcher` in `NotchHUDApp`/`AppDelegate`, start the watcher, and inject the store into the SwiftUI views (as `@Environment` or passed in).
+- `AppEnvironment` already owns `spoolURL`. Create a single `SessionStore` and `SpoolWatcher` in `VibenotchApp`/`AppDelegate`, start the watcher, and inject the store into the SwiftUI views (as `@Environment` or passed in).
 - `NotchPeekView`: show `store.total` and up to 3 colored dots reflecting the real status mix (or a compact "n" + dots). Use `.monospacedDigit()`.
 - `NotchPanelView`: list the real `store.sessions` via `SessionRowView` (project name + status dot + optional detail). Empty state: "No active sessions".
 - `SessionRowView`: dot color from `displayStatus`, project name, subtle secondary detail.
 - IMPORTANT: `NotchWindowManager` builds the DynamicNotch with `NotchPeekView()`/`NotchPanelView()` closures — make those views observe the shared store so they update live. Pass the store into the views.
 
-## 4. Emitter scripts (write to repo `scripts/`, they get installed to ~/.notch-hud/bin/ by the manager)
+## 4. Emitter scripts (write to repo `scripts/`, they get installed to ~/.vibenotch/bin/ by the manager)
 
-### `scripts/notch-emit`  (POSIX sh, `chmod +x`)
-Usage: `notch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd DIR] [--pid N] [--remove]`
-- Spool dir: `${NOTCH_HUD_HOME:-$HOME/.notch-hud}/sessions` (mkdir -p).
+### `scripts/vibenotch-emit`  (POSIX sh, `chmod +x`)
+Usage: `vibenotch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd DIR] [--pid N] [--remove]`
+- Spool dir: `${VIBENOTCH_HOME:-$HOME/.vibenotch}/sessions` (mkdir -p).
 - Capture terminal identity from inherited env: `TERM_PROGRAM`, `ITERM_SESSION_ID`, `WEZTERM_PANE`, `KITTY_WINDOW_ID`, and tty via `ps -o tty= -p "$PPID" 2>/dev/null` (prefix `/dev/`), fallback `tty`.
 - Maintain a per-id seq counter file at `<spool>/../seq/<id>` (mkdir -p), increment each write.
 - Build JSON with `jq -n` (jq is available). Fields per the SessionEnvelope schema (schema=1, updated = ISO8601 UTC `date -u +%Y-%m-%dT%H:%M:%SZ`).
@@ -111,20 +111,20 @@ Usage: `notch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd 
 - `--remove` deletes `<id>.json` (and seq file).
 - Always `exit 0` fast.
 
-### `scripts/notch-claude-hook`  (POSIX sh, `chmod +x`)
-Usage: `notch-claude-hook <status>` where status ∈ starting|working|needs_me|done|remove.
+### `scripts/vibenotch-claude-hook`  (POSIX sh, `chmod +x`)
+Usage: `vibenotch-claude-hook <status>` where status ∈ starting|working|needs_me|done|remove.
 - Read hook JSON from stdin, extract with jq: `.session_id`, `.cwd`.
 - Compute id = `claude-<session_id>`, project = basename of cwd.
-- If status == remove → call `notch-emit "$id" claude-code remove --remove`.
-- Else → call `notch-emit "$id" claude-code "$status" --cwd "$cwd" --project "$project"`.
+- If status == remove → call `vibenotch-emit "$id" claude-code remove --remove`.
+- Else → call `vibenotch-emit "$id" claude-code "$status" --cwd "$cwd" --project "$project"`.
 - Must `exit 0` always (never block Claude). Tolerate missing jq/fields gracefully.
 
 ## 5. Provide a manual test fixture
-`scripts/notch-fixture.sh` — writes 2 fake session files directly (one working, one done) so the manager can verify the watcher/UI without a real Claude session. Just calls notch-emit twice with fake ids.
+`scripts/vibenotch-fixture.sh` — writes 2 fake session files directly (one working, one done) so the manager can verify the watcher/UI without a real Claude session. Just calls vibenotch-emit twice with fake ids.
 
 ## Acceptance (manager verifies — do not self-certify)
 1. `swift build` exits 0; `swift test` still green.
-2. Running `scripts/notch-fixture.sh` creates files under `~/.notch-hud/sessions/`, and the running app's peek count + panel reflect them within ~1s (watcher works).
+2. Running `scripts/vibenotch-fixture.sh` creates files under `~/.vibenotch/sessions/`, and the running app's peek count + panel reflect them within ~1s (watcher works).
 3. With the manager-installed Claude hooks, a real Claude session shows Working on prompt submit and Done on stop.
 
 When done: print files created/modified. Do not build.
@@ -162,7 +162,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -182,7 +182,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -393,7 +393,7 @@ import SwiftUI
 
 struct NotchPanelView: View {
     private let sessions = [
-        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
         SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
         SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
     ]
@@ -471,7 +471,7 @@ struct AppEnvironment {
 
     init(fileManager: FileManager = .default) {
         spoolURL = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notch-hud", isDirectory: true)
+            .appendingPathComponent(".vibenotch", isDirectory: true)
             .appendingPathComponent("sessions", isDirectory: true)
 
         do {
@@ -485,7 +485,7 @@ struct AppEnvironment {
                 ofItemAtPath: spoolURL.path
             )
         } catch {
-            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
+            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
         }
     }
 }
@@ -494,7 +494,7 @@ import SwiftUI
 
 @main
 @MainActor
-struct NotchHUDApp: App {
+struct VibenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -546,7 +546,7 @@ Read the full milestone spec and all six required Swift files; now checking pack
   • Wire existing app and views to the live SessionStore
   • Review diffs and report files created or modified
 exec
-/bin/zsh -lc "git status --short && rg --files | sort && sed -n '1,260p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "git status --short && rg --files | sort && sed -n '1,260p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 ?? .codex/
 ?? .eval-run.log
@@ -567,18 +567,18 @@ exec
 ?? tools/
 ?? vendor/
 Package.swift
-Sources/NotchHUD/App/AppEnvironment.swift
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Info.plist
-Sources/NotchHUD/Model/NotchGeometry.swift
-Sources/NotchHUD/Notch/HoverController.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
-Sources/NotchHUD/Notch/NotchPeekView.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
+Sources/Vibenotch/App/AppEnvironment.swift
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Info.plist
+Sources/Vibenotch/Model/NotchGeometry.swift
+Sources/Vibenotch/Notch/HoverController.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
+Sources/Vibenotch/Notch/NotchPeekView.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
 TASKS.md
-Tests/NotchHUDTests/AppEnvironmentTests.swift
-Tests/NotchHUDTests/NotchGeometryTests.swift
+Tests/VibenotchTests/AppEnvironmentTests.swift
+Tests/VibenotchTests/NotchGeometryTests.swift
 evals/hover_eval.sh
 expanded.png
 notch_crop.png
@@ -623,7 +623,7 @@ vendor/DynamicNotchKit/media/demo.gif
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -632,25 +632,25 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         ),
         .testTarget(
-            name: "NotchHUDTests",
-            dependencies: ["NotchHUD"],
-            path: "Tests/NotchHUDTests"
+            name: "VibenotchTests",
+            dependencies: ["Vibenotch"],
+            path: "Tests/VibenotchTests"
         )
     ]
 )
@@ -664,29 +664,29 @@ Repository structure and Swift target are confirmed. Beginning the requested add
   • Wire existing app and views to the live SessionStore
   • Review diffs and report files created or modified
 exec
-/bin/zsh -lc 'mkdir -p Sources/NotchHUD/Store scripts' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'mkdir -p Sources/Vibenotch/Store scripts' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/Session.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/SessionEnvelope.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/SessionStatus.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/TerminalIdentity.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Store/SessionStore.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Store/SpoolReader.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Store/SpoolWatcher.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-claude-hook
-/Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-emit
-/Users/coopersimson/Desktop/AI Projects/notch-hud/scripts/notch-fixture.sh
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/Session.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/SessionEnvelope.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/SessionStatus.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/TerminalIdentity.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Store/SessionStore.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Store/SpoolReader.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Store/SpoolWatcher.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-claude-hook
+/Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-emit
+/Users/coopersimson/Desktop/AI Projects/vibenotch/scripts/vibenotch-fixture.sh
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -720,11 +720,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea76c2ff75a
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,42 @@
 +import Foundation
 +
@@ -768,11 +768,11 @@ index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea7
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2f7aafde7
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,48 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -822,11 +822,11 @@ index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f39f731c5
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -881,11 +881,11 @@ index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -895,16 +895,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -942,10 +942,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c44004654bf39
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -990,10 +990,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c4400
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -1047,10 +1047,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f2661687f
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -1099,11 +1099,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -1165,11 +1165,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -1198,11 +1198,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd2703afb3
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -1212,7 +1212,7 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -1401,11 +1401,11 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -1424,7 +1424,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -1440,11 +1440,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -1501,7 +1501,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -1581,7 +1581,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -1590,16 +1590,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -1615,10 +1615,10 @@ index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3f
 +
 +exit 0
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -1652,11 +1652,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea76c2ff75a
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,42 @@
 +import Foundation
 +
@@ -1700,11 +1700,11 @@ index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea7
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2f7aafde7
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,48 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -1754,11 +1754,11 @@ index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f39f731c5
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -1813,11 +1813,11 @@ index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -1827,16 +1827,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -1874,10 +1874,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c44004654bf39
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -1922,10 +1922,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c4400
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -1979,10 +1979,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f2661687f
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -2031,11 +2031,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -2097,11 +2097,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -2130,11 +2130,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd2703afb3
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -2144,7 +2144,7 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -2333,11 +2333,11 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -2356,7 +2356,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -2372,11 +2372,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -2433,7 +2433,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -2513,7 +2513,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -2522,16 +2522,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -2548,11 +2548,11 @@ index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3f
 +exit 0
 
 exec
-/bin/zsh -lc "chmod +x scripts/notch-emit scripts/notch-claude-hook scripts/notch-fixture.sh && stat -f '%Sp %N' scripts/notch-emit scripts/notch-claude-hook scripts/notch-fixture.sh && sed -n '1,220p' Sources/NotchHUD/Model/SessionStatus.swift && sed -n '1,220p' Sources/NotchHUD/Model/TerminalIdentity.swift && sed -n '1,260p' Sources/NotchHUD/Model/SessionEnvelope.swift && sed -n '1,220p' Sources/NotchHUD/Model/Session.swift && sed -n '1,220p' Sources/NotchHUD/Store/SpoolReader.swift && sed -n '1,300p' Sources/NotchHUD/Store/SessionStore.swift && sed -n '1,380p' Sources/NotchHUD/Store/SpoolWatcher.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "chmod +x scripts/vibenotch-emit scripts/vibenotch-claude-hook scripts/vibenotch-fixture.sh && stat -f '%Sp %N' scripts/vibenotch-emit scripts/vibenotch-claude-hook scripts/vibenotch-fixture.sh && sed -n '1,220p' Sources/Vibenotch/Model/SessionStatus.swift && sed -n '1,220p' Sources/Vibenotch/Model/TerminalIdentity.swift && sed -n '1,260p' Sources/Vibenotch/Model/SessionEnvelope.swift && sed -n '1,220p' Sources/Vibenotch/Model/Session.swift && sed -n '1,220p' Sources/Vibenotch/Store/SpoolReader.swift && sed -n '1,300p' Sources/Vibenotch/Store/SessionStore.swift && sed -n '1,380p' Sources/Vibenotch/Store/SpoolWatcher.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
--rwxr-xr-x scripts/notch-emit
--rwxr-xr-x scripts/notch-claude-hook
--rwxr-xr-x scripts/notch-fixture.sh
+-rwxr-xr-x scripts/vibenotch-emit
+-rwxr-xr-x scripts/vibenotch-claude-hook
+-rwxr-xr-x scripts/vibenotch-fixture.sh
 import SwiftUI
 
 enum SessionStatus: String, Codable, Sendable {
@@ -2799,7 +2799,7 @@ final class SpoolWatcher: @unchecked Sendable {
     private let store: SessionStore
     private let fileManager: FileManager
     private let reader = SpoolReader()
-    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
+    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 
     private var source: DispatchSourceFileSystemObject?
     private var debounceWorkItem: DispatchWorkItem?
@@ -2989,10 +2989,10 @@ final class SpoolWatcher: @unchecked Sendable {
     }
 }
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -3026,11 +3026,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea76c2ff75a
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,42 @@
 +import Foundation
 +
@@ -3074,11 +3074,11 @@ index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea7
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2f7aafde7
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,48 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -3128,11 +3128,11 @@ index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f39f731c5
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -3187,11 +3187,11 @@ index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -3201,16 +3201,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -3248,10 +3248,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c44004654bf39
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -3296,10 +3296,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c4400
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -3353,10 +3353,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f2661687f
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -3405,11 +3405,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -3471,11 +3471,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -3504,11 +3504,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd2703afb3
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -3518,7 +3518,7 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -3707,11 +3707,11 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -3730,7 +3730,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -3746,11 +3746,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -3807,7 +3807,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -3887,7 +3887,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -3896,16 +3896,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -3922,7 +3922,7 @@ index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3f
 +exit 0
 
 exec
-/bin/zsh -lc "sed -n '1,260p' Sources/NotchHUD/Notch/NotchPeekView.swift && sed -n '1,300p' Sources/NotchHUD/Notch/NotchPanelView.swift && sed -n '1,260p' Sources/NotchHUD/Notch/SessionRowView.swift && sed -n '1,300p' Sources/NotchHUD/Notch/NotchWindowManager.swift && sed -n '1,220p' Sources/NotchHUD/App/AppEnvironment.swift && sed -n '1,260p' Sources/NotchHUD/App/NotchHUDApp.swift && sed -n '1,320p' scripts/notch-emit && sed -n '1,220p' scripts/notch-claude-hook && sed -n '1,180p' scripts/notch-fixture.sh" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,260p' Sources/Vibenotch/Notch/NotchPeekView.swift && sed -n '1,300p' Sources/Vibenotch/Notch/NotchPanelView.swift && sed -n '1,260p' Sources/Vibenotch/Notch/SessionRowView.swift && sed -n '1,300p' Sources/Vibenotch/Notch/NotchWindowManager.swift && sed -n '1,220p' Sources/Vibenotch/App/AppEnvironment.swift && sed -n '1,260p' Sources/Vibenotch/App/VibenotchApp.swift && sed -n '1,320p' scripts/vibenotch-emit && sed -n '1,220p' scripts/vibenotch-claude-hook && sed -n '1,180p' scripts/vibenotch-fixture.sh" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import SwiftUI
 
@@ -4079,7 +4079,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -4099,7 +4099,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -4282,7 +4282,7 @@ struct AppEnvironment {
 
     init(fileManager: FileManager = .default) {
         spoolURL = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notch-hud", isDirectory: true)
+            .appendingPathComponent(".vibenotch", isDirectory: true)
             .appendingPathComponent("sessions", isDirectory: true)
 
         do {
@@ -4296,7 +4296,7 @@ struct AppEnvironment {
                 ofItemAtPath: spoolURL.path
             )
         } catch {
-            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
+            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
         }
     }
 }
@@ -4305,7 +4305,7 @@ import SwiftUI
 
 @main
 @MainActor
-struct NotchHUDApp: App {
+struct VibenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -4410,7 +4410,7 @@ case $id in
         ;;
 esac
 
-notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
+notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 spool_dir=$notch_home/sessions
 seq_dir=$notch_home/seq
 session_file=$spool_dir/$id.json
@@ -4490,7 +4490,7 @@ if jq -n \
             kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
             windowId: (if $window_id == "" then null else $window_id end)
         },
-        source: "notch-emit"
+        source: "vibenotch-emit"
     }' > "$tmp_file" 2>/dev/null
 then
     mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -4516,7 +4516,7 @@ cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
 [ -n "$session_id" ] || exit 0
 
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-emitter=$script_dir/notch-emit
+emitter=$script_dir/vibenotch-emit
 [ -x "$emitter" ] || exit 0
 
 id=claude-$session_id
@@ -4535,7 +4535,7 @@ exit 0
 #!/bin/sh
 
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-emitter=$script_dir/notch-emit
+emitter=$script_dir/vibenotch-emit
 
 [ -x "$emitter" ] || exit 0
 
@@ -4551,10 +4551,10 @@ emitter=$script_dir/notch-emit
 
 exit 0
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -4588,11 +4588,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea76c2ff75a
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,42 @@
 +import Foundation
 +
@@ -4636,11 +4636,11 @@ index 0000000000000000000000000000000000000000..9d956635fd958c3ab28aa5352d5b7ea7
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2f7aafde7
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,48 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -4690,11 +4690,11 @@ index 0000000000000000000000000000000000000000..660b951f5a0e6e127c99860a0f055da2
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f39f731c5
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -4749,11 +4749,11 @@ index 0000000000000000000000000000000000000000..f24c3dab52bc769ccca8b813cfcab75f
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -4763,16 +4763,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -4810,10 +4810,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c44004654bf39
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -4858,10 +4858,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..b223adb5d513218a466aeb1d5d0c4400
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -4915,10 +4915,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f2661687f
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -4967,11 +4967,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..f23c074da8f4283fbb0fd4dc8a32657f
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -5033,11 +5033,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -5066,11 +5066,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd2703afb3
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -5080,7 +5080,7 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -5269,11 +5269,11 @@ index 0000000000000000000000000000000000000000..a0c729a2cf34a76c8acf92ae3878fbfd
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -5292,7 +5292,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -5308,11 +5308,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -5369,7 +5369,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -5449,7 +5449,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -5458,16 +5458,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -5487,16 +5487,16 @@ codex
 The first pass is in place. I’m doing a read-only conformance review now; I found two small hardening points to address in-file: make the peek dots represent distinct live status categories, and use explicit SwiftUI text/accessor forms that are safer under the Swift 6 toolchain.
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/Session.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/SessionEnvelope.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/SessionStatus.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Store/SpoolWatcher.swift
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/Session.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/SessionEnvelope.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/SessionStatus.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -5530,11 +5530,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1ab032a5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,58 @@
 +import Foundation
 +
@@ -5594,11 +5594,11 @@ index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8dd6e42f5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,78 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -5678,11 +5678,11 @@ index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8d
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87612f9fe6
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -5737,11 +5737,11 @@ index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -5751,16 +5751,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -5798,10 +5798,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3101de741
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -5857,10 +5857,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -5914,10 +5914,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0c00137fc
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -5966,11 +5966,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -6032,11 +6032,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -6065,11 +6065,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c7285b54a
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -6079,7 +6079,7 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -6268,11 +6268,11 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -6291,7 +6291,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -6307,11 +6307,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -6368,7 +6368,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -6448,7 +6448,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -6457,16 +6457,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -6482,10 +6482,10 @@ index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3f
 +
 +exit 0
 
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -6519,11 +6519,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1ab032a5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,58 @@
 +import Foundation
 +
@@ -6583,11 +6583,11 @@ index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8dd6e42f5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,78 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -6667,11 +6667,11 @@ index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8d
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87612f9fe6
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -6726,11 +6726,11 @@ index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -6740,16 +6740,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -6787,10 +6787,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3101de741
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -6846,10 +6846,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -6903,10 +6903,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0c00137fc
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -6955,11 +6955,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -7021,11 +7021,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -7054,11 +7054,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c7285b54a
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -7068,7 +7068,7 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -7257,11 +7257,11 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -7280,7 +7280,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -7296,11 +7296,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -7357,7 +7357,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -7437,7 +7437,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -7446,16 +7446,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -7474,55 +7474,55 @@ index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3f
 codex
 The implementation now matches the requested data path end to end: hook JSON → atomic spool files → debounced directory rescans → main-actor store → live DynamicNotch views. I’m checking only file contents/references and executable bits; I will not invoke Swift build/test or run the fixture.
 exec
-/bin/zsh -lc "rg -n 'NotchPeekView\\(\\)|NotchPanelView\\(\\)|SessionRowView\\.Session|Text\\(\"3\"\\)|statusBlue|statusYellow|statusGreen' Sources/NotchHUD || true
-rg -n 'SessionStore|SpoolWatcher|NotchPeekView\\(store:|NotchPanelView\\(store:' Sources/NotchHUD
-find Sources/NotchHUD/Model Sources/NotchHUD/Store scripts -maxdepth 1 -type f -print | sort
-stat -f '%Sp %N' scripts/notch-emit scripts/notch-claude-hook scripts/notch-fixture.sh
-git status --short -- Sources/NotchHUD/App/AppEnvironment.swift Sources/NotchHUD/App/NotchHUDApp.swift Sources/NotchHUD/Model Sources/NotchHUD/Notch/HoverController.swift Sources/NotchHUD/Model/NotchGeometry.swift Sources/NotchHUD/Notch/NotchPeekView.swift Sources/NotchHUD/Notch/NotchPanelView.swift Sources/NotchHUD/Notch/SessionRowView.swift Sources/NotchHUD/Notch/NotchWindowManager.swift Sources/NotchHUD/Store scripts" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "rg -n 'NotchPeekView\\(\\)|NotchPanelView\\(\\)|SessionRowView\\.Session|Text\\(\"3\"\\)|statusBlue|statusYellow|statusGreen' Sources/Vibenotch || true
+rg -n 'SessionStore|SpoolWatcher|NotchPeekView\\(store:|NotchPanelView\\(store:' Sources/Vibenotch
+find Sources/Vibenotch/Model Sources/Vibenotch/Store scripts -maxdepth 1 -type f -print | sort
+stat -f '%Sp %N' scripts/vibenotch-emit scripts/vibenotch-claude-hook scripts/vibenotch-fixture.sh
+git status --short -- Sources/Vibenotch/App/AppEnvironment.swift Sources/Vibenotch/App/VibenotchApp.swift Sources/Vibenotch/Model Sources/Vibenotch/Notch/HoverController.swift Sources/Vibenotch/Model/NotchGeometry.swift Sources/Vibenotch/Notch/NotchPeekView.swift Sources/Vibenotch/Notch/NotchPanelView.swift Sources/Vibenotch/Notch/SessionRowView.swift Sources/Vibenotch/Notch/NotchWindowManager.swift Sources/Vibenotch/Store scripts" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-Sources/NotchHUD/Store/SpoolWatcher.swift:4:final class SpoolWatcher: @unchecked Sendable {
-Sources/NotchHUD/Store/SpoolWatcher.swift:6:    private let store: SessionStore
-Sources/NotchHUD/Store/SpoolWatcher.swift:18:    init(spoolURL: URL, store: SessionStore, fileManager: FileManager = .default) {
-Sources/NotchHUD/Store/SessionStore.swift:5:final class SessionStore {
-Sources/NotchHUD/App/NotchHUDApp.swift:19:    private var sessionStore: SessionStore?
-Sources/NotchHUD/App/NotchHUDApp.swift:20:    private var spoolWatcher: SpoolWatcher?
-Sources/NotchHUD/App/NotchHUDApp.swift:27:        let sessionStore = SessionStore()
-Sources/NotchHUD/App/NotchHUDApp.swift:28:        let spoolWatcher = SpoolWatcher(spoolURL: environment.spoolURL, store: sessionStore)
-Sources/NotchHUD/Notch/NotchPeekView.swift:4:    let store: SessionStore
-Sources/NotchHUD/Notch/NotchWindowManager.swift:12:    private let store: SessionStore
-Sources/NotchHUD/Notch/NotchWindowManager.swift:22:    init(environment: AppEnvironment, store: SessionStore) {
-Sources/NotchHUD/Notch/NotchWindowManager.swift:157:            expanded: { NotchPanelView(store: store) },
-Sources/NotchHUD/Notch/NotchWindowManager.swift:158:            compactLeading: { NotchPeekView(store: store) },
-Sources/NotchHUD/Notch/NotchWindowManager.swift:173:            expanded: { NotchPeekView(store: store) }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:178:            expanded: { NotchPanelView(store: store) }
-Sources/NotchHUD/Notch/NotchPanelView.swift:4:    let store: SessionStore
-Sources/NotchHUD/Model/NotchGeometry.swift
-Sources/NotchHUD/Model/Session.swift
-Sources/NotchHUD/Model/SessionEnvelope.swift
-Sources/NotchHUD/Model/SessionStatus.swift
-Sources/NotchHUD/Model/TerminalIdentity.swift
-Sources/NotchHUD/Store/SessionStore.swift
-Sources/NotchHUD/Store/SpoolReader.swift
-Sources/NotchHUD/Store/SpoolWatcher.swift
-scripts/notch-claude-hook
-scripts/notch-emit
-scripts/notch-fixture.sh
--rwxr-xr-x scripts/notch-emit
--rwxr-xr-x scripts/notch-claude-hook
--rwxr-xr-x scripts/notch-fixture.sh
-?? Sources/NotchHUD/App/AppEnvironment.swift
-?? Sources/NotchHUD/App/NotchHUDApp.swift
-?? Sources/NotchHUD/Model/NotchGeometry.swift
-?? Sources/NotchHUD/Model/Session.swift
-?? Sources/NotchHUD/Model/SessionEnvelope.swift
-?? Sources/NotchHUD/Model/SessionStatus.swift
-?? Sources/NotchHUD/Model/TerminalIdentity.swift
-?? Sources/NotchHUD/Notch/HoverController.swift
-?? Sources/NotchHUD/Notch/NotchPanelView.swift
-?? Sources/NotchHUD/Notch/NotchPeekView.swift
-?? Sources/NotchHUD/Notch/NotchWindowManager.swift
-?? Sources/NotchHUD/Notch/SessionRowView.swift
-?? Sources/NotchHUD/Store/
+Sources/Vibenotch/Store/SpoolWatcher.swift:4:final class SpoolWatcher: @unchecked Sendable {
+Sources/Vibenotch/Store/SpoolWatcher.swift:6:    private let store: SessionStore
+Sources/Vibenotch/Store/SpoolWatcher.swift:18:    init(spoolURL: URL, store: SessionStore, fileManager: FileManager = .default) {
+Sources/Vibenotch/Store/SessionStore.swift:5:final class SessionStore {
+Sources/Vibenotch/App/VibenotchApp.swift:19:    private var sessionStore: SessionStore?
+Sources/Vibenotch/App/VibenotchApp.swift:20:    private var spoolWatcher: SpoolWatcher?
+Sources/Vibenotch/App/VibenotchApp.swift:27:        let sessionStore = SessionStore()
+Sources/Vibenotch/App/VibenotchApp.swift:28:        let spoolWatcher = SpoolWatcher(spoolURL: environment.spoolURL, store: sessionStore)
+Sources/Vibenotch/Notch/NotchPeekView.swift:4:    let store: SessionStore
+Sources/Vibenotch/Notch/NotchWindowManager.swift:12:    private let store: SessionStore
+Sources/Vibenotch/Notch/NotchWindowManager.swift:22:    init(environment: AppEnvironment, store: SessionStore) {
+Sources/Vibenotch/Notch/NotchWindowManager.swift:157:            expanded: { NotchPanelView(store: store) },
+Sources/Vibenotch/Notch/NotchWindowManager.swift:158:            compactLeading: { NotchPeekView(store: store) },
+Sources/Vibenotch/Notch/NotchWindowManager.swift:173:            expanded: { NotchPeekView(store: store) }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:178:            expanded: { NotchPanelView(store: store) }
+Sources/Vibenotch/Notch/NotchPanelView.swift:4:    let store: SessionStore
+Sources/Vibenotch/Model/NotchGeometry.swift
+Sources/Vibenotch/Model/Session.swift
+Sources/Vibenotch/Model/SessionEnvelope.swift
+Sources/Vibenotch/Model/SessionStatus.swift
+Sources/Vibenotch/Model/TerminalIdentity.swift
+Sources/Vibenotch/Store/SessionStore.swift
+Sources/Vibenotch/Store/SpoolReader.swift
+Sources/Vibenotch/Store/SpoolWatcher.swift
+scripts/vibenotch-claude-hook
+scripts/vibenotch-emit
+scripts/vibenotch-fixture.sh
+-rwxr-xr-x scripts/vibenotch-emit
+-rwxr-xr-x scripts/vibenotch-claude-hook
+-rwxr-xr-x scripts/vibenotch-fixture.sh
+?? Sources/Vibenotch/App/AppEnvironment.swift
+?? Sources/Vibenotch/App/VibenotchApp.swift
+?? Sources/Vibenotch/Model/NotchGeometry.swift
+?? Sources/Vibenotch/Model/Session.swift
+?? Sources/Vibenotch/Model/SessionEnvelope.swift
+?? Sources/Vibenotch/Model/SessionStatus.swift
+?? Sources/Vibenotch/Model/TerminalIdentity.swift
+?? Sources/Vibenotch/Notch/HoverController.swift
+?? Sources/Vibenotch/Notch/NotchPanelView.swift
+?? Sources/Vibenotch/Notch/NotchPeekView.swift
+?? Sources/Vibenotch/Notch/NotchWindowManager.swift
+?? Sources/Vibenotch/Notch/SessionRowView.swift
+?? Sources/Vibenotch/Store/
 ?? scripts/
 
 All requested model, watcher/store, script, and UI wiring files are written and reviewed. Per instruction, no Swift build/test or fixture execution was performed.
@@ -7531,10 +7531,10 @@ All requested model, watcher/store, script, and UI wiring files are written and 
   ✓ Create session model/store/watcher files and shell scripts
   ✓ Wire existing app and views to the live SessionStore
   ✓ Review diffs and report files created or modified
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -7568,11 +7568,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1ab032a5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,58 @@
 +import Foundation
 +
@@ -7632,11 +7632,11 @@ index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8dd6e42f5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,78 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -7716,11 +7716,11 @@ index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8d
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87612f9fe6
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -7775,11 +7775,11 @@ index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -7789,16 +7789,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -7836,10 +7836,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3101de741
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -7895,10 +7895,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -7952,10 +7952,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0c00137fc
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -8004,11 +8004,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -8070,11 +8070,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -8103,11 +8103,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c7285b54a
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -8117,7 +8117,7 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -8306,11 +8306,11 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -8329,7 +8329,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -8345,11 +8345,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -8406,7 +8406,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -8486,7 +8486,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -8495,16 +8495,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -8525,30 +8525,30 @@ Implemented `specs/M1-live-claude-sessions.md` exactly as requested. HoverContro
 
 Created:
 
-- [SessionStatus.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/SessionStatus.swift)
-- [TerminalIdentity.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/TerminalIdentity.swift)
-- [SessionEnvelope.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/SessionEnvelope.swift)
-- [Session.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/Session.swift)
-- [SpoolReader.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SpoolReader.swift)
-- [SpoolWatcher.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SpoolWatcher.swift)
-- [SessionStore.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SessionStore.swift)
-- [notch-emit](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-emit)
-- [notch-claude-hook](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-claude-hook)
-- [notch-fixture.sh](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-fixture.sh)
+- [SessionStatus.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/SessionStatus.swift)
+- [TerminalIdentity.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/TerminalIdentity.swift)
+- [SessionEnvelope.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/SessionEnvelope.swift)
+- [Session.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/Session.swift)
+- [SpoolReader.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SpoolReader.swift)
+- [SpoolWatcher.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SpoolWatcher.swift)
+- [SessionStore.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SessionStore.swift)
+- [vibenotch-emit](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-emit)
+- [vibenotch-claude-hook](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-claude-hook)
+- [vibenotch-fixture.sh](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-fixture.sh)
 
 Modified:
 
-- [NotchHUDApp.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift)
-- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift)
-- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift)
-- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift)
-- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift)
+- [VibenotchApp.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift)
+- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift)
+- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift)
+- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift)
+- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift)
 
 All three scripts are executable.
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b07fe2b8c3
---- a/Sources/NotchHUD/App/NotchHUDApp.swift
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
+--- a/Sources/Vibenotch/App/VibenotchApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -16,16 +16,23 @@
  @MainActor
  private final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -8582,11 +8582,11 @@ index 55633cbc3661de76a2fe1171274539f15cdc5b0c..d56b5c7b841e66b653f746118ecc36b0
          NotificationCenter.default.removeObserver(self)
      }
  
-diff --git a/Sources/NotchHUD/Model/Session.swift b/Sources/NotchHUD/Model/Session.swift
+diff --git a/Sources/Vibenotch/Model/Session.swift b/Sources/Vibenotch/Model/Session.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1ab032a5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/Session.swift
++++ b/Sources/Vibenotch/Model/Session.swift
 @@ -0,0 +1,58 @@
 +import Foundation
 +
@@ -8646,11 +8646,11 @@ index 0000000000000000000000000000000000000000..69d9c9045b26e505cc85a243169948d1
 +        return envelope.id
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionEnvelope.swift b/Sources/NotchHUD/Model/SessionEnvelope.swift
+diff --git a/Sources/Vibenotch/Model/SessionEnvelope.swift b/Sources/Vibenotch/Model/SessionEnvelope.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8dd6e42f5f
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionEnvelope.swift
++++ b/Sources/Vibenotch/Model/SessionEnvelope.swift
 @@ -0,0 +1,78 @@
 +struct SessionEnvelope: Codable, Sendable {
 +    let schema: Int
@@ -8730,11 +8730,11 @@ index 0000000000000000000000000000000000000000..6e59d2bb6edc72953d22ef4053738f8d
 +        source = try container.decodeIfPresent(String.self, forKey: .source)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/SessionStatus.swift b/Sources/NotchHUD/Model/SessionStatus.swift
+diff --git a/Sources/Vibenotch/Model/SessionStatus.swift b/Sources/Vibenotch/Model/SessionStatus.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87612f9fe6
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/SessionStatus.swift
++++ b/Sources/Vibenotch/Model/SessionStatus.swift
 @@ -0,0 +1,53 @@
 +import SwiftUI
 +
@@ -8789,11 +8789,11 @@ index 0000000000000000000000000000000000000000..d7fc09bf710c006d16a71bbc06305e87
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Model/TerminalIdentity.swift b/Sources/NotchHUD/Model/TerminalIdentity.swift
+diff --git a/Sources/Vibenotch/Model/TerminalIdentity.swift b/Sources/Vibenotch/Model/TerminalIdentity.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42fad0c304
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/TerminalIdentity.swift
++++ b/Sources/Vibenotch/Model/TerminalIdentity.swift
 @@ -0,0 +1,8 @@
 +struct TerminalIdentity: Codable, Sendable {
 +    let termProgram: String?
@@ -8803,16 +8803,16 @@ index 0000000000000000000000000000000000000000..f3970dc076f66e95ad915e83274f7a42
 +    let kittyWindowId: String?
 +    let windowId: String?
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d47f485c7
---- a/Sources/NotchHUD/Notch/NotchPanelView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
+--- a/Sources/Vibenotch/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -1,11 +1,7 @@
  import SwiftUI
  
  struct NotchPanelView: View {
 -    private let sessions = [
--        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+-        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 -        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 -        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 -    ]
@@ -8850,10 +8850,10 @@ index 04a4a2fff065e07efcb7e2b1a1a30139836ad639..a231e3d40ad22c8c7ed3174f70acc22d
                  }
              }
          }
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3101de741
---- a/Sources/NotchHUD/Notch/NotchPeekView.swift
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
+--- a/Sources/Vibenotch/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -1,18 +1,19 @@
  import SwiftUI
  
@@ -8909,10 +8909,10 @@ index 985c6b642c66ae228360a7c2ef84d7f67ad960dd..ff2fc4f2f605124ae4f33a11cea925d3
 -    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 -    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331d573a37a
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -9,6 +9,7 @@
      private typealias FloatingPanel = DynamicNotch<NotchPanelView, EmptyView, EmptyView>
  
@@ -8966,10 +8966,10 @@ index 5b647efc19bb4788dbefb3a41bcdd8d187e115cb..addee4bd9097c2a90d55ce2f9c699331
          )
          floatingPeek = peek
          floatingPanel = panel
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0c00137fc
---- a/Sources/NotchHUD/Notch/SessionRowView.swift
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
+--- a/Sources/Vibenotch/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -1,30 +1,34 @@
 -import Foundation
  import SwiftUI
@@ -9018,11 +9018,11 @@ index d0bc37076cddd9ae733c3ff146cb48b549e9a2c1..edbff2c293b0276d7c836e3e887cbfc0
          .background(.white.opacity(0.045))
          .clipShape(.rect(cornerRadius: 8))
      }
-diff --git a/Sources/NotchHUD/Store/SessionStore.swift b/Sources/NotchHUD/Store/SessionStore.swift
+diff --git a/Sources/Vibenotch/Store/SessionStore.swift b/Sources/Vibenotch/Store/SessionStore.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8b4642ae1
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SessionStore.swift
++++ b/Sources/Vibenotch/Store/SessionStore.swift
 @@ -0,0 +1,60 @@
 +import Observation
 +
@@ -9084,11 +9084,11 @@ index 0000000000000000000000000000000000000000..17e5ac48d0dc8c72c034addf0641d0d8
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolReader.swift b/Sources/NotchHUD/Store/SpoolReader.swift
+diff --git a/Sources/Vibenotch/Store/SpoolReader.swift b/Sources/Vibenotch/Store/SpoolReader.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a991c703c
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolReader.swift
++++ b/Sources/Vibenotch/Store/SpoolReader.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -9117,11 +9117,11 @@ index 0000000000000000000000000000000000000000..a2d283ccdfbb9ecb82817b6e3b57e41a
 +        return formatter.date(from: value)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Store/SpoolWatcher.swift b/Sources/NotchHUD/Store/SpoolWatcher.swift
+diff --git a/Sources/Vibenotch/Store/SpoolWatcher.swift b/Sources/Vibenotch/Store/SpoolWatcher.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c7285b54a
 --- /dev/null
-+++ b/Sources/NotchHUD/Store/SpoolWatcher.swift
++++ b/Sources/Vibenotch/Store/SpoolWatcher.swift
 @@ -0,0 +1,197 @@
 +import Darwin
 +import Foundation
@@ -9131,7 +9131,7 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +    private let store: SessionStore
 +    private let fileManager: FileManager
 +    private let reader = SpoolReader()
-+    private let ioQueue = DispatchQueue(label: "com.notch-hud.spool-watcher", qos: .utility)
++    private let ioQueue = DispatchQueue(label: "com.vibenotch.spool-watcher", qos: .utility)
 +
 +    private var source: DispatchSourceFileSystemObject?
 +    private var debounceWorkItem: DispatchWorkItem?
@@ -9320,11 +9320,11 @@ index 0000000000000000000000000000000000000000..8c7ffd2c642aadafa5031b8a6a81706c
 +        ioQueue.asyncAfter(deadline: .now() + delay, execute: workItem)
 +    }
 +}
-diff --git a/scripts/notch-claude-hook b/scripts/notch-claude-hook
+diff --git a/scripts/vibenotch-claude-hook b/scripts/vibenotch-claude-hook
 new file mode 100644
 index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5fa1cae63
 --- /dev/null
-+++ b/scripts/notch-claude-hook
++++ b/scripts/vibenotch-claude-hook
 @@ -0,0 +1,33 @@
 +#!/bin/sh
 +
@@ -9343,7 +9343,7 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +[ -n "$session_id" ] || exit 0
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +[ -x "$emitter" ] || exit 0
 +
 +id=claude-$session_id
@@ -9359,11 +9359,11 @@ index 0000000000000000000000000000000000000000..f6d854d3ef428426a73c2c647da69db5
 +
 +"$emitter" "$id" claude-code "$status" --cwd "$cwd" --project "$project" >/dev/null 2>&1
 +exit 0
-diff --git a/scripts/notch-emit b/scripts/notch-emit
+diff --git a/scripts/vibenotch-emit b/scripts/vibenotch-emit
 new file mode 100644
 index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706660c4b91
 --- /dev/null
-+++ b/scripts/notch-emit
++++ b/scripts/vibenotch-emit
 @@ -0,0 +1,144 @@
 +#!/bin/sh
 +
@@ -9420,7 +9420,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +        ;;
 +esac
 +
-+notch_home=${NOTCH_HUD_HOME:-"$HOME/.notch-hud"}
++notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
 +spool_dir=$notch_home/sessions
 +seq_dir=$notch_home/seq
 +session_file=$spool_dir/$id.json
@@ -9500,7 +9500,7 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +            kittyWindowId: (if $kitty_window_id == "" then null else $kitty_window_id end),
 +            windowId: (if $window_id == "" then null else $window_id end)
 +        },
-+        source: "notch-emit"
++        source: "vibenotch-emit"
 +    }' > "$tmp_file" 2>/dev/null
 +then
 +    mv -f "$tmp_file" "$session_file" >/dev/null 2>&1
@@ -9509,16 +9509,16 @@ index 0000000000000000000000000000000000000000..67c87e97dee99efc22bcb20675b8c706
 +fi
 +
 +exit 0
-diff --git a/scripts/notch-fixture.sh b/scripts/notch-fixture.sh
+diff --git a/scripts/vibenotch-fixture.sh b/scripts/vibenotch-fixture.sh
 new file mode 100644
 index 0000000000000000000000000000000000000000..e9df7f9c840f3c98e36f8913339d2e3fa8641b14
 --- /dev/null
-+++ b/scripts/notch-fixture.sh
++++ b/scripts/vibenotch-fixture.sh
 @@ -0,0 +1,18 @@
 +#!/bin/sh
 +
 +script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-+emitter=$script_dir/notch-emit
++emitter=$script_dir/vibenotch-emit
 +
 +[ -x "$emitter" ] || exit 0
 +
@@ -9540,23 +9540,23 @@ Implemented `specs/M1-live-claude-sessions.md` exactly as requested. HoverContro
 
 Created:
 
-- [SessionStatus.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/SessionStatus.swift)
-- [TerminalIdentity.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/TerminalIdentity.swift)
-- [SessionEnvelope.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/SessionEnvelope.swift)
-- [Session.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Model/Session.swift)
-- [SpoolReader.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SpoolReader.swift)
-- [SpoolWatcher.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SpoolWatcher.swift)
-- [SessionStore.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Store/SessionStore.swift)
-- [notch-emit](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-emit)
-- [notch-claude-hook](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-claude-hook)
-- [notch-fixture.sh](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/scripts/notch-fixture.sh)
+- [SessionStatus.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/SessionStatus.swift)
+- [TerminalIdentity.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/TerminalIdentity.swift)
+- [SessionEnvelope.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/SessionEnvelope.swift)
+- [Session.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Model/Session.swift)
+- [SpoolReader.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SpoolReader.swift)
+- [SpoolWatcher.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SpoolWatcher.swift)
+- [SessionStore.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Store/SessionStore.swift)
+- [vibenotch-emit](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-emit)
+- [vibenotch-claude-hook](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-claude-hook)
+- [vibenotch-fixture.sh](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/scripts/vibenotch-fixture.sh)
 
 Modified:
 
-- [NotchHUDApp.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift)
-- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift)
-- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift)
-- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift)
-- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift)
+- [VibenotchApp.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift)
+- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift)
+- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift)
+- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift)
+- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift)
 
 All three scripts are executable.

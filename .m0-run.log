@@ -1,48 +1,48 @@
 Building for debugging...
 [0/3] Write swift-version--1AB21518FC5DEDBE.txt
-Build of product 'NotchHUD' complete! (0.15s)
-2026-07-20 12:05:44.680 NotchHUD[65141:9588924] [HoverDiag] PIN notchRect=(918.0, 1291.0, 220.0, 38.0) screenFrame=(0.0, 0.0, 2056.0, 1329.0) safeTop=38.0 globalMonitor=true localMonitor=true
-2026-07-20 12:05:44.808 NotchHUD[65141:9588924] [HoverDiag] ENTER delivered -> expand()
-2026-07-20 12:05:44.808 NotchHUD[65141:9588924] [HoverDiag] expand() called isExpanded=false selectedScreen=true notchedHUD=true
-2026-07-20 12:05:45.188 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:45.717 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:46.224 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:46.754 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:47.276 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:47.802 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:48.334 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:48.861 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:49.371 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:49.877 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:50.388 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:50.921 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:51.455 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
-2026-07-20 12:05:51.971 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(396.1953125, 1229.23828125) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:52.478 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-302.1953125, 1215.4453125) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:53.000 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1059.06640625, 1042.7890625) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:53.530 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1614.87109375, 1083.796875) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:54.043 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1410.37109375, 1199.03515625) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:54.571 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:55.078 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:55.611 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:56.145 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:56.669 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:57.175 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:57.678 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:58.210 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:58.721 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:59.226 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:05:59.760 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:00.276 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:00.777 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:01.301 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:01.828 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:02.341 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:02.867 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:03.377 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:03.897 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:04.400 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:04.921 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:06:05.454 NotchHUD[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
-2026-07-20 12:11:24.238 NotchHUD[65141:9588924] [HoverDiag] ENTER delivered -> expand()
-2026-07-20 12:11:24.240 NotchHUD[65141:9588924] [HoverDiag] expand() called isExpanded=false selectedScreen=true notchedHUD=true
+Build of product 'Vibenotch' complete! (0.15s)
+2026-07-20 12:05:44.680 Vibenotch[65141:9588924] [HoverDiag] PIN notchRect=(918.0, 1291.0, 220.0, 38.0) screenFrame=(0.0, 0.0, 2056.0, 1329.0) safeTop=38.0 globalMonitor=true localMonitor=true
+2026-07-20 12:05:44.808 Vibenotch[65141:9588924] [HoverDiag] ENTER delivered -> expand()
+2026-07-20 12:05:44.808 Vibenotch[65141:9588924] [HoverDiag] expand() called isExpanded=false selectedScreen=true notchedHUD=true
+2026-07-20 12:05:45.188 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:45.717 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:46.224 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:46.754 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:47.276 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:47.802 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:48.334 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:48.861 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:49.371 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:49.877 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:50.388 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:50.921 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:51.455 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(850.0, 1326.0) inRect=false inside=true enterDelivered=true pinned=true
+2026-07-20 12:05:51.971 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(396.1953125, 1229.23828125) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:52.478 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-302.1953125, 1215.4453125) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:53.000 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1059.06640625, 1042.7890625) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:53.530 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1614.87109375, 1083.796875) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:54.043 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1410.37109375, 1199.03515625) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:54.571 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:55.078 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:55.611 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:56.145 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:56.669 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:57.175 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:57.678 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:58.210 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:58.721 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:59.226 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:05:59.760 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:00.276 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:00.777 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:01.301 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:01.828 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:02.341 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:02.867 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:03.377 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:03.897 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:04.400 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:04.921 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:06:05.454 Vibenotch[65141:9588924] [HoverDiag] SAMPLE loc=(-1399.7265625, 1208.4375) inRect=false inside=false enterDelivered=false pinned=true
+2026-07-20 12:11:24.238 Vibenotch[65141:9588924] [HoverDiag] ENTER delivered -> expand()
+2026-07-20 12:11:24.240 Vibenotch[65141:9588924] [HoverDiag] expand() called isExpanded=false selectedScreen=true notchedHUD=true

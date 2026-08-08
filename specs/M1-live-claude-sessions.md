@@ -9,7 +9,7 @@ Scope for M1: Claude Code only, two events (working on prompt submit, done on st
 - DO NOT change HoverController / NotchGeometry / hover behavior. Additive work + wiring only.
 - Keep everything compiling under Command Line Tools (no `@Entry`/`#Preview` macros; `@Observable` is fine).
 
-## 1. Model files (Sources/NotchHUD/Model/)
+## 1. Model files (Sources/Vibenotch/Model/)
 
 ### `SessionStatus.swift`
 ```swift
@@ -30,7 +30,7 @@ Use a decoder that tolerates missing optional keys.
 ### `Session.swift`
 The in-memory model the UI uses: `id`, `agent`, `project` (fallback to basename of cwd, else id), `status`, `detail`, `updatedAt: Date`, `seq`, `terminal`. Init from a `SessionEnvelope`. Provide `displayStatus`.
 
-## 2. Store + watcher (Sources/NotchHUD/Store/)
+## 2. Store + watcher (Sources/Vibenotch/Store/)
 
 ### `SpoolReader.swift`
 Reads one `<id>.json` file: `Data(contentsOf:)`, JSON-decode to `SessionEnvelope`, return `Session?` (nil on decode failure — caller retries next tick). ISO8601 parsing via `ISO8601DateFormatter` (with fractional seconds).
@@ -49,17 +49,17 @@ Reads one `<id>.json` file: `Data(contentsOf:)`, JSON-decode to `SessionEnvelope
 - Computed summary for the peek: `counts: (working: Int, needsMe: Int, done: Int)` and `total`.
 
 ## 3. Wire the UI to live data
-- `AppEnvironment` already owns `spoolURL`. Create a single `SessionStore` and `SpoolWatcher` in `NotchHUDApp`/`AppDelegate`, start the watcher, and inject the store into the SwiftUI views (as `@Environment` or passed in).
+- `AppEnvironment` already owns `spoolURL`. Create a single `SessionStore` and `SpoolWatcher` in `VibenotchApp`/`AppDelegate`, start the watcher, and inject the store into the SwiftUI views (as `@Environment` or passed in).
 - `NotchPeekView`: show `store.total` and up to 3 colored dots reflecting the real status mix (or a compact "n" + dots). Use `.monospacedDigit()`.
 - `NotchPanelView`: list the real `store.sessions` via `SessionRowView` (project name + status dot + optional detail). Empty state: "No active sessions".
 - `SessionRowView`: dot color from `displayStatus`, project name, subtle secondary detail.
 - IMPORTANT: `NotchWindowManager` builds the DynamicNotch with `NotchPeekView()`/`NotchPanelView()` closures — make those views observe the shared store so they update live. Pass the store into the views.
 
-## 4. Emitter scripts (write to repo `scripts/`, they get installed to ~/.notch-hud/bin/ by the manager)
+## 4. Emitter scripts (write to repo `scripts/`, they get installed to ~/.vibenotch/bin/ by the manager)
 
-### `scripts/notch-emit`  (POSIX sh, `chmod +x`)
-Usage: `notch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd DIR] [--pid N] [--remove]`
-- Spool dir: `${NOTCH_HUD_HOME:-$HOME/.notch-hud}/sessions` (mkdir -p).
+### `scripts/vibenotch-emit`  (POSIX sh, `chmod +x`)
+Usage: `vibenotch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd DIR] [--pid N] [--remove]`
+- Spool dir: `${VIBENOTCH_HOME:-$HOME/.vibenotch}/sessions` (mkdir -p).
 - Capture terminal identity from inherited env: `TERM_PROGRAM`, `ITERM_SESSION_ID`, `WEZTERM_PANE`, `KITTY_WINDOW_ID`, and tty via `ps -o tty= -p "$PPID" 2>/dev/null` (prefix `/dev/`), fallback `tty`.
 - Maintain a per-id seq counter file at `<spool>/../seq/<id>` (mkdir -p), increment each write.
 - Build JSON with `jq -n` (jq is available). Fields per the SessionEnvelope schema (schema=1, updated = ISO8601 UTC `date -u +%Y-%m-%dT%H:%M:%SZ`).
@@ -67,20 +67,20 @@ Usage: `notch-emit <id> <agent> <status> [--detail TEXT] [--project DIR] [--cwd 
 - `--remove` deletes `<id>.json` (and seq file).
 - Always `exit 0` fast.
 
-### `scripts/notch-claude-hook`  (POSIX sh, `chmod +x`)
-Usage: `notch-claude-hook <status>` where status ∈ starting|working|needs_me|done|remove.
+### `scripts/vibenotch-claude-hook`  (POSIX sh, `chmod +x`)
+Usage: `vibenotch-claude-hook <status>` where status ∈ starting|working|needs_me|done|remove.
 - Read hook JSON from stdin, extract with jq: `.session_id`, `.cwd`.
 - Compute id = `claude-<session_id>`, project = basename of cwd.
-- If status == remove → call `notch-emit "$id" claude-code remove --remove`.
-- Else → call `notch-emit "$id" claude-code "$status" --cwd "$cwd" --project "$project"`.
+- If status == remove → call `vibenotch-emit "$id" claude-code remove --remove`.
+- Else → call `vibenotch-emit "$id" claude-code "$status" --cwd "$cwd" --project "$project"`.
 - Must `exit 0` always (never block Claude). Tolerate missing jq/fields gracefully.
 
 ## 5. Provide a manual test fixture
-`scripts/notch-fixture.sh` — writes 2 fake session files directly (one working, one done) so the manager can verify the watcher/UI without a real Claude session. Just calls notch-emit twice with fake ids.
+`scripts/vibenotch-fixture.sh` — writes 2 fake session files directly (one working, one done) so the manager can verify the watcher/UI without a real Claude session. Just calls vibenotch-emit twice with fake ids.
 
 ## Acceptance (manager verifies — do not self-certify)
 1. `swift build` exits 0; `swift test` still green.
-2. Running `scripts/notch-fixture.sh` creates files under `~/.notch-hud/sessions/`, and the running app's peek count + panel reflect them within ~1s (watcher works).
+2. Running `scripts/vibenotch-fixture.sh` creates files under `~/.vibenotch/sessions/`, and the running app's peek count + panel reflect them within ~1s (watcher works).
 3. With the manager-installed Claude hooks, a real Claude session shows Working on prompt submit and Done on stop.
 
 When done: print files created/modified. Do not build.

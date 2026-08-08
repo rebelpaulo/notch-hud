@@ -7,7 +7,7 @@ Goal: clicking a session row in the panel raises the Terminal.app window/tab tha
 - DO NOT change HoverController, NotchGeometry, SpoolWatcher/SessionStore behavior. Additive + wiring.
 - CLT-safe (no @Entry/#Preview). @Observable is fine.
 
-## 1. FIX tty capture in `scripts/notch-emit` (critical — click-to-focus needs it)
+## 1. FIX tty capture in `scripts/vibenotch-emit` (critical — click-to-focus needs it)
 The current `ps -o tty= -p "$PPID"` returns null because the hook process is often ttyless. FIX: walk the parent-process chain from the emit process upward and take the FIRST ancestor with a real tty. Add a shell function:
 
 ```sh
@@ -27,9 +27,9 @@ find_tty() {
   return 0   # empty tty is acceptable (unknown)
 }
 ```
-Use `find_tty` result for the `terminal.tty` field. Keep everything else identical. Re-install note: manager copies scripts to ~/.notch-hud/bin.
+Use `find_tty` result for the `terminal.tty` field. Keep everything else identical. Re-install note: manager copies scripts to ~/.vibenotch/bin.
 
-## 2. Focus module (Sources/NotchHUD/Focus/)
+## 2. Focus module (Sources/Vibenotch/Focus/)
 
 ### `FocusStrategy.swift`
 ```swift
@@ -82,7 +82,7 @@ Pick first strategy whose canHandle matches session.terminal; run its focus off 
 - Wire a shared `FocusDispatcher` from the app into the views (same pattern as SessionStore).
 
 ## 4. Info.plist
-Add `NSAppleEventsUsageDescription` = "NotchHUD raises the terminal window of the agent session you click." (Sources/NotchHUD/Info.plist already exists; add the key.)
+Add `NSAppleEventsUsageDescription` = "Vibenotch raises the terminal window of the agent session you click." (Sources/Vibenotch/Info.plist already exists; add the key.)
 
 ## Acceptance (manager verifies with a REAL Claude session in Terminal)
 1. swift build exits 0; swift test still green.

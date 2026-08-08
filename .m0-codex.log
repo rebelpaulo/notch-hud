@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.144.1
 --------
-workdir: /Users/coopersimson/Desktop/AI Projects/notch-hud
+workdir: /Users/coopersimson/Desktop/AI Projects/vibenotch
 model: gpt-5.6-sol
 provider: openai
 approval: never
@@ -11,12 +11,12 @@ reasoning summaries: none
 session id: 019f80c7-f8f1-73a2-ac24-147069162df4
 --------
 user
-You are the worker. Implement the spec in specs/M0-notch-skeleton.md EXACTLY: create Package.swift and ALL the Swift source files it lists, plus Sources/NotchHUD/Info.plist. 
+You are the worker. Implement the spec in specs/M0-notch-skeleton.md EXACTLY: create Package.swift and ALL the Swift source files it lists, plus Sources/Vibenotch/Info.plist. 
 
 CRITICAL CONSTRAINTS:
 - DO NOT run 'swift build' or 'swift run'. Your sandbox cannot build (SwiftPM sandbox nesting fails). Just WRITE the files. The manager builds separately and will send you any compile errors to fix.
 - The DynamicNotchKit source is already resolved at .build/checkouts/DynamicNotchKit/Sources/ — READ it to use the REAL API (types, initializers, expand/hide method names). Do not guess the API.
-- Make Package.swift consistent: if you keep the Info.plist sectcreate linker flag, you MUST create Sources/NotchHUD/Info.plist so it exists. Otherwise drop the linker flag and rely on runtime NSApp.setActivationPolicy(.accessory).
+- Make Package.swift consistent: if you keep the Info.plist sectcreate linker flag, you MUST create Sources/Vibenotch/Info.plist so it exists. Otherwise drop the linker flag and rely on runtime NSApp.setActivationPolicy(.accessory).
 
 When done, print the list of every file you created. Do not build.
 codex
@@ -26,14 +26,14 @@ I’ll read the milestone spec and the checked-out DynamicNotchKit implementatio
   • Create Package.swift, all listed Swift sources, and Info.plist
   • Verify contents and report every created file without building
 exec
-/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M0-notch-skeleton.md' -g 'Package.swift' -g '*.swift' -g 'Info.plist' | sort" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M0-notch-skeleton.md' -g 'Package.swift' -g '*.swift' -g 'Info.plist' | sort" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-/Users/coopersimson/Desktop/AI Projects/notch-hud
+/Users/coopersimson/Desktop/AI Projects/vibenotch
 Package.swift
 specs/M0-notch-skeleton.md
 
 exec
-/bin/zsh -lc "sed -n '1,260p' specs/M0-notch-skeleton.md && git status --short && sed -n '1,240p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,260p' specs/M0-notch-skeleton.md && git status --short && sed -n '1,240p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 # M0 spec — Notch skeleton (for GPT-5.6 Sol to implement)
 
@@ -44,28 +44,28 @@ Build the thinnest walking skeleton of a macOS notch HUD app. This milestone is 
 ### 1. `Package.swift`
 - swift-tools-version 6.0
 - Platform: `.macOS(.v14)`
-- One executable target `NotchHUD` in `Sources/NotchHUD`
+- One executable target `Vibenotch` in `Sources/Vibenotch`
 - Dependency: DynamicNotchKit — `.package(url: "https://github.com/MrKai77/DynamicNotchKit.git", from: "1.1.0")`, product `"DynamicNotchKit"` (verify the exact product name from the package; adjust if it differs)
 - Resource handling: none needed yet
 
-### 2. `Sources/NotchHUD/App/NotchHUDApp.swift`
+### 2. `Sources/Vibenotch/App/VibenotchApp.swift`
 - `@main` struct using `NSApplicationDelegateAdaptor`
 - In `applicationDidFinishLaunching`: set `NSApp.setActivationPolicy(.accessory)` (agent app, no Dock icon), create `AppEnvironment`, boot a `NotchWindowManager`
 - Also set `LSUIElement` via an Info.plist (see file 6) — do both the plist key and the runtime `.accessory` call
 - Observe `NSApplication.didChangeScreenParametersNotification` and tell `NotchWindowManager` to re-pin to the built-in (notched) screen
 
-### 3. `Sources/NotchHUD/App/AppEnvironment.swift`
-- Holds constants: `spoolURL = ~/.notch-hud/sessions` (create the dir, 0700, on init), staleness thresholds (`workingStaleSeconds = 90`, `dropSeconds = 900`)
+### 3. `Sources/Vibenotch/App/AppEnvironment.swift`
+- Holds constants: `spoolURL = ~/.vibenotch/sessions` (create the dir, 0700, on init), staleness thresholds (`workingStaleSeconds = 90`, `dropSeconds = 900`)
 - Pure data/config holder for now (later milestones inject the store here)
 
-### 4. `Sources/NotchHUD/Notch/NotchWindowManager.swift`
+### 4. `Sources/Vibenotch/Notch/NotchWindowManager.swift`
 - Wraps DynamicNotchKit. Read the package's current API from Package.resolved / its README-style symbols and use the real types (e.g. `DynamicNotch`, `DynamicNotchInfo`, `.expand()/.hide()` or whatever the installed version exposes). Do not invent API — inspect the checked-out source under `.build/checkouts/DynamicNotchKit`.
 - Two visual states:
   - **peek** (at rest): a compact view (`NotchPeekView`) showing a hardcoded count, e.g. "3" with three small colored dots (blue/yellow/green). Panel `ignoresMouseEvents = true` in this state.
   - **expanded** (on hover): `NotchPanelView` — a dark rounded panel that drops below the notch showing a hardcoded static list of 3 fake sessions (project name + a colored status dot). Mouse enabled.
 - Pin to the screen where `NSScreen.safeAreaInsets.top > 0` (built-in notched display). If none has a notch (`safeAreaInsets.top == 0` everywhere), fall back to a top-center floating pill using the same views (DynamicNotchKit may handle this; if not, log it and still show the pill).
 
-### 5. `Sources/NotchHUD/Notch/HoverController.swift`
+### 5. `Sources/Vibenotch/Notch/HoverController.swift`
 - Hybrid hover detection:
   - An always-on invisible borderless non-activating `NSPanel` positioned exactly over the notch rect, with an `NSTrackingArea` (`.mouseEnteredAndExited`, `.activeAlways`) → fires enter/exit.
   - Plus `NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved)` as a fallback that hit-tests the cursor against the notch rect (throttle to ~30fps; cheap rect test).
@@ -73,12 +73,12 @@ Build the thinnest walking skeleton of a macOS notch HUD app. This milestone is 
 - Debounce: ~120ms on enter, ~300ms on exit. Enter → `NotchWindowManager.expand()`, exit → `.collapse()`.
 - Compute the notch rect from `NSScreen.auxiliaryTopLeftArea` / `auxiliaryTopRightArea` (the gap between them is the notch) on the built-in screen.
 
-### 6. `Sources/NotchHUD/Info.plist` (and wire it into Package.swift `linkerSettings` or via `unsafeFlags` `-Xlinker -sectcreate`… — simplest: use a `.plist` and `swiftSettings`/`linkerSettings` to embed, or document how `swift run` picks it up)
-- `LSUIElement = true`, `LSMinimumSystemVersion = 14.0`, `CFBundleName = NotchHUD`, `CFBundleIdentifier = com.actionable.notchhud`
+### 6. `Sources/Vibenotch/Info.plist` (and wire it into Package.swift `linkerSettings` or via `unsafeFlags` `-Xlinker -sectcreate`… — simplest: use a `.plist` and `swiftSettings`/`linkerSettings` to embed, or document how `swift run` picks it up)
+- `LSUIElement = true`, `LSMinimumSystemVersion = 14.0`, `CFBundleName = Vibenotch`, `CFBundleIdentifier = com.rebelpaulo.vibenotch`
 - If embedding the plist into an SPM executable is awkward, instead set the activation policy purely at runtime (`.accessory`) AND note in a `README.md` that a proper `.app` bundle + Info.plist comes in M6. Runtime `.accessory` is sufficient to hide the Dock icon for M0.
 
 ### 7. Placeholder SwiftUI views
-- `Sources/NotchHUD/Notch/NotchPeekView.swift` and `NotchPanelView.swift` and `SessionRowView.swift`. Dark background (`Color(red:0.04,green:0.04,blue:0.047)`), white text, colored status dots (blue `#0A84FF`, yellow `#FFD60A`, green `#30D158`). Rounded corners ~10pt. Keep it clean; real design is M6.
+- `Sources/Vibenotch/Notch/NotchPeekView.swift` and `NotchPanelView.swift` and `SessionRowView.swift`. Dark background (`Color(red:0.04,green:0.04,blue:0.047)`), white text, colored status dots (blue `#0A84FF`, yellow `#FFD60A`, green `#30D158`). Rounded corners ~10pt. Keep it clean; real design is M6.
 
 ## Constraints
 - Must compile with `swift build` on macOS 26 / Swift 6.1 targeting macOS 14.
@@ -106,7 +106,7 @@ Write all files now. After writing, run `swift build` yourself and fix any compi
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -118,18 +118,18 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         )
@@ -139,7 +139,7 @@ let package = Package(
 codex
 The spec’s final sentence asks for a build, but your explicit constraint supersedes it; I will not run any Swift build/run command. The existing untracked `Package.swift` already uses the plist embedding approach, so I’ll validate that setup against the sources and keep or adjust it as needed.
 exec
-/bin/zsh -lc "rg --files .build/checkouts/DynamicNotchKit/Sources .build/checkouts/DynamicNotchKit | sort | sed -n '1,260p'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "rg --files .build/checkouts/DynamicNotchKit/Sources .build/checkouts/DynamicNotchKit | sort | sed -n '1,260p'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 .build/checkouts/DynamicNotchKit/LICENSE
 .build/checkouts/DynamicNotchKit/Package.resolved
@@ -195,7 +195,7 @@ sed -n '1,220p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Utility
 sed -n '1,260p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Utility/DynamicNotchPanel.swift
 sed -n '1,240p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/DynamicNotchInfo/DynamicNotchInfo.swift
 sed -n '1,200p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/DynamicNotch/DynamicNotchStyle.swift
-sed -n '1,160p' .build/checkouts/DynamicNotchKit/Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+sed -n '1,160p' .build/checkouts/DynamicNotchKit/Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 //
 //  DynamicNotch.swift
@@ -846,7 +846,7 @@ sed -n '1,320p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Views/N
 sed -n '1,300p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Views/NotchContentView.swift
 sed -n '1,220p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Views/NotchlessView.swift
 sed -n '1,160p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/DynamicNotch/DynamicNotchHoverBehavior.swift
-sed -n '1,220p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Utility/NSScreen+Extensions.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+sed -n '1,220p' .build/checkouts/DynamicNotchKit/Sources/DynamicNotchKit/Utility/NSScreen+Extensions.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
         if needsNewWindow {
             // Create window but don't show it yet
@@ -1405,7 +1405,7 @@ extension NSScreen {
 
 exec
 /bin/zsh -lc "sed -n '1,220p' Package.resolved
-rg -n \"DynamicNotch\\(|await .*compact|windowController|ignoresMouseEvents\" .build/checkouts/DynamicNotchKit/README.md .build/checkouts/DynamicNotchKit/Tests .build/checkouts/DynamicNotchKit/Sources -g '*.swift' -g '*.md'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+rg -n \"DynamicNotch\\(|await .*compact|windowController|ignoresMouseEvents\" .build/checkouts/DynamicNotchKit/README.md .build/checkouts/DynamicNotchKit/Tests .build/checkouts/DynamicNotchKit/Sources -g '*.swift' -g '*.md'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 {
   "originHash" : "ff2ec6b93af6d6c17bf64d9fe15938a94256cd408d59c48bdd7f57f6c2c8e9ee",
@@ -1454,24 +1454,24 @@ The spec and dependency API are now confirmed. DynamicNotchKit’s floating styl
   → Create Package.swift, all listed Swift sources, and Info.plist
   • Verify contents and report every created file without building
 exec
-/bin/zsh -lc 'mkdir -p Sources/NotchHUD/App Sources/NotchHUD/Notch' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'mkdir -p Sources/Vibenotch/App Sources/Vibenotch/Notch' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Package.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/AppEnvironment.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Info.plist
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Package.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/AppEnvironment.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Info.plist
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -1482,7 +1482,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -1496,22 +1496,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -1553,31 +1553,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60300c6533
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,210 @@
 +import AppKit
 +
@@ -1789,17 +1789,17 @@ index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -1837,11 +1837,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -1878,11 +1878,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d25b7f8a1b
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,220 @@
 +import AppKit
 +import DynamicNotchKit
@@ -1918,7 +1918,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -1938,7 +1938,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +        }
@@ -2104,11 +2104,11 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e23f5b413
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,30 @@
 +import SwiftUI
 +
@@ -2141,11 +2141,11 @@ index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e
 +    }
 +}
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -2156,7 +2156,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -2170,22 +2170,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -2227,31 +2227,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60300c6533
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,210 @@
 +import AppKit
 +
@@ -2463,17 +2463,17 @@ index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -2511,11 +2511,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -2552,11 +2552,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d25b7f8a1b
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,220 @@
 +import AppKit
 +import DynamicNotchKit
@@ -2592,7 +2592,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -2612,7 +2612,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +        }
@@ -2778,11 +2778,11 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e23f5b413
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,30 @@
 +import SwiftUI
 +
@@ -2816,25 +2816,25 @@ index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e
 +}
 
 exec
-/bin/zsh -lc 'rg --files Package.swift Sources/NotchHUD | sort && git diff -- Package.swift Sources/NotchHUD && git status --short -- Package.swift Sources/NotchHUD' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'rg --files Package.swift Sources/Vibenotch | sort && git diff -- Package.swift Sources/Vibenotch && git status --short -- Package.swift Sources/Vibenotch' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 Package.swift
-Sources/NotchHUD/App/AppEnvironment.swift
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Info.plist
-Sources/NotchHUD/Notch/HoverController.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
-Sources/NotchHUD/Notch/NotchPeekView.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
+Sources/Vibenotch/App/AppEnvironment.swift
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Info.plist
+Sources/Vibenotch/Notch/HoverController.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
+Sources/Vibenotch/Notch/NotchPeekView.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
 ?? Package.swift
-?? Sources/NotchHUD/
+?? Sources/Vibenotch/
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -2845,7 +2845,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -2859,22 +2859,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -2916,31 +2916,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60300c6533
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,210 @@
 +import AppKit
 +
@@ -3152,17 +3152,17 @@ index 0000000000000000000000000000000000000000..66e2d29eba0f8ff0fd1f03db1f458e60
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -3200,11 +3200,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -3241,11 +3241,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d25b7f8a1b
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,220 @@
 +import AppKit
 +import DynamicNotchKit
@@ -3281,7 +3281,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -3301,7 +3301,7 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +        }
@@ -3467,11 +3467,11 @@ index 0000000000000000000000000000000000000000..930ae9874e63cbd5cfa48d2fb9e5e4d2
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e23f5b413
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,30 @@
 +import SwiftUI
 +
@@ -3506,14 +3506,14 @@ index 0000000000000000000000000000000000000000..360706216fea62002b85cb668ce1404e
 
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -3524,7 +3524,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -3538,22 +3538,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -3595,31 +3595,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114b865a4eb
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,201 @@
 +import AppKit
 +
@@ -3822,17 +3822,17 @@ index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -3870,11 +3870,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -3911,11 +3911,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3fe711618
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,222 @@
 +import AppKit
 +import DynamicNotchKit
@@ -3951,7 +3951,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -3970,7 +3970,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -4139,11 +4139,11 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -4177,11 +4177,11 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 +    }
 +}
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -4192,7 +4192,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -4206,22 +4206,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -4263,31 +4263,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114b865a4eb
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,201 @@
 +import AppKit
 +
@@ -4490,17 +4490,17 @@ index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -4538,11 +4538,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -4579,11 +4579,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3fe711618
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,222 @@
 +import AppKit
 +import DynamicNotchKit
@@ -4619,7 +4619,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -4638,7 +4638,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -4807,11 +4807,11 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -4848,22 +4848,22 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 codex
 All required files are now present. I’m doing a source-only consistency pass now—checking actor isolation, lifecycle races, hover geometry, plist wiring, and the exact file list—without invoking the Swift toolchain.
 exec
-/bin/zsh -lc "sed -n '1,240p' Sources/NotchHUD/App/NotchHUDApp.swift
-sed -n '1,220p' Sources/NotchHUD/App/AppEnvironment.swift
-sed -n '1,420p' Sources/NotchHUD/Notch/NotchWindowManager.swift
-sed -n '1,420p' Sources/NotchHUD/Notch/HoverController.swift
-sed -n '1,220p' Sources/NotchHUD/Notch/NotchPeekView.swift
-sed -n '1,260p' Sources/NotchHUD/Notch/NotchPanelView.swift
-sed -n '1,220p' Sources/NotchHUD/Notch/SessionRowView.swift
-sed -n '1,180p' Sources/NotchHUD/Info.plist
-sed -n '1,180p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,240p' Sources/Vibenotch/App/VibenotchApp.swift
+sed -n '1,220p' Sources/Vibenotch/App/AppEnvironment.swift
+sed -n '1,420p' Sources/Vibenotch/Notch/NotchWindowManager.swift
+sed -n '1,420p' Sources/Vibenotch/Notch/HoverController.swift
+sed -n '1,220p' Sources/Vibenotch/Notch/NotchPeekView.swift
+sed -n '1,260p' Sources/Vibenotch/Notch/NotchPanelView.swift
+sed -n '1,220p' Sources/Vibenotch/Notch/SessionRowView.swift
+sed -n '1,180p' Sources/Vibenotch/Info.plist
+sed -n '1,180p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import AppKit
 import SwiftUI
 
 @main
 @MainActor
-struct NotchHUDApp: App {
+struct VibenotchApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -4914,7 +4914,7 @@ struct AppEnvironment {
 
     init(fileManager: FileManager = .default) {
         spoolURL = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notch-hud", isDirectory: true)
+            .appendingPathComponent(".vibenotch", isDirectory: true)
             .appendingPathComponent("sessions", isDirectory: true)
 
         do {
@@ -4928,7 +4928,7 @@ struct AppEnvironment {
                 ofItemAtPath: spoolURL.path
             )
         } catch {
-            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
+            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
         }
     }
 }
@@ -4966,7 +4966,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -4985,7 +4985,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -5394,7 +5394,7 @@ import SwiftUI
 
 struct NotchPanelView: View {
     private let sessions = [
-        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
+        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
         SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
         SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
     ]
@@ -5468,9 +5468,9 @@ struct SessionRowView: View {
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.actionable.notchhud</string>
+    <string>com.rebelpaulo.vibenotch</string>
     <key>CFBundleName</key>
-    <string>NotchHUD</string>
+    <string>Vibenotch</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>LSUIElement</key>
@@ -5482,7 +5482,7 @@ struct SessionRowView: View {
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -5494,29 +5494,29 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         )
     ]
 )
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -5527,7 +5527,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -5541,22 +5541,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -5598,31 +5598,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114b865a4eb
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,201 @@
 +import AppKit
 +
@@ -5825,17 +5825,17 @@ index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -5873,11 +5873,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -5914,11 +5914,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3fe711618
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,222 @@
 +import AppKit
 +import DynamicNotchKit
@@ -5954,7 +5954,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -5973,7 +5973,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -6142,11 +6142,11 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -6182,7 +6182,7 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 
 exec
 /bin/zsh -lc "sed -n '220,275p' .build/checkouts/DynamicNotchKit/Tests/DynamicNotchKitTests/DynamicNotchKitTests.swift
-rg -n \"@MainActor|addGlobalMonitorForEvents|addLocalMonitorForEvents\" /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Modules/AppKit.swiftmodule/*.swiftinterface 2>/dev/null | head -80" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+rg -n \"@MainActor|addGlobalMonitorForEvents|addLocalMonitorForEvents\" /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Modules/AppKit.swiftmodule/*.swiftinterface 2>/dev/null | head -80" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
             notch.compactLeading = .init(image: Image(nsImage: NSImage(named: NSImage.applicationIconName)!))
         }
@@ -6238,11 +6238,11 @@ rg -n \"@MainActor|addGlobalMonitorForEvents|addLocalMonitorForEvents\" /Applica
 }
 zsh:2: no matches found: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/AppKit.framework/Modules/AppKit.swiftmodule/*.swiftinterface
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -6253,7 +6253,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -6267,22 +6267,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -6324,31 +6324,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114b865a4eb
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,201 @@
 +import AppKit
 +
@@ -6551,17 +6551,17 @@ index 0000000000000000000000000000000000000000..bfdc3dc9991b153201dcfb3251139114
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -6599,11 +6599,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -6640,11 +6640,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3fe711618
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,222 @@
 +import AppKit
 +import DynamicNotchKit
@@ -6680,7 +6680,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -6699,7 +6699,7 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -6868,11 +6868,11 @@ index 0000000000000000000000000000000000000000..281991f830ec66ee071bcef26bc381d3
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -6908,13 +6908,13 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -6925,7 +6925,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -6939,22 +6939,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -6996,31 +6996,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -7235,17 +7235,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -7283,11 +7283,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -7324,11 +7324,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -7364,7 +7364,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -7384,7 +7384,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -7554,11 +7554,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -7592,11 +7592,11 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 +    }
 +}
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -7607,7 +7607,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -7621,22 +7621,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -7678,31 +7678,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -7917,17 +7917,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -7965,11 +7965,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -8006,11 +8006,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -8046,7 +8046,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -8066,7 +8066,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -8236,11 +8236,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -8275,69 +8275,69 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 +}
 
 exec
-/bin/zsh -lc 'rg -n "!|DynamicNotchInfo|'"\\.expand\\(|\\.compact\\(|\\.hide\\(|safeAreaInsets|auxiliaryTop|ignoresMouseEvents|addGlobalMonitor|addLocalMonitor|LSUIElement|sectcreate\" Package.swift Sources/NotchHUD
-find Sources/NotchHUD -type f -maxdepth 4 -print | sort" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'rg -n "!|DynamicNotchInfo|'"\\.expand\\(|\\.compact\\(|\\.hide\\(|safeAreaInsets|auxiliaryTop|ignoresMouseEvents|addGlobalMonitor|addLocalMonitor|LSUIElement|sectcreate\" Package.swift Sources/Vibenotch
+find Sources/Vibenotch -type f -maxdepth 4 -print | sort" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 Package.swift:26:                    "-Xlinker", "-sectcreate",
-Sources/NotchHUD/Info.plist:2:<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-Sources/NotchHUD/Info.plist:11:    <key>LSUIElement</key>
-Sources/NotchHUD/Notch/NotchWindowManager.swift:52:            if screen.safeAreaInsets.top > 0 {
-Sources/NotchHUD/Notch/NotchWindowManager.swift:59:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:65:        guard !isExpanded, let screen = selectedScreen else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:66:        guard notchedHUD != nil || (floatingPeek != nil && floatingPanel != nil) else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:74:            configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: false)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:77:                await notchedHUD.expand(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:79:                self.configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: false)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:87:            await floatingPeek.hide()
-Sources/NotchHUD/Notch/NotchWindowManager.swift:89:            await floatingPanel.expand(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:91:            self.configureWindow(floatingPanel.windowController?.window, ignoresMouseEvents: false)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:104:            configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:107:                await notchedHUD.compact(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:108:                guard self.transitionGeneration == generation, !self.isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:109:                self.configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:115:        configureWindow(floatingPanel.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:118:            await floatingPanel.hide()
-Sources/NotchHUD/Notch/NotchWindowManager.swift:119:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:120:            await floatingPeek.expand(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:121:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:122:            self.configureWindow(floatingPeek.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:130:            screen.safeAreaInsets.top,
-Sources/NotchHUD/Notch/NotchWindowManager.swift:145:        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.screens.first
-Sources/NotchHUD/Notch/NotchWindowManager.swift:158:        await notch.compact(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:159:        guard transitionGeneration == generation, !isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:160:        configureWindow(notch.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:177:        await peek.expand(on: screen)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:178:        guard transitionGeneration == generation, !isExpanded else { return }
-Sources/NotchHUD/Notch/NotchWindowManager.swift:179:        configureWindow(peek.windowController?.window, ignoresMouseEvents: true)
-Sources/NotchHUD/Notch/NotchWindowManager.swift:182:    private func configureWindow(_ window: NSWindow?, ignoresMouseEvents: Bool) {
-Sources/NotchHUD/Notch/NotchWindowManager.swift:184:        window.ignoresMouseEvents = ignoresMouseEvents
-Sources/NotchHUD/Notch/NotchWindowManager.swift:195:            await notchedHUD.hide()
-Sources/NotchHUD/Notch/NotchWindowManager.swift:198:            await floatingPeek.hide()
-Sources/NotchHUD/Notch/NotchWindowManager.swift:201:            await floatingPanel.hide()
-Sources/NotchHUD/Notch/HoverController.swift:72:        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
-Sources/NotchHUD/Notch/HoverController.swift:78:        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
-Sources/NotchHUD/Notch/HoverController.swift:102:        guard inside != pointerIsInside else { return }
-Sources/NotchHUD/Notch/HoverController.swift:107:            guard !enterDelivered else { return }
-Sources/NotchHUD/Notch/HoverController.swift:116:                guard let self, self.pointerIsInside, !self.enterDelivered else { return }
-Sources/NotchHUD/Notch/HoverController.swift:131:                guard let self, !self.pointerIsInside, self.enterDelivered else { return }
-Sources/NotchHUD/Notch/HoverController.swift:140:            let leftArea = screen.auxiliaryTopLeftArea,
-Sources/NotchHUD/Notch/HoverController.swift:141:            let rightArea = screen.auxiliaryTopRightArea,
-Sources/NotchHUD/Notch/HoverController.swift:146:                y: screen.frame.maxY - screen.safeAreaInsets.top,
-Sources/NotchHUD/Notch/HoverController.swift:148:                height: screen.safeAreaInsets.top
-Sources/NotchHUD/App/AppEnvironment.swift
-Sources/NotchHUD/App/NotchHUDApp.swift
-Sources/NotchHUD/Info.plist
-Sources/NotchHUD/Notch/HoverController.swift
-Sources/NotchHUD/Notch/NotchPanelView.swift
-Sources/NotchHUD/Notch/NotchPeekView.swift
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/SessionRowView.swift
+Sources/Vibenotch/Info.plist:2:<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+Sources/Vibenotch/Info.plist:11:    <key>LSUIElement</key>
+Sources/Vibenotch/Notch/NotchWindowManager.swift:52:            if screen.safeAreaInsets.top > 0 {
+Sources/Vibenotch/Notch/NotchWindowManager.swift:59:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:65:        guard !isExpanded, let screen = selectedScreen else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:66:        guard notchedHUD != nil || (floatingPeek != nil && floatingPanel != nil) else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:74:            configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: false)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:77:                await notchedHUD.expand(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:79:                self.configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: false)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:87:            await floatingPeek.hide()
+Sources/Vibenotch/Notch/NotchWindowManager.swift:89:            await floatingPanel.expand(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:91:            self.configureWindow(floatingPanel.windowController?.window, ignoresMouseEvents: false)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:104:            configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:107:                await notchedHUD.compact(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:108:                guard self.transitionGeneration == generation, !self.isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:109:                self.configureWindow(notchedHUD.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:115:        configureWindow(floatingPanel.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:118:            await floatingPanel.hide()
+Sources/Vibenotch/Notch/NotchWindowManager.swift:119:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:120:            await floatingPeek.expand(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:121:            guard self.transitionGeneration == generation, !self.isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:122:            self.configureWindow(floatingPeek.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:130:            screen.safeAreaInsets.top,
+Sources/Vibenotch/Notch/NotchWindowManager.swift:145:        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.screens.first
+Sources/Vibenotch/Notch/NotchWindowManager.swift:158:        await notch.compact(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:159:        guard transitionGeneration == generation, !isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:160:        configureWindow(notch.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:177:        await peek.expand(on: screen)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:178:        guard transitionGeneration == generation, !isExpanded else { return }
+Sources/Vibenotch/Notch/NotchWindowManager.swift:179:        configureWindow(peek.windowController?.window, ignoresMouseEvents: true)
+Sources/Vibenotch/Notch/NotchWindowManager.swift:182:    private func configureWindow(_ window: NSWindow?, ignoresMouseEvents: Bool) {
+Sources/Vibenotch/Notch/NotchWindowManager.swift:184:        window.ignoresMouseEvents = ignoresMouseEvents
+Sources/Vibenotch/Notch/NotchWindowManager.swift:195:            await notchedHUD.hide()
+Sources/Vibenotch/Notch/NotchWindowManager.swift:198:            await floatingPeek.hide()
+Sources/Vibenotch/Notch/NotchWindowManager.swift:201:            await floatingPanel.hide()
+Sources/Vibenotch/Notch/HoverController.swift:72:        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+Sources/Vibenotch/Notch/HoverController.swift:78:        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+Sources/Vibenotch/Notch/HoverController.swift:102:        guard inside != pointerIsInside else { return }
+Sources/Vibenotch/Notch/HoverController.swift:107:            guard !enterDelivered else { return }
+Sources/Vibenotch/Notch/HoverController.swift:116:                guard let self, self.pointerIsInside, !self.enterDelivered else { return }
+Sources/Vibenotch/Notch/HoverController.swift:131:                guard let self, !self.pointerIsInside, self.enterDelivered else { return }
+Sources/Vibenotch/Notch/HoverController.swift:140:            let leftArea = screen.auxiliaryTopLeftArea,
+Sources/Vibenotch/Notch/HoverController.swift:141:            let rightArea = screen.auxiliaryTopRightArea,
+Sources/Vibenotch/Notch/HoverController.swift:146:                y: screen.frame.maxY - screen.safeAreaInsets.top,
+Sources/Vibenotch/Notch/HoverController.swift:148:                height: screen.safeAreaInsets.top
+Sources/Vibenotch/App/AppEnvironment.swift
+Sources/Vibenotch/App/VibenotchApp.swift
+Sources/Vibenotch/Info.plist
+Sources/Vibenotch/Notch/HoverController.swift
+Sources/Vibenotch/Notch/NotchPanelView.swift
+Sources/Vibenotch/Notch/NotchPeekView.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/SessionRowView.swift
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -8348,7 +8348,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -8362,22 +8362,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -8419,31 +8419,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -8658,17 +8658,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -8706,11 +8706,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -8747,11 +8747,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -8787,7 +8787,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -8807,7 +8807,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -8977,11 +8977,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -9016,32 +9016,32 @@ index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b5
 +}
 
 exec
-/bin/zsh -lc 'expected=$(mktemp /tmp/notchhud-expected.XXXXXX)
-actual=$(mktemp /tmp/notchhud-actual.XXXXXX)
-printf '"'%s\\n' 'Package.swift' 'Sources/NotchHUD/App/AppEnvironment.swift' 'Sources/NotchHUD/App/NotchHUDApp.swift' 'Sources/NotchHUD/Info.plist' 'Sources/NotchHUD/Notch/HoverController.swift' 'Sources/NotchHUD/Notch/NotchPanelView.swift' 'Sources/NotchHUD/Notch/NotchPeekView.swift' 'Sources/NotchHUD/Notch/NotchWindowManager.swift' 'Sources/NotchHUD/Notch/SessionRowView.swift' | sort > \""'$expected"
-{ printf '"'%s\\n' Package.swift; find Sources/NotchHUD -type f -print; } | sort > \""'$actual"
+/bin/zsh -lc 'expected=$(mktemp /tmp/vibenotch-expected.XXXXXX)
+actual=$(mktemp /tmp/vibenotch-actual.XXXXXX)
+printf '"'%s\\n' 'Package.swift' 'Sources/Vibenotch/App/AppEnvironment.swift' 'Sources/Vibenotch/App/VibenotchApp.swift' 'Sources/Vibenotch/Info.plist' 'Sources/Vibenotch/Notch/HoverController.swift' 'Sources/Vibenotch/Notch/NotchPanelView.swift' 'Sources/Vibenotch/Notch/NotchPeekView.swift' 'Sources/Vibenotch/Notch/NotchWindowManager.swift' 'Sources/Vibenotch/Notch/SessionRowView.swift' | sort > \""'$expected"
+{ printf '"'%s\\n' Package.swift; find Sources/Vibenotch -type f -print; } | sort > \""'$actual"
 diff -u "$expected" "$actual"
-wc -l Package.swift Sources/NotchHUD/App/*.swift Sources/NotchHUD/Notch/*.swift Sources/NotchHUD/Info.plist
-git status --short -- Package.swift Sources/NotchHUD' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+wc -l Package.swift Sources/Vibenotch/App/*.swift Sources/Vibenotch/Notch/*.swift Sources/Vibenotch/Info.plist
+git status --short -- Package.swift Sources/Vibenotch' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
       34 Package.swift
-      27 Sources/NotchHUD/App/AppEnvironment.swift
-      47 Sources/NotchHUD/App/NotchHUDApp.swift
-     213 Sources/NotchHUD/Notch/HoverController.swift
-      42 Sources/NotchHUD/Notch/NotchPanelView.swift
-      35 Sources/NotchHUD/Notch/NotchPeekView.swift
-     224 Sources/NotchHUD/Notch/NotchWindowManager.swift
-      31 Sources/NotchHUD/Notch/SessionRowView.swift
-      14 Sources/NotchHUD/Info.plist
+      27 Sources/Vibenotch/App/AppEnvironment.swift
+      47 Sources/Vibenotch/App/VibenotchApp.swift
+     213 Sources/Vibenotch/Notch/HoverController.swift
+      42 Sources/Vibenotch/Notch/NotchPanelView.swift
+      35 Sources/Vibenotch/Notch/NotchPeekView.swift
+     224 Sources/Vibenotch/Notch/NotchWindowManager.swift
+      31 Sources/Vibenotch/Notch/SessionRowView.swift
+      14 Sources/Vibenotch/Info.plist
      667 total
 ?? Package.swift
-?? Sources/NotchHUD/
+?? Sources/Vibenotch/
 
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -9052,7 +9052,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -9066,22 +9066,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -9123,31 +9123,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -9362,17 +9362,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -9410,11 +9410,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -9451,11 +9451,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -9491,7 +9491,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -9511,7 +9511,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -9681,11 +9681,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -9724,11 +9724,11 @@ Created the complete nine-file inventory from the spec and completed source-only
   ✓ Inspect DynamicNotchKit’s real public API
   ✓ Create Package.swift, all listed Swift sources, and Info.plist
   ✓ Verify contents and report every created file without building
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -9739,7 +9739,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -9753,22 +9753,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -9810,31 +9810,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -10049,17 +10049,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -10097,11 +10097,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -10138,11 +10138,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -10178,7 +10178,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -10198,7 +10198,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -10368,11 +10368,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -10411,20 +10411,20 @@ Implemented the M0 notch skeleton using DynamicNotchKit 1.1.0’s real API. Per 
 
 Created:
 
-- [Package.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Package.swift)
-- [AppEnvironment.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/AppEnvironment.swift)
-- [NotchHUDApp.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift)
-- [Info.plist](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Info.plist)
-- [HoverController.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift)
-- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift)
-- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift)
-- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift)
-- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift)
-diff --git a/Sources/NotchHUD/App/AppEnvironment.swift b/Sources/NotchHUD/App/AppEnvironment.swift
+- [Package.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Package.swift)
+- [AppEnvironment.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/AppEnvironment.swift)
+- [VibenotchApp.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift)
+- [Info.plist](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Info.plist)
+- [HoverController.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift)
+- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift)
+- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift)
+- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift)
+- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift)
+diff --git a/Sources/Vibenotch/App/AppEnvironment.swift b/Sources/Vibenotch/App/AppEnvironment.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193d03c25c6
 --- /dev/null
-+++ b/Sources/NotchHUD/App/AppEnvironment.swift
++++ b/Sources/Vibenotch/App/AppEnvironment.swift
 @@ -0,0 +1,27 @@
 +import Foundation
 +
@@ -10435,7 +10435,7 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +
 +    init(fileManager: FileManager = .default) {
 +        spoolURL = fileManager.homeDirectoryForCurrentUser
-+            .appendingPathComponent(".notch-hud", isDirectory: true)
++            .appendingPathComponent(".vibenotch", isDirectory: true)
 +            .appendingPathComponent("sessions", isDirectory: true)
 +
 +        do {
@@ -10449,22 +10449,22 @@ index 0000000000000000000000000000000000000000..65019d28ddef4c23f5d3556594983193
 +                ofItemAtPath: spoolURL.path
 +            )
 +        } catch {
-+            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
++            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/App/NotchHUDApp.swift b/Sources/NotchHUD/App/NotchHUDApp.swift
+diff --git a/Sources/Vibenotch/App/VibenotchApp.swift b/Sources/Vibenotch/App/VibenotchApp.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f15cdc5b0c
 --- /dev/null
-+++ b/Sources/NotchHUD/App/NotchHUDApp.swift
++++ b/Sources/Vibenotch/App/VibenotchApp.swift
 @@ -0,0 +1,47 @@
 +import AppKit
 +import SwiftUI
 +
 +@main
 +@MainActor
-+struct NotchHUDApp: App {
++struct VibenotchApp: App {
 +    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 +
 +    var body: some Scene {
@@ -10506,31 +10506,31 @@ index 0000000000000000000000000000000000000000..55633cbc3661de76a2fe1171274539f1
 +        windowManager?.repinToBuiltInScreen()
 +    }
 +}
-diff --git a/Sources/NotchHUD/Info.plist b/Sources/NotchHUD/Info.plist
+diff --git a/Sources/Vibenotch/Info.plist b/Sources/Vibenotch/Info.plist
 new file mode 100644
 index 0000000000000000000000000000000000000000..86a96c73d1ea0b71601a1f3f2a5e630cb3791588
 --- /dev/null
-+++ b/Sources/NotchHUD/Info.plist
++++ b/Sources/Vibenotch/Info.plist
 @@ -0,0 +1,14 @@
 +<?xml version="1.0" encoding="UTF-8"?>
 +<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 +<plist version="1.0">
 +<dict>
 +    <key>CFBundleIdentifier</key>
-+    <string>com.actionable.notchhud</string>
++    <string>com.rebelpaulo.vibenotch</string>
 +    <key>CFBundleName</key>
-+    <string>NotchHUD</string>
++    <string>Vibenotch</string>
 +    <key>LSMinimumSystemVersion</key>
 +    <string>14.0</string>
 +    <key>LSUIElement</key>
 +    <true/>
 +</dict>
 +</plist>
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a7d9a8fc6
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -0,0 +1,213 @@
 +import AppKit
 +
@@ -10745,17 +10745,17 @@ index 0000000000000000000000000000000000000000..4214e989a9689dab9df20fbf7a9cb41a
 +    override var canBecomeKey: Bool { false }
 +    override var canBecomeMain: Bool { false }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPanelView.swift b/Sources/NotchHUD/Notch/NotchPanelView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPanelView.swift b/Sources/Vibenotch/Notch/NotchPanelView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139836ad639
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPanelView.swift
++++ b/Sources/Vibenotch/Notch/NotchPanelView.swift
 @@ -0,0 +1,42 @@
 +import SwiftUI
 +
 +struct NotchPanelView: View {
 +    private let sessions = [
-+        SessionRowView.Session(projectName: "notch-hud", statusColor: .statusBlue),
++        SessionRowView.Session(projectName: "vibenotch", statusColor: .statusBlue),
 +        SessionRowView.Session(projectName: "billing-service", statusColor: .statusYellow),
 +        SessionRowView.Session(projectName: "docs-refresh", statusColor: .statusGreen)
 +    ]
@@ -10793,11 +10793,11 @@ index 0000000000000000000000000000000000000000..04a4a2fff065e07efcb7e2b1a1a30139
 +        }
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchPeekView.swift b/Sources/NotchHUD/Notch/NotchPeekView.swift
+diff --git a/Sources/Vibenotch/Notch/NotchPeekView.swift b/Sources/Vibenotch/Notch/NotchPeekView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f67ad960dd
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchPeekView.swift
++++ b/Sources/Vibenotch/Notch/NotchPeekView.swift
 @@ -0,0 +1,35 @@
 +import SwiftUI
 +
@@ -10834,11 +10834,11 @@ index 0000000000000000000000000000000000000000..985c6b642c66ae228360a7c2ef84d7f6
 +    static let statusYellow = Color(red: 255 / 255, green: 214 / 255, blue: 10 / 255)
 +    static let statusGreen = Color(red: 48 / 255, green: 209 / 255, blue: 88 / 255)
 +}
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22e0563c01
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -0,0 +1,224 @@
 +import AppKit
 +import DynamicNotchKit
@@ -10874,7 +10874,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +
 +    func repinToBuiltInScreen() {
 +        guard let screen = preferredScreen() else {
-+            NSLog("NotchHUD could not find a screen to pin to.")
++            NSLog("Vibenotch could not find a screen to pin to.")
 +            return
 +        }
 +
@@ -10894,7 +10894,7 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +            if screen.safeAreaInsets.top > 0 {
 +                await self.installNotchedHUD(on: screen, generation: generation)
 +            } else {
-+                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
++                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
 +                await self.installFloatingHUD(on: screen, generation: generation)
 +            }
 +
@@ -11064,11 +11064,11 @@ index 0000000000000000000000000000000000000000..91d1866cd32fffeccab779f80a3ceb22
 +        containsExpandedContent(at: point)
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/SessionRowView.swift b/Sources/NotchHUD/Notch/SessionRowView.swift
+diff --git a/Sources/Vibenotch/Notch/SessionRowView.swift b/Sources/Vibenotch/Notch/SessionRowView.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..d0bc37076cddd9ae733c3ff146cb48b549e9a2c1
 --- /dev/null
-+++ b/Sources/NotchHUD/Notch/SessionRowView.swift
++++ b/Sources/Vibenotch/Notch/SessionRowView.swift
 @@ -0,0 +1,31 @@
 +import Foundation
 +import SwiftUI
@@ -11108,12 +11108,12 @@ Implemented the M0 notch skeleton using DynamicNotchKit 1.1.0’s real API. Per 
 
 Created:
 
-- [Package.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Package.swift)
-- [AppEnvironment.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/AppEnvironment.swift)
-- [NotchHUDApp.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/App/NotchHUDApp.swift)
-- [Info.plist](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Info.plist)
-- [HoverController.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift)
-- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPanelView.swift)
-- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchPeekView.swift)
-- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift)
-- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/notch-hud/Sources/NotchHUD/Notch/SessionRowView.swift)
+- [Package.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Package.swift)
+- [AppEnvironment.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/AppEnvironment.swift)
+- [VibenotchApp.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/App/VibenotchApp.swift)
+- [Info.plist](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Info.plist)
+- [HoverController.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift)
+- [NotchPanelView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPanelView.swift)
+- [NotchPeekView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchPeekView.swift)
+- [NotchWindowManager.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift)
+- [SessionRowView.swift](/Users/coopersimson/Desktop/AI%20Projects/vibenotch/Sources/Vibenotch/Notch/SessionRowView.swift)
