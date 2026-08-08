@@ -344,7 +344,7 @@ import Testing
     let publishedID = try #require(entry["id"] as? String)
 
     await fixture.runner.setStateOutput(
-        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"\#(publishedID)"}}"#
+        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"pending_command":{"action":"resume","id":"\#(publishedID)"}}"#
     )
     await fixture.bridge.checkNow(pollRemoteState: true)
 
@@ -373,7 +373,7 @@ import Testing
     let publishedID = try #require(entry["id"] as? String)
 
     await fixture.runner.setStateOutput(
-        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"\#(publishedID)"}}"#
+        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"pending_command":{"action":"resume","id":"\#(publishedID)"}}"#
     )
     await fixture.runner.failStatePut(true)
     await fixture.bridge.checkNow(pollRemoteState: true)
@@ -391,7 +391,7 @@ import Testing
         mode: .manual,
         percent: nil,
         onAC: true,
-        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"deadbeefdeadbeef"}}"#
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"pending_command":{"action":"resume","id":"deadbeefdeadbeef"}}"#
     )
     defer { fixture.remove() }
 
