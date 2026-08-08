@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Observation
 
@@ -238,8 +239,20 @@ final class RemoteBridge {
             case startedAt = "started_at"
         }
 
+        static func opaqueID(_ sessionID: String) -> String {
+            SHA256.hash(data: Data(sessionID.utf8))
+                .prefix(8)
+                .map { String(format: "%02x", $0) }
+                .joined()
+        }
+
         init(_ session: Session, formatter: ISO8601DateFormatter) {
-            id = session.id
+            // The phone only needs something stable to key a row on, and the
+            // real value is the Claude session UUID — an identifier that can
+            // be correlated elsewhere. A truncated digest gives the phone
+            // exactly the uniqueness it needs and nothing it can trace back,
+            // and the Mac can still match a row by recomputing it.
+            id = Self.opaqueID(session.id)
             project = session.project
             agent = session.agent
             status = switch session.displayStatus {

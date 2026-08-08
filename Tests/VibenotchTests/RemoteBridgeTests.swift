@@ -182,8 +182,14 @@ import Testing
     let sessions = try #require(
         JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: [[String: Any]]]
     )["sessions"]
-    let fields = Set(try #require(sessions?.first).keys)
-    #expect(fields == ["id", "project", "agent", "status", "started_at", "subagents"])
+    let entry = try #require(sessions?.first)
+    #expect(Set(entry.keys) == ["id", "project", "agent", "status", "started_at", "subagents"])
+    // The id must not be the session's own identifier: that is the Claude
+    // session UUID, which is correlatable elsewhere. Stable and opaque.
+    let published = try #require(entry["id"] as? String)
+    #expect(published != "s1")
+    #expect(published.count == 16)
+    #expect(published.allSatisfy { $0.isHexDigit })
 }
 
 @MainActor
