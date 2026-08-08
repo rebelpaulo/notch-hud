@@ -7,6 +7,9 @@ swift build -c release
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/NotchHUD "$APP/Contents/MacOS/NotchHUD"
+# Localizations live in the SPM resource bundle; Bundle.module finds it under
+# Contents/Resources, so without this copy the app is English-only.
+cp -R .build/release/NotchHUD_NotchHUD.bundle "$APP/Contents/Resources/"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

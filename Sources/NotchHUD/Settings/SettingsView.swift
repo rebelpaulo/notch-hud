@@ -13,7 +13,7 @@ struct SettingsView: View {
 
     @State private var watchedBundleID = ""
     @State private var remotePairing: RemotePairing?
-    @State private var remoteStatus = "A verificar…"
+    @State private var remoteStatus = t("checking…")
     @State private var pushResult: RemoteActionResult?
     @State private var isSendingTestPush = false
 
@@ -38,16 +38,16 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                settingsSection("All-Nighter", systemImage: "bolt.fill") {
+                settingsSection(t("Gotta go!"), systemImage: "bolt.fill") {
                     allNighterSection
                 }
-                settingsSection("Sessões", systemImage: "rectangle.stack") {
+                settingsSection(t("Sessions"), systemImage: "rectangle.stack") {
                     sessionsSection
                 }
-                settingsSection("Remoto (telemóvel)", systemImage: "iphone") {
+                settingsSection(t("Remote (phone)"), systemImage: "iphone") {
                     remoteSection
                 }
-                settingsSection("Sobre", systemImage: "info.circle") {
+                settingsSection(t("About"), systemImage: "info.circle") {
                     aboutSection
                 }
             }
@@ -63,7 +63,7 @@ struct SettingsView: View {
 
     private var allNighterSection: some View {
         VStack(alignment: .leading, spacing: 13) {
-            settingsRow("Modo predefinido") {
+            settingsRow(t("Default mode")) {
                 Picker("", selection: defaultModeBinding) {
                     ForEach(DefaultModeChoice.allCases) { choice in
                         Text(choice.title).tag(choice)
@@ -74,7 +74,7 @@ struct SettingsView: View {
             }
 
             VStack(alignment: .leading, spacing: 7) {
-                Text("INÍCIO RÁPIDO")
+                Text(t("QUICK START"))
                     .settingsCaption()
                 HStack(spacing: 8) {
                     timerButton("30 min", seconds: 30 * 60)
@@ -84,44 +84,44 @@ struct SettingsView: View {
             }
 
             Divider().overlay(.white.opacity(0.08))
-            settingsToggle("Permitir que o ecrã durma", isOn: keepAwakeEngine.configBinding(\.allowDisplaySleep))
+            settingsToggle(t("Let the display sleep"), isOn: keepAwakeEngine.configBinding(\.allowDisplaySleep))
             settingsToggle(
-                "Manter acordado com a tampa fechada",
+                t("Stay awake with the lid closed"),
                 isOn: keepAwakeEngine.configBinding(\.closedLidMode)
             )
             .disabled(!closedLidModeAvailable)
             if !closedLidModeAvailable {
-                Text("Instala primeiro: sudo scripts/install-all-nighter.sh")
+                Text(t("Install first: sudo scripts/install-all-nighter.sh"))
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundStyle(.orange.opacity(0.85))
             }
             settingsToggle(
-                "Só com alimentação ligada quando a tampa está fechada",
+                t("Only on AC power when the lid is closed"),
                 isOn: keepAwakeEngine.configBinding(\.acPowerOnlyForClosedLid)
             )
             .disabled(!closedLidModeAvailable || !keepAwakeEngine.config.closedLidMode)
-            settingsToggle("Desligar ao desbloquear", isOn: keepAwakeEngine.configBinding(\.autoOffOnUnlock))
+            settingsToggle(t("Turn off on unlock"), isOn: keepAwakeEngine.configBinding(\.autoOffOnUnlock))
 
             stepperRow(
-                "Limite mínimo da bateria",
+                t("Battery floor"),
                 value: batteryFloorBinding,
                 range: 10...50,
                 suffix: "%"
             )
             stepperRow(
-                "Período de tolerância",
+                t("Grace period"),
                 value: graceMinutesBinding,
                 range: 0...60,
                 suffix: " min"
             )
 
             VStack(alignment: .leading, spacing: 8) {
-                settingsToggle("Lembrar quando estiver inativo", isOn: reminderEnabledBinding)
+                settingsToggle(t("Remind me while idle"), isOn: reminderEnabledBinding)
                 if keepAwakeEngine.config.reminderAfterIdleSeconds > 0 {
                     stepperRow(
-                        "Lembrar após",
+                        t("Remind after"),
                         value: reminderHoursBinding,
-                        range: 1...24,
+                        range: 1...12,
                         suffix: " h"
                     )
                 }
@@ -142,7 +142,7 @@ struct SettingsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 7))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(keepAwakeEngine.isActive ? "Desligar All-Nighter" : "Ligar All-Nighter")
+                    .accessibilityLabel(keepAwakeEngine.isActive ? t("Turn off Gotta go!") : t("Turn on Gotta go!"))
 
                     Text(statusText(at: context.date))
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
@@ -154,7 +154,7 @@ struct SettingsView: View {
 
     private var watchedAppsEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("APPS VIGIADAS")
+            Text(t("WATCHED APPS"))
                 .settingsCaption()
             ForEach(keepAwakeEngine.config.watchedBundleIDs, id: \.self) { bundleID in
                 HStack {
@@ -170,15 +170,15 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white.opacity(0.42))
-                    .accessibilityLabel("Remover \(bundleID)")
+                    .accessibilityLabel(t("Remove %@", bundleID))
                 }
             }
             HStack(spacing: 8) {
-                TextField("com.exemplo.app", text: $watchedBundleID)
+                TextField("com.example.app", text: $watchedBundleID)
                     .textFieldStyle(.roundedBorder)
                     .font(.system(size: 11, design: .monospaced))
                     .onSubmit(addWatchedBundleID)
-                Button("Adicionar", action: addWatchedBundleID)
+                Button(t("Add"), action: addWatchedBundleID)
                     .disabled(watchedBundleID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
@@ -187,11 +187,11 @@ struct SettingsView: View {
     private var sessionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             fixedInfoRow(
-                "Sem atualização",
-                value: "\(Int(workingStaleSeconds)) s → estado desconhecido"
+                t("No update for"),
+                value: t("%d s → unknown state", Int(workingStaleSeconds))
             )
-            fixedInfoRow("Remoção", value: "\(Int(dropSeconds / 60)) min")
-            Text("Valores fixos. Clicar numa sessão concluída abre-a e remove o respetivo cartão; os chips Desktop identificam sessões de apps de secretária.")
+            fixedInfoRow(t("Card removal"), value: "\(Int(dropSeconds / 60)) min")
+            Text(t("Fixed values. Clicking a finished session opens it and removes its card; Desktop chips mark sessions from desktop apps."))
                 .settingsExplanation()
         }
     }
@@ -200,14 +200,14 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             if let remotePairing {
                 fixedInfoRow("URL", value: remotePairing.url)
-                fixedInfoRow("Segredo", value: "••••")
+                fixedInfoRow(t("Secret"), value: "••••")
             } else {
-                Text("Ainda não emparelhado. Cria ~/.notch-hud/remote.json e consulta a documentação de configuração remota no projeto.")
+                Text(t("Not paired yet. Create ~/.notch-hud/remote.json and see the remote setup docs in the project."))
                     .settingsExplanation()
             }
-            fixedInfoRow("Interruptor remoto", value: remoteStatus)
+            fixedInfoRow(t("Remote state"), value: remoteStatus)
             HStack(spacing: 10) {
-                Button("Enviar push de teste") {
+                Button(t("Send test push")) {
                     sendTestPush()
                 }
                 .disabled(remotePairing == nil || isSendingTestPush)
@@ -222,8 +222,8 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            fixedInfoRow("Versão", value: "NotchHUD dev")
-            fixedInfoRow("Diretório de sessões", value: spoolURL.path)
+            fixedInfoRow(t("Version"), value: "NotchHUD dev")
+            fixedInfoRow(t("Sessions directory"), value: spoolURL.path)
         }
     }
 
@@ -329,8 +329,10 @@ struct SettingsView: View {
 
     private var reminderHoursBinding: Binding<Int> {
         Binding(
-            get: { max(1, min(24, Int(keepAwakeEngine.config.reminderAfterIdleSeconds / 3_600))) },
-            set: { keepAwakeEngine.config.reminderAfterIdleSeconds = TimeInterval(max(1, min(24, $0)) * 3_600) }
+            // 12h matches KeepAwakeSettingsLogic.reminderHours and the remote
+            // API's validator; a higher value would silently come back as 12.
+            get: { max(1, min(12, Int(keepAwakeEngine.config.reminderAfterIdleSeconds / 3_600))) },
+            set: { keepAwakeEngine.config.reminderAfterIdleSeconds = TimeInterval(max(1, min(12, $0)) * 3_600) }
         )
     }
 
@@ -354,11 +356,11 @@ struct SettingsView: View {
     }
 
     private func statusText(at date: Date) -> String {
-        guard keepAwakeEngine.isActive else { return "All-Nighter desligado" }
+        guard keepAwakeEngine.isActive else { return t("Gotta go! is off") }
         let elapsed = max(0, date.timeIntervalSince(keepAwakeEngine.activeSince ?? date))
-        var result = "Ativo há \(compactDuration(elapsed)) · \(modeName(keepAwakeEngine.mode))"
+        var result = t("On for %@ · %@", compactDuration(elapsed), modeName(keepAwakeEngine.mode))
         if let remaining = keepAwakeEngine.remainingTime(at: date) {
-            result += " · faltam \(compactDuration(remaining))"
+            result += t(" · %@ left", compactDuration(remaining))
         }
         return result
     }
@@ -370,38 +372,38 @@ struct SettingsView: View {
 
     private func modeName(_ mode: KeepAwakeMode) -> String {
         switch mode {
-        case .off: "desligado"
-        case .manual: "indefinido"
-        case .timer: "temporizador"
-        case .whileAgentsWork: "enquanto os agentes trabalham"
-        case .whileAppsRunning: "enquanto as apps estão abertas"
+        case .off: t("off")
+        case .manual: t("indefinite")
+        case .timer: t("timer")
+        case .whileAgentsWork: t("while agents are working")
+        case .whileAppsRunning: t("while the apps are open")
         }
     }
 
     private func refreshRemoteStatus() async {
         remotePairing = RemotePairing.load(from: remoteConfigURL)
         guard remotePairing != nil else {
-            remoteStatus = "não configurado"
+            remoteStatus = t("not configured")
             return
         }
         let result = await commandRunner.run(arguments: ["--state"])
         guard result.exitCode == 0,
               let enabled = RemoteKillSwitchState.decode(result.stdout)
         else {
-            remoteStatus = "indisponível"
+            remoteStatus = t("unavailable")
             return
         }
-        remoteStatus = enabled ? "ligado" : "desligado"
+        remoteStatus = enabled ? t("on") : t("off")
     }
 
     private func sendTestPush() {
         isSendingTestPush = true
         pushResult = nil
         Task {
-            let result = await commandRunner.run(arguments: ["NotchHUD", "Teste"])
+            let result = await commandRunner.run(arguments: ["NotchHUD", t("Test")])
             pushResult = RemoteActionResult(
                 succeeded: result.exitCode == 0,
-                message: result.exitCode == 0 ? "Enviado ✓" : "Falhou (\(result.exitCode))"
+                message: result.exitCode == 0 ? t("Sent ✓") : t("Failed (%d)", result.exitCode)
             )
             isSendingTestPush = false
         }
@@ -446,7 +448,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
-        fatalError("init(coder:) não é suportado")
+        fatalError("init(coder:) is not supported")
     }
 
     func show() {
@@ -498,9 +500,9 @@ private enum DefaultModeChoice: String, CaseIterable, Identifiable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .agents: "Enquanto os agentes trabalham"
-        case .apps: "Enquanto as apps estão abertas"
-        case .indefinite: "Indefinido"
+        case .agents: t("While agents are working")
+        case .apps: t("While the apps are open")
+        case .indefinite: t("Indefinitely")
         }
     }
     var mode: KeepAwakeMode {

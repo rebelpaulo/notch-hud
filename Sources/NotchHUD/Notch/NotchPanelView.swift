@@ -113,11 +113,11 @@ struct NotchPanelView: View {
     private var header: some View {
         HStack(alignment: .center) {
             HStack(spacing: 4) {
-                summaryPart(store.counts.working, "a trabalhar", color: DisplayStatus.working.color)
+                summaryPart(store.counts.working, t("working"), color: DisplayStatus.working.color)
                 summarySeparator
-                summaryPart(store.counts.needsMe, "precisam de ti", color: DisplayStatus.needsMe.color)
+                summaryPart(store.counts.needsMe, t("need you"), color: DisplayStatus.needsMe.color)
                 summarySeparator
-                summaryPart(store.counts.done, "concluídos", color: DisplayStatus.done.color)
+                summaryPart(store.counts.done, t("done"), color: DisplayStatus.done.color)
             }
 
             Spacer()
@@ -132,8 +132,8 @@ struct NotchPanelView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("Abrir definições")
-            .accessibilityLabel("Definições")
+            .help(t("Open settings"))
+            .accessibilityLabel(t("Settings"))
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
     }
@@ -159,28 +159,28 @@ struct NotchPanelView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
             .buttonStyle(.plain)
-            .help(keepAwakeEngine.isActive ? "Desligar All-Nighter" : "Ligar All-Nighter")
-            .accessibilityLabel(keepAwakeEngine.isActive ? "Desligar All-Nighter" : "Ligar All-Nighter")
+            .help(keepAwakeEngine.isActive ? t("Turn off Gotta go!") : t("Turn on Gotta go!"))
+            .accessibilityLabel(keepAwakeEngine.isActive ? t("Turn off Gotta go!") : t("Turn on Gotta go!"))
 
             Menu {
-                modeButton("Enquanto os agentes trabalham", mode: .whileAgentsWork)
-                modeButton("Enquanto as apps estiverem abertas", mode: .whileAppsRunning)
+                modeButton(t("While agents are working"), mode: .whileAgentsWork)
+                modeButton(t("While the apps are open"), mode: .whileAppsRunning)
                 Divider()
                 timerButton("30 min", seconds: 30 * 60)
                 timerButton("1h", seconds: 60 * 60)
                 timerButton("2h", seconds: 2 * 60 * 60)
-                modeButton("Indefinido", mode: .manual)
+                modeButton(t("Indefinitely"), mode: .manual)
                 Divider()
-                Toggle("Permitir ecrã dormir", isOn: keepAwakeEngine.configBinding(\.allowDisplaySleep))
+                Toggle(t("Let the display sleep"), isOn: keepAwakeEngine.configBinding(\.allowDisplaySleep))
                 Toggle(
-                    "Manter acordado de tampa fechada",
+                    t("Stay awake with the lid closed"),
                     isOn: keepAwakeEngine.configBinding(\.closedLidMode)
                 )
                 .disabled(!closedLidModeAvailable)
                 if !closedLidModeAvailable {
-                    Text("No repo notch-hud, corre install-all-nighter.sh com sudo")
+                    Text(t("In the notch-hud repo, run install-all-nighter.sh with sudo"))
                 }
-                Toggle("Desligar ao desbloquear", isOn: keepAwakeEngine.configBinding(\.autoOffOnUnlock))
+                Toggle(t("Turn off on unlock"), isOn: keepAwakeEngine.configBinding(\.autoOffOnUnlock))
                 if keepAwakeEngine.isActive {
                     Divider()
                     Text(activeFooter)
@@ -194,8 +194,8 @@ struct NotchPanelView: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Opções do All-Nighter")
-            .accessibilityLabel("Opções do All-Nighter")
+            .help(t("Gotta go! options"))
+            .accessibilityLabel(t("Gotta go! options"))
         }
         .font(.system(size: 10, weight: .medium, design: .monospaced))
     }
@@ -230,20 +230,20 @@ struct NotchPanelView: View {
 
     private var activeFooter: String {
         let elapsed = max(0, Date().timeIntervalSince(keepAwakeEngine.activeSince ?? Date()))
-        var footer = "ativo há \(compactDuration(elapsed)) · modo \(modeName(keepAwakeEngine.mode))"
+        var footer = t("on for %@ · %@ mode", compactDuration(elapsed), modeName(keepAwakeEngine.mode))
         if let remaining = keepAwakeEngine.remainingTime(at: Date()) {
-            footer += " · faltam \(compactDuration(remaining))"
+            footer += t(" · %@ left", compactDuration(remaining))
         }
         return footer
     }
 
     private func modeName(_ mode: KeepAwakeMode) -> String {
         switch mode {
-        case .off: "desligado"
-        case .manual: "indefinido"
-        case .timer: "temporizador"
-        case .whileAgentsWork: "agentes"
-        case .whileAppsRunning: "apps"
+        case .off: t("off")
+        case .manual: t("indefinite")
+        case .timer: t("timer")
+        case .whileAgentsWork: t("agents")
+        case .whileAppsRunning: t("apps")
         }
     }
 
@@ -271,7 +271,7 @@ struct NotchPanelView: View {
     private var emptyState: some View {
         HStack(spacing: 8) {
             AgentSprite(status: .idle, size: 18)
-            Text("Sem sessões ativas")
+            Text(t("No active sessions"))
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.48))
         }

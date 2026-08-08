@@ -29,7 +29,7 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(fixture.assertions.activeIDs.isEmpty)
     #expect(fixture.notifications.messages == [
-        "All-Nighter terminou — todos os agentes concluíram"
+        "Gotta go! finished — all agents done"
     ])
 }
 
@@ -43,7 +43,7 @@ import Testing
 
     #expect(fixture.engine.mode == .off)
     #expect(fixture.assertions.activeIDs.isEmpty)
-    #expect(fixture.notifications.messages == ["All-Nighter: bateria baixa, a dormir"])
+    #expect(fixture.notifications.messages == ["Gotta go!: battery low, going to sleep"])
 }
 
 @MainActor
@@ -177,7 +177,7 @@ import Testing
     fixture.engine.tick(now: start.addingTimeInterval(7_200))
 
     #expect(fixture.notifications.messages == [
-        "All-Nighter ativo há 1h sem agentes a trabalhar"
+        "Gotta go! on for 1h with no agents working"
     ])
 }
 

@@ -46,7 +46,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let keepAwakeEngine = KeepAwakeEngine(
             sessionStore: sessionStore,
-            notificationPoster: PortugueseKeepAwakeNotificationPoster()
+            notificationPoster: SystemNotificationPoster()
         )
         let sleepGuardController = SleepGuardController(engine: keepAwakeEngine)
         let remoteBridge = RemoteBridge(engine: keepAwakeEngine, sessionStore: sessionStore)
@@ -124,7 +124,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         let pauseItem = NSMenuItem(
-            title: "Pausar aprovações",
+            title: t("Pause approvals"),
             action: #selector(togglePauseApprovals(_:)),
             keyEquivalent: ""
         )
@@ -133,7 +133,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(pauseItem)
 
         let collapseItem = NSMenuItem(
-            title: "Recolher painel",
+            title: t("Collapse panel"),
             action: #selector(collapsePanel(_:)),
             keyEquivalent: ""
         )
@@ -142,7 +142,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "Sair do NotchHUD",
+            title: t("Quit NotchHUD"),
             action: #selector(quitNotchHUD(_:)),
             keyEquivalent: "q"
         )

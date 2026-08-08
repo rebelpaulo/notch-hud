@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "NotchHUD",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -18,6 +19,7 @@ let package = Package(
             ],
             path: "Sources/NotchHUD",
             exclude: ["Info.plist"],
+            resources: [.process("Resources")],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

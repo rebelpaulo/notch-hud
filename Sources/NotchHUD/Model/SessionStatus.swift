@@ -26,13 +26,13 @@ enum DisplayStatus: Hashable, Sendable {
     var label: String {
         switch self {
         case .working:
-            "Working"
+            t("Working")
         case .needsMe:
-            "Needs me"
+            t("Needs me")
         case .done:
-            "Done"
+            t("Done")
         case .idle:
-            "Idle"
+            t("Idle")
         }
     }
 }
