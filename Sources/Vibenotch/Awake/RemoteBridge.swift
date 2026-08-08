@@ -95,6 +95,7 @@ final class RemoteBridge {
     private let userDefaults: UserDefaults
     private let conversationIndex: ClaudeConversationIndex
     private let resumer: any ConversationResuming
+    private let remoteControlServer: RemoteControlServer
 
     private var timer: Timer?
     private var isStarted = false
@@ -135,10 +136,12 @@ final class RemoteBridge {
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         userDefaults: UserDefaults = .standard,
         conversationIndex: ClaudeConversationIndex? = nil,
-        resumer: (any ConversationResuming)? = nil
+        resumer: (any ConversationResuming)? = nil,
+        remoteControlServer: RemoteControlServer = RemoteControlServer()
     ) {
         self.conversationIndex = conversationIndex ?? ClaudeConversationIndex(homeURL: homeURL)
         self.resumer = resumer ?? TerminalConversationResumer()
+        self.remoteControlServer = remoteControlServer
         self.engine = engine
         self.sessionStore = sessionStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
@@ -412,6 +415,7 @@ final class RemoteBridge {
         await publishBatteryIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
+        await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
         await runPendingCommand(remote.command)
     }
 
@@ -561,6 +565,14 @@ final class RemoteBridge {
             lastExecutedCommandID = nil
             return
         }
+        if command.action == "remote_control" || command.action == "remote_control_stop" {
+            await changeRemoteControl(
+                starting: command.action == "remote_control",
+                requestID: command.id ?? command.action ?? "remote-control"
+            )
+            return
+        }
+
         guard command.action == "resume", let requestedID = command.id else { return }
 
         // Already done — but the slot still has to be freed, or a repeat jams
@@ -616,6 +628,67 @@ final class RemoteBridge {
         }.value
         cachedConversations = (Date(), value)
         return value
+    }
+
+    /// Whether a remote-control server is up, so the phone's button can show
+    /// the state rather than always offering to start one.
+    private func publishRemoteControlIfChanged(remoteValue: Bool?) async {
+        let server = remoteControlServer
+        // pgrep is a process spawn; off the main actor like the transcript
+        // scan, for the same reason.
+        let running = await Task.detached(priority: .utility) { server.isRunning() }.value
+
+        // Compared against what the remote already holds rather than a local
+        // copy: a local cache would publish once on every launch just to say
+        // what the server already knew.
+        guard running != (remoteValue ?? false) else { return }
+        _ = await run(["--state-put"], stdin: #"{"remote_control":\#(running)}"#)
+    }
+
+    /// Starts the server in the most recently active project. Server mode
+    /// serves sessions from its own directory, and the last place the user was
+    /// working is the best guess available without asking them to pick one.
+    private func changeRemoteControl(starting: Bool, requestID: String) async {
+        // NOT taken from the resumable list: that one hides untitled
+        // conversations, so a fresh install or anyone who never renames one
+        // would have had the button silently do nothing.
+        let index = conversationIndex
+        let directory = starting
+            ? await Task.detached(priority: .utility) { index.mostRecentDirectory() }.value
+            : nil
+        guard await run(["--state-put"], stdin: #"{"clear_command_id":"\#(requestID)"}"#).exitCode == 0
+        else {
+            NSLog("Vibenotch left a remote-control request in place: could not clear it")
+            return
+        }
+
+        guard starting else {
+            let server = remoteControlServer
+            await Task.detached(priority: .utility) { server.stop() }.value
+            // Published straight away rather than left to the next tick: the
+            // phone asked for this and should not watch a stale "on" for ten
+            // seconds while wondering whether the tap registered.
+            _ = await run(["--state-put"], stdin: #"{"remote_control":false}"#)
+            return
+        }
+
+        guard let directory else {
+            // Say so rather than fail silently: the tap has to produce
+            // something, and "there is no project to start in" is the answer.
+            await push(
+                title: "Vibenotch",
+                body: t("No project to start remote control in — open one on the Mac first"),
+                tag: "remote-control-empty"
+            )
+            return
+        }
+        if resumer.startRemoteControl(in: directory) {
+            await push(
+                title: "Vibenotch",
+                body: t("Remote control starting on the Mac — pick it in the Claude app"),
+                tag: "remote-control"
+            )
+        }
     }
 
     private func push(title: String, body: String, tag: String? = nil) async {
@@ -782,6 +855,7 @@ private struct RemoteStateWithSettings: Decodable {
     let settings: RemoteSettingsPayload?
     let sessions: [RemoteSessionCount]?
     let resumable: [RemoteSessionCount]?
+    let remoteControl: Bool?
     let settingsRev: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -789,6 +863,7 @@ private struct RemoteStateWithSettings: Decodable {
         case settings
         case sessions
         case resumable
+        case remoteControl = "remote_control"
         // The column is `pending_command`, and GET returns it under that name.
         // Decoding "command" silently found nothing, so the Mac never saw a
         // request — and the unit test missed it because its fixture used the

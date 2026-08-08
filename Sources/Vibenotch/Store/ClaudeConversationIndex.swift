@@ -55,6 +55,20 @@ struct ClaudeConversationIndex: Sendable {
             .map { $0 }
     }
 
+    /// The project of the most recent transcript, titled or not.
+    ///
+    /// Separate from `recentConversations()` on purpose: that one hides
+    /// untitled conversations because their auto-generated names mean nothing
+    /// to the reader, but "where was I last working" has no such requirement —
+    /// and taking the directory from the filtered list meant a fresh install,
+    /// or anyone who never renames a conversation, got nothing at all.
+    func mostRecentDirectory() -> String? {
+        for url in transcriptURLs().prefix(Self.scanLimit) {
+            if let directory = directory(at: url) { return directory }
+        }
+        return nil
+    }
+
     private func transcriptURLs() -> [URL] {
         guard let directories = try? fileManager.contentsOfDirectory(
             at: projectsURL,
@@ -82,15 +96,20 @@ struct ClaudeConversationIndex: Sendable {
             ?? .distantPast
     }
 
-    private func conversation(at url: URL) -> ClaudeConversation? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+    private func directory(at url: URL) -> String? {
+        fields(at: url).directory
+    }
+
+    /// Reads the two fields both callers need in one pass.
+    private func fields(at url: URL) -> (title: String?, directory: String?) {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return (nil, nil) }
         defer { try? handle.close() }
 
         // 256 KB covers the first lines of any transcript without pulling a
         // multi-megabyte conversation into memory to read two fields.
         guard let chunk = try? handle.read(upToCount: 256 * 1024),
               let text = String(data: chunk, encoding: .utf8)
-        else { return nil }
+        else { return (nil, nil) }
 
         var title: String?
         var directory: String?
@@ -107,7 +126,11 @@ struct ClaudeConversationIndex: Sendable {
                 directory = value
             }
         }
+        return (title, directory)
+    }
 
+    private func conversation(at url: URL) -> ClaudeConversation? {
+        let (title, directory) = fields(at: url)
         guard let title, let directory else { return nil }
         return ClaudeConversation(
             id: url.deletingPathExtension().lastPathComponent,

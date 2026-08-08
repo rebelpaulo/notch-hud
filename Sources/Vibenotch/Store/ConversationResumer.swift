@@ -5,9 +5,14 @@ protocol ConversationResuming: Sendable {
     /// Reopens `conversation` with Remote Control, so it can be continued from
     /// the phone. Returns false if the terminal refused it.
     func resume(_ conversation: ClaudeConversation) -> Bool
+
+    /// Starts a `claude remote-control` server in `directory`, which is what
+    /// puts the Mac in the Claude app's Devices list. Different from resuming
+    /// one conversation, which is why it is a separate call.
+    func startRemoteControl(in directory: String) -> Bool
 }
 
-/// Opens a real terminal window running `claude --remote-control --resume`.
+/// Opens a real terminal window running the command.
 ///
 /// Not a detached background process: Remote Control needs the `claude`
 /// process to stay alive, and a window is also the honest thing to leave
@@ -19,8 +24,18 @@ struct TerminalConversationResumer: ConversationResuming {
     var runScript: (String) throws -> String? = { try AppleScriptRunner.run($0) }
 
     func resume(_ conversation: ClaudeConversation) -> Bool {
-        let command = Self.command(for: conversation)
-        NSLog("Vibenotch resume command: [%@]", command)
+        run(Self.command(for: conversation), describing: conversation.id)
+    }
+
+    func startRemoteControl(in directory: String) -> Bool {
+        run(Self.remoteControlCommand(inDirectory: directory), describing: "remote control")
+    }
+
+    private func run(_ command: String, describing subject: String) -> Bool {
+        // Logged because one live run typed "ecd" instead of "cd" and could
+        // not be reproduced. Without the exact command there is nothing to
+        // inspect if it happens again.
+        NSLog("Vibenotch terminal command: [%@]", command)
         do {
             _ = try runScript("""
             tell application "Terminal"
@@ -30,7 +45,7 @@ struct TerminalConversationResumer: ConversationResuming {
             """)
             return true
         } catch {
-            NSLog("Vibenotch could not resume %@: %@", conversation.id, error.localizedDescription)
+            NSLog("Vibenotch could not start %@: %@", subject, error.localizedDescription)
             return false
         }
     }
@@ -40,6 +55,10 @@ struct TerminalConversationResumer: ConversationResuming {
     /// makes it true either way, which is the point of the request.
     static func command(for conversation: ClaudeConversation) -> String {
         "cd \(shellQuoted(conversation.directory)) && claude --remote-control --resume \(shellQuoted(conversation.id))"
+    }
+
+    static func remoteControlCommand(inDirectory directory: String) -> String {
+        "cd \(shellQuoted(directory)) && claude remote-control"
     }
 
     /// Single quotes so nothing in a path can be read as shell syntax, with
