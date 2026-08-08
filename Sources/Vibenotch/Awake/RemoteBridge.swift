@@ -775,7 +775,11 @@ private struct RemoteStateWithSettings: Decodable {
         case settings
         case sessions
         case resumable
-        case command
+        // The column is `pending_command`, and GET returns it under that name.
+        // Decoding "command" silently found nothing, so the Mac never saw a
+        // request — and the unit test missed it because its fixture used the
+        // key this decoder wanted rather than the one the API returns.
+        case command = "pending_command"
         case settingsRev = "settings_rev"
     }
 }
