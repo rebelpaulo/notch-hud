@@ -27,6 +27,28 @@ import Testing
     #expect(conversation.id == "aaaaaaaa-1111-2222-3333-444444444444")
 }
 
+@Test func indexTakesTheLatestTitleWhenAConversationWasRenamed() throws {
+    // Renaming appends another customTitle record; stopping at the first one
+    // publishes the name the user deliberately changed away from.
+    let fixture = try ConversationFixture()
+    defer { fixture.remove() }
+    try fixture.write(
+        directoryName: "-Users-mac-project",
+        sessionID: "eeeeeeee-1111-2222-3333-444444444444",
+        lines: [
+            #"{"type":"custom-title","customTitle":"Old name"}"#,
+            #"{"type":"user","cwd":"/Users/mac/project"}"#,
+            #"{"type":"custom-title","customTitle":"Revenge ads meta"}"#,
+        ]
+    )
+
+    let conversation = try #require(
+        ClaudeConversationIndex(homeURL: fixture.home).recentConversations().first
+    )
+
+    #expect(conversation.title == "Revenge ads meta")
+}
+
 @Test func indexSkipsConversationsWithNoTitle() throws {
     let fixture = try ConversationFixture()
     defer { fixture.remove() }

@@ -352,6 +352,36 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeDoesNotActOnACommandItCouldNotClear() async throws {
+    // This action opens a Terminal window and starts a Claude process. Acting
+    // while the request is still sitting in the remote means the next poll
+    // sees it again — a new window every ten seconds until a clear succeeds.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    try fixture.writeConversation(
+        sessionID: "aaaaaaaa-1111-2222-3333-444444444444",
+        title: "Revenge ads meta",
+        directory: "/Users/mac/Claude code"
+    )
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let published = try #require(
+        await fixture.runner.statePutBodies().first { $0.contains("resumable") }
+    )
+    let entry = try #require(
+        (JSONSerialization.jsonObject(with: Data(published.utf8)) as? [String: [[String: Any]]])?["resumable"]?.first
+    )
+    let publishedID = try #require(entry["id"] as? String)
+
+    await fixture.runner.setStateOutput(
+        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"\#(publishedID)"}}"#
+    )
+    await fixture.runner.failStatePut(true)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.resumer.resumed.isEmpty)
+}
+
+@MainActor
 @Test func remoteBridgeResumesOnlyAConversationItPublishedItself() async throws {
     // The security boundary, pinned. The phone sends an opaque id and nothing
     // else — no path, no command — and the Mac resolves it against its own
@@ -643,6 +673,11 @@ private actor FakeRemoteCommandRunner: CommandRunning {
         stateOutput = value
     }
     private var settingsPutExitCode: Int32 = 0
+    private var statePutFails = false
+
+    func failStatePut(_ value: Bool) {
+        statePutFails = value
+    }
 
     init(stateOutput: String) {
         self.stateOutput = stateOutput
@@ -657,6 +692,9 @@ private actor FakeRemoteCommandRunner: CommandRunning {
         stdins.append(stdin)
         if arguments == ["--settings-put"] {
             return CommandRunResult(stdout: "", exitCode: settingsPutExitCode)
+        }
+        if arguments == ["--state-put"], statePutFails {
+            return CommandRunResult(stdout: "", exitCode: 1)
         }
         return CommandRunResult(
             stdout: arguments == ["--state"] ? stateOutput : "{}",

@@ -246,6 +246,16 @@ final class RemoteBridge {
     private var lastPublishedSessions: [PublishedSession]?
     private var lastPublishedResumable: [PublishedConversation]?
 
+    /// The last request actually carried out. A clear that succeeds on the
+    /// server but is not reflected in the next GET would otherwise run the
+    /// same request twice.
+    private var lastExecutedCommandID: String?
+
+    /// Conversations change on the order of minutes, and the scan stats every
+    /// transcript. Re-reading the whole history every ten seconds is work
+    /// nobody asked for.
+    private var cachedConversations: (at: Date, value: [ClaudeConversation])?
+
     /// What the phone sees of a past conversation. The title is already on the
     /// user's phone in the Claude app, and the project name is already
     /// published for live sessions — the directory is not, and never is.
@@ -506,7 +516,7 @@ final class RemoteBridge {
         let key = sessionIDKey
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
-        let snapshot = conversationIndex.recentConversations().map {
+        let snapshot = await conversations().map {
             PublishedConversation(
                 id: PublishedSession.opaqueID($0.id, key: key),
                 title: $0.title,
@@ -544,14 +554,22 @@ final class RemoteBridge {
     private func runPendingCommand(_ command: RemoteCommand?) async {
         guard let command, command.action == "resume", let requestedID = command.id else { return }
 
+        guard requestedID != lastExecutedCommandID else { return }
+
         let key = sessionIDKey
-        let match = conversationIndex.recentConversations().first {
+        let match = await conversations().first {
             PublishedSession.opaqueID($0.id, key: key) == requestedID
         }
 
-        // Clear it either way: an unmatched request must not be retried every
-        // ten seconds for the rest of the session.
-        _ = await run(["--state-put"], stdin: #"{"command":null}"#)
+        // Clear FIRST, and only act if the clear stuck. Acting on a request
+        // still sitting in the remote means the next poll sees it again — and
+        // this action opens a Terminal window and starts a Claude process, so
+        // "retry until it works" would be a new window every ten seconds.
+        guard await run(["--state-put"], stdin: #"{"command":null}"#).exitCode == 0 else {
+            NSLog("Vibenotch left a resume request in place: could not clear it")
+            return
+        }
+        lastExecutedCommandID = requestedID
 
         guard let match else {
             NSLog("Vibenotch ignored a resume request for an unknown conversation")
@@ -565,6 +583,21 @@ final class RemoteBridge {
                 tag: "resume-\(requestedID)"
             )
         }
+    }
+
+    /// Off the main actor: the scan stats every transcript in every project,
+    /// and this class is @MainActor, so doing it inline stalls the notch and
+    /// the settings window on a machine with a long history.
+    private func conversations() async -> [ClaudeConversation] {
+        if let cachedConversations, Date().timeIntervalSince(cachedConversations.at) < 60 {
+            return cachedConversations.value
+        }
+        let index = conversationIndex
+        let value = await Task.detached(priority: .utility) {
+            index.recentConversations()
+        }.value
+        cachedConversations = (Date(), value)
+        return value
     }
 
     private func push(title: String, body: String, tag: String? = nil) async {

@@ -23,7 +23,7 @@ struct ClaudeConversation: Equatable, Sendable {
 /// become `-`), so the working directory is taken from the transcript's own
 /// `cwd` field instead — it is the only unambiguous source, and the resume has
 /// to run in the right directory.
-struct ClaudeConversationIndex {
+struct ClaudeConversationIndex: Sendable {
     /// How many of the most recently touched transcripts to parse. Sorting by
     /// modification date first means the scan cost does not grow with the
     /// hundreds of old conversations that will never be resumed.
@@ -34,14 +34,14 @@ struct ClaudeConversationIndex {
     static let lineLimit = 60
 
     let projectsURL: URL
-    private let fileManager: FileManager
 
-    init(
-        homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
-        fileManager: FileManager = .default
-    ) {
+    /// `FileManager.default` rather than an injected instance: this runs off
+    /// the main actor, and the shared instance is the one Apple documents as
+    /// safe to use concurrently for these read-only calls.
+    private var fileManager: FileManager { .default }
+
+    init(homeURL: URL = FileManager.default.homeDirectoryForCurrentUser) {
         projectsURL = homeURL.appendingPathComponent(".claude/projects", isDirectory: true)
-        self.fileManager = fileManager
     }
 
     /// Most recent first. Only titled conversations: an untitled one shows up
@@ -68,7 +68,13 @@ struct ClaudeConversationIndex {
             ))?.filter { $0.pathExtension == "jsonl" } ?? []
         }
 
-        return transcripts.sorted { modificationDate(of: $0) > modificationDate(of: $1) }
+        // Stat once per file, not once per comparison: sorting on a computed
+        // property turns n files into n·log n stat calls, which is the whole
+        // cost on a machine with a long history.
+        return transcripts
+            .map { (url: $0, date: modificationDate(of: $0)) }
+            .sorted { $0.date > $1.date }
+            .map(\.url)
     }
 
     private func modificationDate(of url: URL) -> Date {
@@ -91,13 +97,15 @@ struct ClaudeConversationIndex {
         for line in text.split(separator: "\n", omittingEmptySubsequences: true).prefix(Self.lineLimit) {
             guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
             else { continue }
+            // Last title wins: renaming a conversation appends another
+            // customTitle record, so stopping at the first one publishes the
+            // name the user changed away from.
             if let value = object["customTitle"] as? String, !value.isEmpty {
                 title = value
             }
             if directory == nil, let value = object["cwd"] as? String, !value.isEmpty {
                 directory = value
             }
-            if title != nil, directory != nil { break }
         }
 
         guard let title, let directory else { return nil }
