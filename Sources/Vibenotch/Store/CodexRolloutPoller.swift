@@ -224,7 +224,8 @@ final class CodexRolloutPoller {
             // seq stays meaningful and the spool watcher doesn't churn.
             if previous.status == status.rawValue,
                previous.updated == updated,
-               previous.toolLine == toolLine {
+               previous.toolLine == toolLine,
+               previous.subagents == subagents {
                 return
             }
             var envelope: [String: Any] = [
@@ -273,19 +274,23 @@ final class CodexRolloutPoller {
     private func existingEnvelope(
         at fileURL: URL,
         sessionID: String
-    ) -> (seq: Int, started: String?, status: String?, updated: String?, toolLine: String?) {
+    ) -> (seq: Int, started: String?, status: String?, updated: String?, toolLine: String?, subagents: Int) {
         guard fileManager.fileExists(atPath: fileURL.path),
               let data = try? Data(contentsOf: fileURL),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               object["id"] as? String == sessionID
-        else { return (0, nil, nil, nil, nil) }
+        else { return (0, nil, nil, nil, nil, 0) }
 
         return (
             object["seq"] as? Int ?? 0,
             object["started"] as? String,
             object["status"] as? String,
             object["updated"] as? String,
-            object["toolLine"] as? String
+            object["toolLine"] as? String,
+            // Absent in files written before this field existed, which is the
+            // upgrade case: without it in the comparison below, an entry that
+            // is otherwise unchanged is skipped and never gains the count.
+            object["subagents"] as? Int ?? 0
         )
     }
 
