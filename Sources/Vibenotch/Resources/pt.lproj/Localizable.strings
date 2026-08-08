@@ -82,6 +82,8 @@
 "Gotta go! turned on remotely ✓" = "Gotta go! ligado remotamente ✓";
 "Gotta go! turned off remotely ✓" = "Gotta go! desligado remotamente ✓";
 
+"Reopening %@ on the Mac — connect from the Claude app" = "A reabrir %@ no Mac — liga-te pela app Claude";
+
 /* Menu bar */
 "Pause approvals" = "Pausar aprovações";
 "Collapse panel" = "Recolher painel";

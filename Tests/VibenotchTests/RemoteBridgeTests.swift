@@ -298,6 +298,113 @@ import Testing
 }
 
 @MainActor
+@Test func needsMeNotificationTagCarriesTheOpaqueIDNotTheRealOne() async throws {
+    // The tag is stored in the notification history the phone reads back, so a
+    // raw session id there would undo the hashing done everywhere else.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
+
+    await fixture.bridge.checkNow()
+
+    let tags = await fixture.runner.recordedCalls()
+        .filter { $0.count == 3 }
+        .map { $0[2] }
+    let needsMe = try #require(tags.first { $0.hasPrefix("needs-me-") })
+    #expect(needsMe != "needs-me-s1")
+    #expect(needsMe.dropFirst("needs-me-".count).count == 16)
+}
+
+@MainActor
+@Test func remoteBridgeResumesTheConversationBehindAPublishedID() async throws {
+    // The full round trip: the Mac indexes a conversation, publishes an opaque
+    // id for it, and resumes the right one when that id comes back. The id is
+    // read from what was actually published rather than recomputed here, so
+    // the test cannot pass by agreeing with a wrong implementation.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    try fixture.writeConversation(
+        sessionID: "aaaaaaaa-1111-2222-3333-444444444444",
+        title: "Revenge ads meta",
+        directory: "/Users/mac/Claude code"
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let published = try #require(
+        await fixture.runner.statePutBodies().first { $0.contains("resumable") }
+    )
+    let resumable = try #require(
+        JSONSerialization.jsonObject(with: Data(published.utf8)) as? [String: [[String: Any]]]
+    )["resumable"]
+    let entry = try #require(resumable?.first)
+    #expect(entry["title"] as? String == "Revenge ads meta")
+    #expect(entry["project"] as? String == "Claude code")
+    // The directory never leaves the Mac; the phone gets the project name only.
+    #expect(entry["directory"] == nil)
+    let publishedID = try #require(entry["id"] as? String)
+
+    await fixture.runner.setStateOutput(
+        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"\#(publishedID)"}}"#
+    )
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.resumer.resumed.map(\.id) == ["aaaaaaaa-1111-2222-3333-444444444444"])
+}
+
+@MainActor
+@Test func remoteBridgeDoesNotActOnACommandItCouldNotClear() async throws {
+    // This action opens a Terminal window and starts a Claude process. Acting
+    // while the request is still sitting in the remote means the next poll
+    // sees it again — a new window every ten seconds until a clear succeeds.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    try fixture.writeConversation(
+        sessionID: "aaaaaaaa-1111-2222-3333-444444444444",
+        title: "Revenge ads meta",
+        directory: "/Users/mac/Claude code"
+    )
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let published = try #require(
+        await fixture.runner.statePutBodies().first { $0.contains("resumable") }
+    )
+    let entry = try #require(
+        (JSONSerialization.jsonObject(with: Data(published.utf8)) as? [String: [[String: Any]]])?["resumable"]?.first
+    )
+    let publishedID = try #require(entry["id"] as? String)
+
+    await fixture.runner.setStateOutput(
+        #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"\#(publishedID)"}}"#
+    )
+    await fixture.runner.failStatePut(true)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.resumer.resumed.isEmpty)
+}
+
+@MainActor
+@Test func remoteBridgeResumesOnlyAConversationItPublishedItself() async throws {
+    // The security boundary, pinned. The phone sends an opaque id and nothing
+    // else — no path, no command — and the Mac resolves it against its own
+    // index. An id it never published must be dropped, or a stolen pairing
+    // secret becomes a way to run something of the attacker's choosing.
+    let fixture = try RemoteBridgeFixture(
+        mode: .manual,
+        percent: nil,
+        onAC: true,
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"command":{"action":"resume","id":"deadbeefdeadbeef"}}"#
+    )
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.resumer.resumed.isEmpty)
+    // Cleared regardless, or an unmatched request retries every ten seconds
+    // for the rest of the session.
+    let bodies = await fixture.runner.statePutBodies()
+    #expect(bodies.contains { $0.contains("\"clear_command_id\":\"deadbeefdeadbeef\"") })
+}
+
+@MainActor
 @Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReading() async throws {
     let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
     defer { fixture.remove() }
@@ -415,6 +522,17 @@ import Testing
 }
 
 @MainActor
+final class FakeConversationResumer: ConversationResuming {
+    private(set) var resumed: [ClaudeConversation] = []
+    var succeeds = true
+
+    func resume(_ conversation: ClaudeConversation) -> Bool {
+        resumed.append(conversation)
+        return succeeds
+    }
+}
+
+@MainActor
 private final class RemoteBridgeFixture {
     let scratch: URL
     let engine: FakeRemoteEngine
@@ -422,6 +540,7 @@ private final class RemoteBridgeFixture {
 
     let runner: FakeRemoteCommandRunner
     let power: FakeRemotePowerSource
+    let resumer = FakeConversationResumer()
     let bridge: RemoteBridge
 
     private let suiteName: String
@@ -455,7 +574,8 @@ private final class RemoteBridgeFixture {
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,
-            userDefaults: userDefaults
+            userDefaults: userDefaults,
+            resumer: resumer
         )
     }
 
@@ -474,13 +594,30 @@ private final class RemoteBridgeFixture {
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,
-            userDefaults: userDefaults
+            userDefaults: userDefaults,
+            resumer: resumer
         )
     }
 
     func repair(url: String) throws {
         try #"{"url":"\#(url)","secret":"test-secret"}"#.write(
             to: scratch.appendingPathComponent(".vibenotch/remote.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+    }
+
+    func writeConversation(sessionID: String, title: String, directory: String) throws {
+        let projects = scratch
+            .appendingPathComponent(".claude/projects", isDirectory: true)
+            .appendingPathComponent("encoded-path", isDirectory: true)
+        try FileManager.default.createDirectory(at: projects, withIntermediateDirectories: true)
+        let lines = [
+            #"{"type":"custom-title","customTitle":"\#(title)","sessionId":"\#(sessionID)"}"#,
+            #"{"type":"user","cwd":"\#(directory)"}"#,
+        ]
+        try (lines.joined(separator: "\n") + "\n").write(
+            to: projects.appendingPathComponent("\(sessionID).jsonl"),
             atomically: true,
             encoding: .utf8
         )
@@ -530,8 +667,17 @@ private final class FakeRemotePowerSource: PowerSourceProviding, @unchecked Send
 private actor FakeRemoteCommandRunner: CommandRunning {
     private var calls: [[String]] = []
     private var stdins: [String?] = []
-    private let stateOutput: String
+    private var stateOutput: String
+
+    func setStateOutput(_ value: String) {
+        stateOutput = value
+    }
     private var settingsPutExitCode: Int32 = 0
+    private var statePutFails = false
+
+    func failStatePut(_ value: Bool) {
+        statePutFails = value
+    }
 
     init(stateOutput: String) {
         self.stateOutput = stateOutput
@@ -546,6 +692,9 @@ private actor FakeRemoteCommandRunner: CommandRunning {
         stdins.append(stdin)
         if arguments == ["--settings-put"] {
             return CommandRunResult(stdout: "", exitCode: settingsPutExitCode)
+        }
+        if arguments == ["--state-put"], statePutFails {
+            return CommandRunResult(stdout: "", exitCode: 1)
         }
         return CommandRunResult(
             stdout: arguments == ["--state"] ? stateOutput : "{}",

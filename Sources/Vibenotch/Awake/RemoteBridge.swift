@@ -93,6 +93,8 @@ final class RemoteBridge {
     private let powerSourceProvider: any PowerSourceProviding
     private let pairingURL: URL
     private let userDefaults: UserDefaults
+    private let conversationIndex: ClaudeConversationIndex
+    private let resumer: any ConversationResuming
 
     private var timer: Timer?
     private var isStarted = false
@@ -131,8 +133,12 @@ final class RemoteBridge {
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
-        userDefaults: UserDefaults = .standard
+        userDefaults: UserDefaults = .standard,
+        conversationIndex: ClaudeConversationIndex? = nil,
+        resumer: (any ConversationResuming)? = nil
     ) {
+        self.conversationIndex = conversationIndex ?? ClaudeConversationIndex(homeURL: homeURL)
+        self.resumer = resumer ?? TerminalConversationResumer()
         self.engine = engine
         self.sessionStore = sessionStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
@@ -238,6 +244,32 @@ final class RemoteBridge {
     /// rewritten every tick. Elapsed time is derived on the phone from
     /// `started`, so a ticking clock is not itself a change.
     private var lastPublishedSessions: [PublishedSession]?
+    private var lastPublishedResumable: [PublishedConversation]?
+
+    /// The last request actually carried out. A clear that succeeds on the
+    /// server but is not reflected in the next GET would otherwise run the
+    /// same request twice.
+    private var lastExecutedCommandID: String?
+
+    /// Conversations change on the order of minutes, and the scan stats every
+    /// transcript. Re-reading the whole history every ten seconds is work
+    /// nobody asked for.
+    private var cachedConversations: (at: Date, value: [ClaudeConversation])?
+
+    /// What the phone sees of a past conversation. The title is already on the
+    /// user's phone in the Claude app, and the project name is already
+    /// published for live sessions — the directory is not, and never is.
+    private struct PublishedConversation: Equatable, Encodable {
+        let id: String
+        let title: String
+        let project: String
+        let lastActive: String
+
+        enum CodingKeys: String, CodingKey {
+            case id, title, project
+            case lastActive = "last_active"
+        }
+    }
 
     /// What leaves the machine. Deliberately narrow: no prompt, no tool line,
     /// no path — those are the sensitive part of what the notch shows, and the
@@ -342,6 +374,7 @@ final class RemoteBridge {
         }
         needsMeSessionIDs.formIntersection(current.keys)
 
+        let key = sessionIDKey
         for sessionID in current.keys.sorted()
             where !needsMeSessionIDs.contains(sessionID) {
             guard let project = current[sessionID] else { continue }
@@ -349,7 +382,10 @@ final class RemoteBridge {
             await push(
                 title: "Vibenotch",
                 body: t("Needs you: %@", project),
-                tag: "needs-me-\(sessionID)"
+                // The opaque id, not the session's own: the tag is stored in
+                // the notification history, and publishing the real id there
+                // would undo the whole point of hashing it in the first place.
+                tag: "needs-me-\(PublishedSession.opaqueID(sessionID, key: key))"
             )
         }
     }
@@ -375,6 +411,8 @@ final class RemoteBridge {
         await reconcileSettings(remote)
         await publishBatteryIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
+        await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
+        await runPendingCommand(remote.command)
     }
 
     private func reconcileDesiredState(_ desired: Bool) async {
@@ -472,6 +510,100 @@ final class RemoteBridge {
         }
     }
 
+    /// Past conversations the phone can ask the Mac to reopen. Published on
+    /// change only, like everything else on this channel.
+    private func publishResumableIfChanged(remoteCount: Int) async {
+        let key = sessionIDKey
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        let snapshot = await conversations().map {
+            PublishedConversation(
+                id: PublishedSession.opaqueID($0.id, key: key),
+                title: $0.title,
+                project: $0.project,
+                lastActive: formatter.string(from: $0.lastActive)
+            )
+        }
+        guard snapshot != lastPublishedResumable else { return }
+
+        // Same rule as the session list: nothing to say when both sides are
+        // already empty, but an empty list over a non-empty remote is worth a
+        // write.
+        if snapshot.isEmpty, remoteCount == 0 {
+            lastPublishedResumable = []
+            return
+        }
+
+        guard let payload = try? JSONEncoder().encode(["resumable": snapshot]),
+              let body = String(data: payload, encoding: .utf8)
+        else { return }
+
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedResumable = snapshot
+        }
+    }
+
+    /// The phone can ask for exactly one thing, and it cannot say how.
+    ///
+    /// The request carries an opaque id and nothing else: no path, no command,
+    /// no arguments. The Mac resolves that id against conversations IT indexed
+    /// and IT published, and builds the command itself. A request naming
+    /// anything the Mac did not publish is dropped — so the worst a stolen
+    /// pairing secret buys is reopening a conversation that is already on that
+    /// machine, never running something of the attacker's choosing.
+    private func runPendingCommand(_ command: RemoteCommand?) async {
+        guard let command, command.action == "resume", let requestedID = command.id else { return }
+
+        guard requestedID != lastExecutedCommandID else { return }
+
+        let key = sessionIDKey
+        let match = await conversations().first {
+            PublishedSession.opaqueID($0.id, key: key) == requestedID
+        }
+
+        // Clear FIRST, and only act if the clear stuck. Acting on a request
+        // still sitting in the remote means the next poll sees it again — and
+        // this action opens a Terminal window and starts a Claude process, so
+        // "retry until it works" would be a new window every ten seconds.
+        // Names the id being acknowledged so the server can make the clear
+        // conditional: an unconditional one would discard a request the phone
+        // wrote after this poll read.
+        let acknowledgement = #"{"clear_command_id":"\#(requestedID)"}"#
+        guard await run(["--state-put"], stdin: acknowledgement).exitCode == 0 else {
+            NSLog("Vibenotch left a resume request in place: could not clear it")
+            return
+        }
+        lastExecutedCommandID = requestedID
+
+        guard let match else {
+            NSLog("Vibenotch ignored a resume request for an unknown conversation")
+            return
+        }
+
+        if resumer.resume(match) {
+            await push(
+                title: "Vibenotch",
+                body: t("Reopening %@ on the Mac — connect from the Claude app", match.title),
+                tag: "resume-\(requestedID)"
+            )
+        }
+    }
+
+    /// Off the main actor: the scan stats every transcript in every project,
+    /// and this class is @MainActor, so doing it inline stalls the notch and
+    /// the settings window on a machine with a long history.
+    private func conversations() async -> [ClaudeConversation] {
+        if let cachedConversations, Date().timeIntervalSince(cachedConversations.at) < 60 {
+            return cachedConversations.value
+        }
+        let index = conversationIndex
+        let value = await Task.detached(priority: .utility) {
+            index.recentConversations()
+        }.value
+        cachedConversations = (Date(), value)
+        return value
+    }
+
     private func push(title: String, body: String, tag: String? = nil) async {
         var arguments = [title, body]
         if let tag {
@@ -503,6 +635,7 @@ final class RemoteBridge {
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
         lastPublishedSessions = nil
+        lastPublishedResumable = nil
         lastSyncedActive = nil
     }
 
@@ -624,16 +757,25 @@ private struct RemoteSettingsPayload: Decodable {
 /// lists sessions that have ended" from "both sides are already empty".
 private struct RemoteSessionCount: Decodable {}
 
+struct RemoteCommand: Decodable {
+    let action: String?
+    let id: String?
+}
+
 private struct RemoteStateWithSettings: Decodable {
     let keepAwakeEnabled: Bool?
+    let command: RemoteCommand?
     let settings: RemoteSettingsPayload?
     let sessions: [RemoteSessionCount]?
+    let resumable: [RemoteSessionCount]?
     let settingsRev: Int?
 
     enum CodingKeys: String, CodingKey {
         case keepAwakeEnabled = "keep_awake_enabled"
         case settings
         case sessions
+        case resumable
+        case command
         case settingsRev = "settings_rev"
     }
 }
