@@ -1,234 +1,304 @@
 # Vibenotch
 
-A live HUD for your AI coding agents, parked in the MacBook notch.
+**A live HUD for your AI coding agents, parked in the MacBook notch.**
 
-Vibenotch watches your Claude Code and Codex CLI sessions and shows their
-status — **Working**, **Needs me**, **Done** — right where you're already
-looking. Hover the notch to expand a glass panel with every session, click a
-row to jump straight to its terminal tab, and (for Claude Code) act on
-permission prompts inline without leaving the notch. An optional
-**All-Nighter** mode keeps the Mac awake even with the lid closed while
-agents are running, and an optional phone companion pushes notifications to
-your phone when a session needs you.
+Vibenotch watches your Claude Code and Codex sessions and shows what each one
+is doing — **working**, **needs you**, **done** — right where you're already
+looking.
 
-Built with Swift 6 / SwiftUI + AppKit, Swift Package Manager, Command Line
-Tools only (no Xcode project, no code signing, no notarization needed for a
-from-source build). See `TASKS.md` for build state and `specs/` for
-milestone specs.
+![The Vibenotch pill in the notch](docs/images/notch-pill.png)
 
-The app UI itself is in Portuguese (PT-PT); this README is in English.
+Hover it and the notch expands into a panel with every session: which project,
+which agent, which model, what tool it just ran. Click a row and the terminal
+or desktop app that owns that session comes to the front.
 
-## Screenshots
+![The expanded panel](docs/images/notch-panel.png)
 
-The repo root has a handful of PNGs captured during development
-(`expanded.png`, `m3b_full.png`, `m4_pop.png`, …) that show the panel at
-various milestones. There isn't yet a curated, up-to-date "here's what it
-looks like today" screenshot — if you want one, run the app and drop a fresh
-capture in `assets/` (or replace this section with an `![](path)` once you
-have one you're happy with).
+The red outline in both shots is **Gotta go!** — the keep-awake mode — telling
+you the Mac will not fall asleep while your agents are still working.
 
-## What it is
+---
 
-- Live status pill in the notch (or a floating pill on notch-less Macs) for
-  every Claude Code and Codex session you have running in a terminal
-- Hover to expand a glass panel listing all sessions with project, current
-  task/tool, and status
-- Click a session to raise the exact terminal tab it's running in
-  (Terminal.app today; iTerm2/WezTerm/Kitty strategies exist as stubs)
-- Inline permission approvals for Claude Code tool calls, with diff-style
-  detail, when explicitly enabled (see [Security](#security) — this is
-  opt-in and not wired up by the base installer)
-- **All-Nighter**: keeps the Mac from sleeping while agents are working, even
-  with the lid closed, via a narrowly-scoped `sudo` rule (optional, separate
-  install step)
-- Phone companion: push notifications to your phone when a session needs you
-  or the battery is getting low during an All-Nighter run (optional, separate repo)
+## Contents
 
-## Requirements
+- [What this is, and what it was](#what-this-is-and-what-it-was)
+- [What Vibenotch adds](#what-vibenotch-adds)
+  - [Codex support](#1-codex-support-cli-and-desktop)
+  - [Gotta go!](#2-gotta-go--the-lid-closed-problem)
+  - [Phone companion](#3-phone-companion)
+  - [Settings](#4-a-real-settings-window)
+  - [Follows your language](#5-follows-your-devices-language)
+  - [One-command install](#6-one-command-install)
+- [Install](#install)
+- [How it works](#how-it-works)
+- [Every option](#every-option)
+- [Uninstall](#uninstall)
+- [Troubleshooting](#troubleshooting)
+- [Credits and licensing](#credits-and-licensing)
 
-- macOS 14 (Sonoma) or later
-- Xcode Command Line Tools (`xcode-select --install`)
-- `jq` (`brew install jq`)
-- A notch is not required — the app falls back to a floating pill on Macs
-  without one
+---
+
+## What this is, and what it was
+
+Vibenotch is an adaptation of **[coopersimson96/notch-hud](https://github.com/coopersimson96/notch-hud)**,
+which built the foundation: the notch geometry and window management, the
+Claude Code session HUD, click-to-focus, and inline approval cards. All of
+that is still here and still theirs.
+
+Everything in the next section is what got added on top.
+
+---
+
+## What Vibenotch adds
+
+### 1. Codex support (CLI and desktop)
+
+The original watched Claude Code. Vibenotch watches **Codex** too, and it took
+three different mechanisms because Codex reports itself three different ways:
+
+- **A `notify` adapter.** Codex can call an external program when a turn ends
+  or an approval is needed. `vibenotch-codex-notify` translates that payload
+  into a session card — `done` on turn-end, `needs me` on an approval request.
+  It is installed *additively*: if you already had a `notify` program
+  configured, yours still runs (chained), and `~/.codex/config.toml` is backed
+  up with a timestamp before anything is written.
+- **A `codex` PATH shim.** `notify` only fires at the *end* of a turn, so a
+  session would appear only once it was already finished. The shim wraps the
+  real `codex` binary and emits `working` the moment you start, `done` when
+  the process exits. (It guards against wrapping itself — a shim that finds
+  itself on `PATH` again is a fork bomb, so it walks past its own inode.)
+- **A rollout-file poller** for **Codex desktop**, which uses neither of the
+  above. Vibenotch reads `~/.codex/sessions/**/rollout-*.jsonl` and derives
+  the session from it.
+
+Sessions from a desktop app get a **Desktop** chip so you can tell them apart
+from terminal ones, and the sprite is colour-coded: **orange for Claude, blue
+for Codex**.
+
+**Subagents count.** When Codex delegates to subagents, the parent turn looks
+finished from the outside. Vibenotch follows `parent_thread_id` in the rollout
+files and keeps the session as *working* while its children are still running,
+instead of declaring victory early.
+
+### 2. Gotta go! — the lid-closed problem
+
+The thing that actually breaks long agent runs: **you close the lid and macOS
+suspends everything.** Your agent stops mid-task.
+
+**Gotta go!** is the fix — think Amphetamine, but it knows what your agents are
+doing. Toggle it from the bolt in the notch, and the whole notch gets a thin
+red outline so you can never wonder whether it's on.
+
+Modes:
+
+| Mode | Stays awake… |
+|---|---|
+| **While agents are working** | until every session is done, plus a grace period |
+| **While the apps are open** | as long as Claude / Codex / your chosen apps are running |
+| **Indefinitely** | until you turn it off |
+| **Timer** | 30 min / 1 h / 2 h, one tap |
+
+It is deliberately hard to leave running by accident:
+
+- **Battery floor.** On battery, it releases below your threshold rather than
+  flattening the machine.
+- **Grace period.** A pause between prompts doesn't count as "done".
+- **Turn off on unlock.** Back at the keyboard, it stands down.
+- **Idle reminder.** Still on hours later with nothing running? It tells you.
+
+**Closed-lid** support needs one extra step, because keeping a MacBook awake
+with the lid shut requires `pmset -a disablesleep`, which is root-only. The
+installer adds a sudoers rule scoped to **exactly two commands** — nothing
+else, validated with `visudo -c` before it's ever active:
+
+```text
+<you> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -a disablesleep 0
+```
+
+A LaunchAgent watchdog runs every 60s and turns `disablesleep` back **off** if
+Vibenotch isn't running — so a crash can't leave your Mac permanently unable
+to sleep.
+
+### 3. Phone companion
+
+An optional PWA you add to your phone's home screen ([notch-remote](https://github.com/rebelpaulo/notch-remote)):
+
+- **See and control Gotta go! from anywhere.** Toggle it on or off remotely;
+  the two sides reconcile in both directions, so flipping the bolt on the Mac
+  updates the phone and vice versa (a local change always wins over a stale
+  remote one).
+- **Change the settings** from the phone — default mode, battery floor, grace
+  period, closed-lid, the lot.
+- **Push notifications** for battery thresholds (50 / 30 / 20 %), for "an agent
+  needs you", and for "all agents finished".
+
+It's your own deployment (Vercel + Supabase + a shared secret you choose), not
+a service anyone else runs.
+
+### 4. A real Settings window
+
+![The settings window](docs/images/settings.png)
+
+Everything is adjustable in one place — modes, quick-start timers, thresholds,
+which apps count as "an agent is running", the pairing status of the phone, and
+a test-push button.
+
+### 5. Follows your device's language
+
+English and Portuguese, chosen from the system language, on both the Mac app
+and the phone app. English is the source language; a missing translation falls
+back to English rather than to a key name.
+
+### 6. One-command install
+
+`scripts/install.sh` builds the app, installs it, wires up the Claude Code
+hooks and the Codex adapter, and can undo all of it. Every change to a file
+you own — `~/.claude/settings.json`, `~/.codex/config.toml`, `~/.zshrc` — is
+**additive** and backed up with a timestamped `.bak` first.
+
+---
 
 ## Install
 
-```sh
-git clone https://github.com/rebelpaulo/vibenotch.git
-cd vibenotch
+**Requirements:** macOS 14+, Xcode Command Line Tools (`xcode-select --install`),
+and `jq` (`brew install jq`). A MacBook with a notch is ideal; without one the
+app falls back to a floating pill.
+
+```bash
+git clone https://github.com/rebelpaulo/notch-hud.git
+cd notch-hud
 ./scripts/install.sh
 ```
 
-This builds Vibenotch from source and installs it — no signing or
-notarization needed because you're building it yourself. The installer is
-idempotent (safe to re-run) and only touches your files additively, with a
-timestamped `.bak` before it changes anything that isn't its own.
+That builds `Vibenotch.app`, installs it to `/Applications`, puts the helper
+scripts in `~/.vibenotch/bin`, merges the five Claude Code hooks into
+`~/.claude/settings.json`, and installs the Codex adapter.
 
-Flags:
+Flags: `--yes` (no prompts), `--skip-claude-hooks`, `--skip-codex`,
+`--uninstall`.
 
-| Flag | Effect |
-|---|---|
-| `--yes` | Don't prompt for anything (e.g. overwriting an existing `/Applications/Vibenotch.app`) |
-| `--skip-claude-hooks` | Don't touch `~/.claude/settings.json` |
-| `--skip-codex` | Don't touch `~/.codex/config.toml` or `~/.zshrc` |
-| `--uninstall` | Remove what the installer installed (see [Uninstall](#uninstall)) |
+**Then, for closed-lid Gotta go! (optional, needs sudo):**
 
-If you'd rather do it by hand, or only want part of it:
-
-```sh
-swift build -c release          # compile
-scripts/make-app.sh              # produce build/Vibenotch.app (ad-hoc signed)
-cp -R build/Vibenotch.app /Applications/
-open /Applications/Vibenotch.app
-```
-
-then install the runtime scripts and hooks yourself — see the next section
-for exactly what `install.sh` does, so you can replicate whichever parts you
-want.
-
-## What it installs, and where
-
-Everything lives under `~/.vibenotch/` except the app itself:
-
-| What | Where | Notes |
-|---|---|---|
-| The app | `/Applications/Vibenotch.app` | Ad-hoc signed by `scripts/make-app.sh`; asks before overwriting an existing copy unless `--yes` |
-| Runtime scripts | `~/.vibenotch/bin/` | `vibenotch-emit`, `vibenotch-claude-hook`, `vibenotch-codex-notify`, `vibenotch-sleepguard`, `vibenotch-sleepguard-watchdog`, `vibenotch-remote-push`, and `codex-shim` installed as `codex` |
-| Session spool | `~/.vibenotch/sessions/*.json` | Written at runtime by the hooks below — one file per live session |
-
-Files it **modifies** (each with a timestamped `.bak` made first, and only
-if a change is actually needed):
-
-- **`~/.claude/settings.json`** — adds five hook entries, all calling
-  `~/.vibenotch/bin/vibenotch-claude-hook`:
-  `UserPromptSubmit`→`working`, `PreToolUse` (matcher `*`)→`tool`,
-  `Stop`→`done`, `Notification`→`notify`, `SessionEnd`→`remove`. This is
-  purely additive: it detects its own entries by the `vibenotch-claude-hook`
-  path and never removes or rewrites hooks it didn't add (your `rtk hook
-  claude` PreToolUse entry, for instance, is left exactly as-is). Re-running
-  the installer is a no-op once these are in place. Skip this step with
-  `--skip-claude-hooks`.
-- **`~/.codex/config.toml`** — sets `notify = ["~/.vibenotch/bin/vibenotch-codex-notify"]`.
-  If you already had a `notify` command configured (e.g. Codex's own
-  computer-use client), it's preserved and chained: Vibenotch's notify runs
-  first, then yours. Skip this with `--skip-codex`.
-- **`~/.zshrc`** — appends a line putting `~/.vibenotch/bin` on your `PATH`
-  ahead of the system one, so the installed `codex` shim (which wraps the
-  real `codex` binary to report status, then execs it) is what actually
-  runs. Also skipped by `--skip-codex`.
-
-The Claude-hook merge and the Codex adapter wiring are separate, idempotent
-scripts (`scripts/install-claude-hooks.sh`, `scripts/install-codex-adapter.sh`)
-that `scripts/install.sh` calls — you can run either on its own.
-
-## Optional: All-Nighter (keep-awake with the lid closed)
-
-Off by default; a separate, `sudo`-gated step:
-
-```sh
+```bash
 sudo scripts/install-gotta-go.sh
 ```
 
-This installs, each idempotently and with a `.bak` of anything it replaces:
+**Then restart your agents.** Claude Code reads its hooks at startup, and the
+`codex` shim is picked up by new shells.
 
-- **A sudoers rule** at `/etc/sudoers.d/vibenotch`, validated with `visudo
-  -c` before it's ever activated (the installer refuses to install anything
-  that doesn't pass validation). Its scope is exactly two commands and
-  nothing else:
-  ```text
-  <you> ALL=(root) NOPASSWD: /usr/bin/pmset -a disablesleep 1, /usr/bin/pmset -a disablesleep 0
-  ```
-  That's the entire grant — it lets Vibenotch flip macOS's `disablesleep`
-  flag on and off without a password prompt each time. It cannot run any
-  other command as root.
-- **`vibenotch-sleepguard`** (`~/.vibenotch/bin/vibenotch-sleepguard`) — a thin
-  wrapper around `sudo -n pmset -a disablesleep {1,0}` (reads of `pmset -g`
-  status never go through `sudo`, since the rule above doesn't cover reads).
-- **A watchdog LaunchAgent**
-  (`~/Library/LaunchAgents/com.rebelpaulo.vibenotch.sleepguard.plist`),
-  running every 60 seconds via `vibenotch-sleepguard-watchdog`. If Vibenotch.app
-  isn't running (crashed, force-quit, whatever) it turns `disablesleep` back
-  off — a fail-safe so a dead app can't accidentally keep your Mac awake
-  forever.
+### Phone companion (optional)
 
-## Optional: phone companion
+See [notch-remote](https://github.com/rebelpaulo/notch-remote) for deploying
+your own instance. Pairing is a single file:
 
-Vibenotch can push a notification to your phone when a session needs you, or
-when the battery drops during an All-Nighter run. The Mac side is just
-`~/.vibenotch/bin/vibenotch-remote-push`, which reads a pairing file at
-`~/.vibenotch/remote.json` (`{"url": "...", "secret": "..."}`) and POSTs to
-that URL with a bearer token — this repo doesn't create that file or that
-backend for you.
+```bash
+mkdir -p ~/.vibenotch
+cat > ~/.vibenotch/remote.json <<'JSON'
+{"url": "https://your-deployment.vercel.app", "secret": "your-shared-secret"}
+JSON
+```
 
-The receiving side lives in a separate repo, **notch-remote**: a small
-Vercel-hosted web app that Supabase backs for pairing/session state, using
-Web Push (VAPID keys) to deliver notifications to your phone's browser
-without needing an app-store install. Pairing it writes
-`~/.vibenotch/remote.json` on this Mac; see that repo for its own setup
-instructions (Supabase project + Vercel deploy + VAPID key generation).
+Open the same URL on your phone, paste the same secret, and add it to the home
+screen.
+
+---
+
+## How it works
+
+There is no daemon and no IPC. Everything goes through a **spool directory** of
+small JSON files:
+
+```text
+~/.vibenotch/sessions/<agent>-<id>.json
+```
+
+- **Claude Code hooks** (`UserPromptSubmit`, `PreToolUse`, `Stop`,
+  `Notification`, `SessionEnd`) call `vibenotch-claude-hook`, which writes the
+  session's current state.
+- **Codex** writes through the `notify` adapter, the PATH shim, and the
+  rollout poller described above.
+- **The app** watches that directory and renders it.
+
+Writes are atomic (temp file + rename) and carry a sequence number, so a slow
+writer can't overwrite a newer state. Anything that stops updating is marked
+unknown after 90 s and dropped after 15 min.
+
+Click-to-focus supports Terminal.app, iTerm2, kitty, WezTerm, and the Claude
+and Codex desktop apps.
+
+---
+
+## Every option
+
+| Setting | What it does | Default |
+|---|---|---|
+| **Default mode** | What the bolt turns on: while agents work / while apps are open / indefinitely | while agents work |
+| **Quick start** | One-tap 30 min, 1 h, 2 h timers | — |
+| **Let the display sleep** | Keeps the machine awake but lets the screen go dark | on |
+| **Stay awake with the lid closed** | Needs `sudo scripts/install-gotta-go.sh` | off |
+| **Only on AC power when the lid is closed** | Refuses closed-lid on battery | on |
+| **Turn off on unlock** | Stands down when you're back | off |
+| **Battery floor** | Releases below this charge (10–50 %) | 20 % |
+| **Grace period** | How long "no agents working" must last before it stops (0–60 min) | 10 min |
+| **Remind me while idle** | Notifies if it's been on with nothing running | off |
+| **Remind after** | How long before that reminder (1–12 h) | 1 h |
+| **Watched apps** | Bundle IDs that count as "an agent is running" | Claude, Codex, Terminal |
+
+Session cards: a session with no update for **90 s** goes unknown; after
+**15 min** its card is dropped. Clicking a finished session opens it and clears
+the card.
+
+---
 
 ## Uninstall
 
-```sh
+```bash
 ./scripts/install.sh --uninstall
 ```
 
-Removes:
+Removes the app, the scripts and the Claude Code hooks (leaving unrelated hooks
+alone). It deliberately does **not** touch the sudoers rule, the LaunchAgent or
+your phone pairing file — it tells you where they are so you can remove them
+yourself.
 
-- `~/.vibenotch/bin/` (all the runtime scripts)
-- The five hook entries from `~/.claude/settings.json` (only the entries
-  whose command points at `vibenotch-claude-hook` — everything else in that file
-  is left alone), unless `--skip-claude-hooks` was also passed
-- `/Applications/Vibenotch.app`
-
-It deliberately does **not** touch:
-
-- The All-Nighter sudoers rule (`/etc/sudoers.d/vibenotch`) — remove with
-  `sudo rm /etc/sudoers.d/vibenotch`
-- The watchdog LaunchAgent
-  (`~/Library/LaunchAgents/com.rebelpaulo.vibenotch.sleepguard.plist`) — `sudo
-  launchctl bootout gui/$(id -u) <path>` then remove the file
-- Your phone-pairing file (`~/.vibenotch/remote.json`)
-- The `notify` line in `~/.codex/config.toml` and the `PATH` line in
-  `~/.zshrc` added by the Codex adapter — `scripts/install-codex-adapter.sh`
-  has no uninstall mode, so edit these by hand if you want them gone
+---
 
 ## Troubleshooting
 
-- **No sessions showing up.** Either the hooks aren't installed
-  (`grep vibenotch-claude-hook ~/.claude/settings.json`), or your terminal was
-  already open when you ran the installer — the `PATH` change for the Codex
-  shim only takes effect in new shells, so restart your terminal (or `source
-  ~/.zshrc`).
-- **Codex Desktop app sessions.** The `codex` shim only covers CLI usage.
-  Desktop-app sessions are picked up separately via `vibenotch-codex-notify`
-  when the app's own notify hook fires (client `"Codex Desktop"`), keyed by
-  a truncated conversation ID — CLI and desktop sessions won't collide.
-- **Click-to-focus doesn't raise the right terminal tab.** The first click
-  triggers a macOS Automation permission prompt (System Settings → Privacy &
-  Security → Automation → Vibenotch → Terminal). Grant it; if you dismissed
-  the prompt, re-enable it there manually.
-- **All-Nighter says it's off but the Mac still won't sleep, or vice
-  versa.** Check `pmset -g | grep SleepDisabled` — the watchdog LaunchAgent
-  should force this back off within 60 seconds of Vibenotch.app not running;
-  if it doesn't, check `pmset -g` works without a password prompt
-  (that's what the sudoers rule grants).
+**Sessions don't appear.** Restart your agent after installing — Claude Code
+reads hooks at startup. Check the spool is being written:
+`ls ~/.vibenotch/sessions`.
 
-## Security
+**Clicking a row doesn't raise the window.** macOS asks for Automation
+permission the first time; the card offers a button that opens the right
+settings pane.
 
-- Everything Vibenotch runs as your own user: the shell hooks
-  (`vibenotch-claude-hook`, `vibenotch-codex-notify`, the `codex` shim) just read
-  small JSON payloads from Claude Code/Codex and write JSON files to
-  `~/.vibenotch/sessions/`. None of that needs elevated privileges.
-- The **only** thing that ever runs with `sudo` is the optional All-Nighter
-  step, and its sudoers grant is scoped to exactly two `pmset`
-  sub-commands (see [above](#optional-all-nighter-keep-awake-with-the-lid-closed)) —
-  it cannot be used to run arbitrary commands as root.
-- Data stored locally, all under `~/.vibenotch/`: session status JSON
-  (`sessions/*.json` — project name, cwd, current task/tool text, terminal
-  tty), your phone-pairing URL and secret if you set one up
-  (`remote.json`), and, if you enable inline approvals, pending/decision
-  files for tool calls awaiting your OK. None of it leaves the machine
-  except the phone-companion push, which you opt into and point at your own
-  backend.
+**"Install first: sudo scripts/install-gotta-go.sh".** Closed-lid mode is
+unavailable until that runs.
+
+**The Mac still sleeps with the lid closed.** Check the assertion is live:
+`pmset -g assertions | grep "Gotta go"`. Note that closed-lid mode refuses to
+engage on battery unless you turn off *Only on AC power*.
+
+**The app is in the wrong language.** It follows the system language. To force
+one: System Settings → General → Language & Region → Applications → add
+Vibenotch.
+
+---
+
+## Credits and licensing
+
+**Built on [coopersimson96/notch-hud](https://github.com/coopersimson96/notch-hud)**
+by Cooper Simson — the notch HUD foundation, the Claude Code session model,
+click-to-focus and the inline approval cards come from that project. Vibenotch
+is a fork that adds Codex support, Gotta go!, the phone companion, the settings
+window, localization and the installer.
+
+**[DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit)** by Kai Azim,
+vendored under `vendor/`, MIT licensed — see `vendor/DynamicNotchKit/LICENSE`.
+
+**Licensing note:** the upstream project does not publish a license, so it is
+"all rights reserved" by default. This repository is a **GitHub fork**, which
+is what GitHub's Terms of Service permit for public repositories — it is not a
+re-upload. If you want to redistribute this code anywhere else, ask the
+upstream author for a license first.
