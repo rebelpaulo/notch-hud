@@ -140,8 +140,10 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   needs you", and for "all agents finished".
 
 What leaves your Mac is deliberately narrow: project name, agent, status,
-start time and subagent count. Never your prompts, the tool lines, or the
-paths you work in.
+start time, subagent count, and a per-session id that is a keyed digest, not
+the session's own identifier — the key is generated once on your machine and
+never published, so nobody holding the digest can work back to the id. Never
+your prompts, the tool lines, or the paths you work in.
 
 <img src="docs/images/phone.png" alt="Vibenotch Remote on a phone" width="320">
 
