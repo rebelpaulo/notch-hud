@@ -127,10 +127,21 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   the two sides reconcile in both directions, so flipping the bolt on the Mac
   updates the phone and vice versa (a local change always wins over a stale
   remote one).
-- **Change the settings** from the phone — default mode, battery floor, grace
-  period, closed-lid, the lot.
+- **See what the agents are doing** — the same session list the notch shows,
+  with the same sprites and status colours, so "which one needs me?" has an
+  answer from the sofa. A list that stops being updated dims and freezes
+  rather than going on claiming work is still running.
+- **The Mac's battery**, so "is it about to die?" does not require walking
+  over to look.
+- **Change the settings** from the phone, split by which machine they change:
+  *this phone* (notifications) and *the Mac* (default mode, battery floor,
+  grace period, closed-lid, the lot).
 - **Push notifications** for battery thresholds (50 / 30 / 20 %), for "an agent
   needs you", and for "all agents finished".
+
+What leaves your Mac is deliberately narrow: project name, agent, status,
+start time and subagent count. Never your prompts, the tool lines, or the
+paths you work in.
 
 <img src="docs/images/phone.png" alt="Vibenotch Remote on a phone" width="320">
 
