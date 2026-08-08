@@ -352,6 +352,34 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeStopsTheRemoteControlServerOnRequest() async throws {
+    // Symmetry matters here: with only a start, the button is dead exactly
+    // when you want it — when the server is running and you want it stopped.
+    let stopped = Stopped()
+    let fixture = try RemoteBridgeFixture(
+        mode: .manual,
+        percent: nil,
+        onAC: true,
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"remote_control":true,"pending_command":{"action":"remote_control_stop","id":"remote_control_stop"}}"#,
+        remoteControlServer: RemoteControlServer(runProcess: { path, _ in
+            if path.hasSuffix("pkill") { stopped.value = true }
+            return path.hasSuffix("pgrep") ? 0 : 0
+        })
+    )
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(stopped.value)
+    let bodies = await fixture.runner.statePutBodies()
+    #expect(bodies.contains { $0.contains(#""remote_control":false"#) })
+}
+
+final class Stopped: @unchecked Sendable {
+    var value = false
+}
+
+@MainActor
 @Test func remoteBridgeReopensTheSameConversationASecondTime() async throws {
     // Closing the terminal and asking again is a normal thing to do. The
     // dedupe existed for a stale read of one request, not to refuse that
@@ -559,10 +587,16 @@ import Testing
 @MainActor
 final class FakeConversationResumer: ConversationResuming {
     private(set) var resumed: [ClaudeConversation] = []
+    private(set) var remoteControlDirectories: [String] = []
     var succeeds = true
 
     func resume(_ conversation: ClaudeConversation) -> Bool {
         resumed.append(conversation)
+        return succeeds
+    }
+
+    func startRemoteControl(in directory: String) -> Bool {
+        remoteControlDirectories.append(directory)
         return succeeds
     }
 }
@@ -586,7 +620,8 @@ private final class RemoteBridgeFixture {
         percent: Int? = nil,
         onAC: Bool = true,
         stateOutput: String = #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#,
-        config: KeepAwakeConfig = KeepAwakeConfig()
+        config: KeepAwakeConfig = KeepAwakeConfig(),
+        remoteControlServer: RemoteControlServer = RemoteControlServer(runProcess: { _, _ in 1 })
     ) throws {
         scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("remote-bridge-tests-\(UUID().uuidString)", isDirectory: true)
@@ -610,7 +645,10 @@ private final class RemoteBridgeFixture {
             powerSourceProvider: power,
             homeURL: scratch,
             userDefaults: userDefaults,
-            resumer: resumer
+            resumer: resumer,
+            // Never spawn a real pgrep from a test: the answer would depend on
+            // what happens to be running on the machine.
+            remoteControlServer: remoteControlServer
         )
     }
 
@@ -630,7 +668,8 @@ private final class RemoteBridgeFixture {
             powerSourceProvider: power,
             homeURL: scratch,
             userDefaults: userDefaults,
-            resumer: resumer
+            resumer: resumer,
+            remoteControlServer: RemoteControlServer(runProcess: { _, _ in 1 })
         )
     }
 
