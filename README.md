@@ -132,6 +132,8 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
 - **Push notifications** for battery thresholds (50 / 30 / 20 %), for "an agent
   needs you", and for "all agents finished".
 
+<img src="docs/images/phone.png" alt="Vibenotch Remote on a phone" width="320">
+
 It's your own deployment (Vercel + Supabase + a shared secret you choose), not
 a service anyone else runs.
 
