@@ -121,7 +121,7 @@ struct SettingsView: View {
                     stepperRow(
                         t("Remind after"),
                         value: reminderHoursBinding,
-                        range: 1...24,
+                        range: 1...12,
                         suffix: " h"
                     )
                 }
@@ -329,8 +329,10 @@ struct SettingsView: View {
 
     private var reminderHoursBinding: Binding<Int> {
         Binding(
-            get: { max(1, min(24, Int(keepAwakeEngine.config.reminderAfterIdleSeconds / 3_600))) },
-            set: { keepAwakeEngine.config.reminderAfterIdleSeconds = TimeInterval(max(1, min(24, $0)) * 3_600) }
+            // 12h matches KeepAwakeSettingsLogic.reminderHours and the remote
+            // API's validator; a higher value would silently come back as 12.
+            get: { max(1, min(12, Int(keepAwakeEngine.config.reminderAfterIdleSeconds / 3_600))) },
+            set: { keepAwakeEngine.config.reminderAfterIdleSeconds = TimeInterval(max(1, min(12, $0)) * 3_600) }
         )
     }
 

@@ -83,6 +83,7 @@ extension SessionStore: RemoteSessionStoring {}
 final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
     private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
+    private static let pairedRemoteURLKey = "remoteBridge.pairedRemoteURL"
 
     private let engine: any RemoteKeepAwakeEngine
     private let sessionStore: any RemoteSessionStoring
@@ -286,6 +287,7 @@ final class RemoteBridge {
     /// /api/state answers with the on/off flag AND the settings blob, so one
     /// GET per tick feeds both reconcilers.
     private func reconcileRemote() async {
+        resetSettingsRevIfPairingChanged()
         let result = await run(["--state"])
         guard result.exitCode == 0,
               let data = result.stdout.data(using: .utf8),
@@ -356,6 +358,22 @@ final class RemoteBridge {
     // local config and re-baselines the sync snapshot, so the same tick
     // never also pushes local values back up for that rev. Only once the
     // rev is caught up do local edits get a chance to push.
+    /// A different remote instance starts its own revision counter, and a
+    /// remote rev is only applied when it is strictly greater than the last one
+    /// seen — so re-pairing to a fresh instance would silently ignore its
+    /// settings until it caught up with the old one's counter. Moving the URL
+    /// drops the baseline.
+    private func resetSettingsRevIfPairingChanged() {
+        guard let data = try? Data(contentsOf: pairingURL),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let url = object["url"] as? String,
+              userDefaults.string(forKey: Self.pairedRemoteURLKey) != url
+        else { return }
+
+        userDefaults.set(url, forKey: Self.pairedRemoteURLKey)
+        lastAppliedSettingsRev = 0
+    }
+
     private func reconcileSettings(_ remote: RemoteStateWithSettings) async {
         let remoteRev = remote.settingsRev ?? 0
         if remoteRev > lastAppliedSettingsRev {
@@ -370,10 +388,16 @@ final class RemoteBridge {
         let currentSnapshot = RemoteSettingsSnapshot(engine.config)
         guard currentSnapshot != lastSyncedSettingsSnapshot else { return }
 
-        guard let body = try? JSONSerialization.data(withJSONObject: ["settings": currentSnapshot.remoteJSONObject]),
+        let payload: [String: Any] = [
+            "settings": currentSnapshot.remoteJSONObject,
+            "base_rev": lastAppliedSettingsRev,
+        ]
+        guard let body = try? JSONSerialization.data(withJSONObject: payload),
               let stdin = String(data: body, encoding: .utf8)
         else { return }
 
+        // A 409 (the phone wrote first) exits non-zero, so the snapshot stays
+        // dirty and the next tick retries on top of the newer rev.
         let pushResult = await run(["--settings-put"], stdin: stdin)
         if pushResult.exitCode == 0 {
             // Next poll's --state will see the bumped rev and re-apply

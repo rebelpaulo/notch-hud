@@ -213,6 +213,32 @@ import Testing
     let settings = try #require(pushed["settings"] as? [String: Any])
     #expect(settings["allowDisplaySleep"] as? Bool == false)
     #expect(settings["batteryFloorPercent"] as? Int == 35)
+    // Without base_rev the write is unconditional and silently overwrites a
+    // phone edit made between this tick's GET and PUT.
+    #expect(pushed["base_rev"] as? Int == 0)
+}
+
+@MainActor
+@Test func remoteBridgeDropsTheSettingsRevBaselineWhenThePairingMovesToAnotherRemote() async throws {
+    // A fresh remote restarts its counter at 0, and revs only apply when
+    // strictly greater — so without this the new remote's settings would be
+    // ignored until it caught up with the old one's numbering.
+    let fixture = try RemoteBridgeFixture(
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{"batteryFloorPercent":45},"settings_rev":9}"#
+    )
+    defer { fixture.remove() }
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(fixture.engine.config.batteryFloorPercent == 45)
+
+    try fixture.repair(url: "https://other.example")
+    let moved = try RemoteBridgeFixture(
+        reusing: fixture,
+        stateOutput: #"{"keep_awake_enabled":true,"settings":{"batteryFloorPercent":15},"settings_rev":1}"#
+    )
+
+    await moved.bridge.checkNow(pollRemoteState: true)
+
+    #expect(moved.engine.config.batteryFloorPercent == 15)
 }
 
 @MainActor
@@ -245,6 +271,7 @@ private final class RemoteBridgeFixture {
     let scratch: URL
     let engine: FakeRemoteEngine
     let store = FakeRemoteStore()
+
     let runner: FakeRemoteCommandRunner
     let power: FakeRemotePowerSource
     let bridge: RemoteBridge
@@ -281,6 +308,33 @@ private final class RemoteBridgeFixture {
             powerSourceProvider: power,
             homeURL: scratch,
             userDefaults: userDefaults
+        )
+    }
+
+    /// Builds a second bridge over the same scratch home and UserDefaults, the
+    /// way a relaunch after re-pairing would see them.
+    init(reusing other: RemoteBridgeFixture, stateOutput: String) throws {
+        scratch = other.scratch
+        engine = other.engine
+        runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
+        power = other.power
+        suiteName = other.suiteName
+        userDefaults = other.userDefaults
+        bridge = RemoteBridge(
+            engine: engine,
+            sessionStore: other.store,
+            commandRunner: runner,
+            powerSourceProvider: power,
+            homeURL: scratch,
+            userDefaults: userDefaults
+        )
+    }
+
+    func repair(url: String) throws {
+        try #"{"url":"\#(url)","secret":"test-secret"}"#.write(
+            to: scratch.appendingPathComponent(".notch-hud/remote.json"),
+            atomically: true,
+            encoding: .utf8
         )
     }
 
