@@ -44,7 +44,7 @@ import Testing
     #expect(FileManager.default.fileExists(atPath: fixture.prefix.appendingPathComponent("bin/vibenotch-sleepguard").path) == false)
 }
 
-@Test func gottaGoInstallerRemovesTheLegacyVibenotchInstallButSparesForeignFiles() throws {
+@Test func gottaGoInstallerRemovesTheLegacyNotchHUDInstallButSparesForeignFiles() throws {
     // The old LaunchAgent watchdog hunts for a process name that no longer
     // exists, concludes Gotta go! is gone and turns `disablesleep` back off —
     // so leaving it behind means the two installs fight each other.
@@ -55,11 +55,11 @@ import Testing
     let result = try fixture.run()
 
     #expect(result.status == 0)
-    #expect(result.output.contains("legacy Vibenotch install: removed"))
+    #expect(result.output.contains("legacy NotchHUD install: removed"))
     #expect(!FileManager.default.fileExists(atPath: fixture.legacyPlistURL.path))
     #expect(!FileManager.default.fileExists(atPath: fixture.legacySudoersURL.path))
     // Backed up, not just deleted.
-    #expect(try fixture.backupCount(matching: "com.rebelpaulo.vibenotch.sleepguard.plist.bak.") == 1)
+    #expect(try fixture.backupCount(matching: "com.actionable.notchhud.sleepguard.plist.bak.") == 1)
 }
 
 @Test func gottaGoInstallerLeavesUnrelatedFilesAtTheLegacyPathsAlone() throws {
@@ -70,7 +70,7 @@ import Testing
     let result = try fixture.run()
 
     #expect(result.status == 0)
-    #expect(result.output.contains("legacy Vibenotch install: absent"))
+    #expect(result.output.contains("legacy NotchHUD install: absent"))
     #expect(FileManager.default.fileExists(atPath: fixture.legacyPlistURL.path))
     #expect(FileManager.default.fileExists(atPath: fixture.legacySudoersURL.path))
 }
@@ -117,12 +117,14 @@ private final class GottaGoInstallerFixture {
         )
     }
 
+    // Historical literals: these name the pre-rename NotchHUD install and must
+    // not be swept along by a future rename, or this stops testing anything.
     var legacyPlistURL: URL {
-        launchagents.appendingPathComponent("com.rebelpaulo.vibenotch.sleepguard.plist")
+        launchagents.appendingPathComponent("com.actionable.notchhud.sleepguard.plist")
     }
 
     var legacySudoersURL: URL {
-        sudoersDirectory.appendingPathComponent("vibenotch")
+        sudoersDirectory.appendingPathComponent("notch-hud")
     }
 
     /// `ours: false` writes files that merely share the paths — the installer
@@ -130,10 +132,10 @@ private final class GottaGoInstallerFixture {
     func seedLegacyInstall(ours: Bool = true) throws {
         try FileManager.default.createDirectory(at: launchagents, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: sudoersDirectory, withIntermediateDirectories: true)
-        try (ours ? "<plist><key>Label</key><string>com.rebelpaulo.vibenotch.sleepguard</string></plist>"
+        try (ours ? "<plist><key>Label</key><string>com.actionable.notchhud.sleepguard</string></plist>"
                   : "<plist>someone else's agent</plist>")
             .write(to: legacyPlistURL, atomically: true, encoding: .utf8)
-        try (ours ? "# Installed by Vibenotch All-Nighter.\ntestuser ALL=(root) NOPASSWD: /usr/bin/pmset\n"
+        try (ours ? "# Installed by NotchHUD All-Nighter.\ntestuser ALL=(root) NOPASSWD: /usr/bin/pmset\n"
                   : "# hand-written by the admin\n")
             .write(to: legacySudoersURL, atomically: true, encoding: .utf8)
     }

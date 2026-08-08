@@ -1,7 +1,7 @@
 #!/bin/sh
 
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-install_prefix=${VIBEVIBEVIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
+install_prefix=${VIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
 install_bin=$install_prefix/bin
 codex_config=${VIBENOTCH_CODEX_CONFIG:-"$HOME/.codex/config.toml"}
 zshrc=$HOME/.zshrc

@@ -5,8 +5,8 @@
 # and the watchdog would read "not disabled" forever (the exact failure the
 # watchdog exists to prevent).
 run_pmset_read() {
-    if [ -n "${NOTCH_vibenotch-sleepguard_PMSET:-}" ]; then
-        "$NOTCH_vibenotch-sleepguard_PMSET" "$@"
+    if [ -n "${VIBENOTCH_SLEEPGUARD_PMSET:-}" ]; then
+        "$VIBENOTCH_SLEEPGUARD_PMSET" "$@"
     else
         /usr/bin/pmset "$@"
     fi
@@ -14,14 +14,14 @@ run_pmset_read() {
 
 case ${1:-} in
     on)
-        if [ -n "${NOTCH_vibenotch-sleepguard_PMSET:-}" ]; then
-            exec "$NOTCH_vibenotch-sleepguard_PMSET" -a disablesleep 1
+        if [ -n "${VIBENOTCH_SLEEPGUARD_PMSET:-}" ]; then
+            exec "$VIBENOTCH_SLEEPGUARD_PMSET" -a disablesleep 1
         fi
         exec /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 1
         ;;
     off)
-        if [ -n "${NOTCH_vibenotch-sleepguard_PMSET:-}" ]; then
-            exec "$NOTCH_vibenotch-sleepguard_PMSET" -a disablesleep 0
+        if [ -n "${VIBENOTCH_SLEEPGUARD_PMSET:-}" ]; then
+            exec "$VIBENOTCH_SLEEPGUARD_PMSET" -a disablesleep 0
         fi
         exec /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 0
         ;;

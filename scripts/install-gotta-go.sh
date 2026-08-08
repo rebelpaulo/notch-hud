@@ -142,34 +142,40 @@ elif [ -z "${VIBENOTCH_GG_PREFIX:-}${VIBENOTCH_GG_LAUNCHAGENTS_DIR:-}${VIBENOTCH
     fi
 fi
 
-# The app used to install under the Vibenotch name. Its LaunchAgent watchdog
+# The app used to install under the NotchHUD name. Its LaunchAgent watchdog
 # looks for a process that no longer exists, decides Gotta go! is gone, and
 # turns `disablesleep` back off — actively fighting this install. Remove it,
 # but only when the file is one we wrote (matched by our own Label / marker),
 # never anything else that happens to share the path.
-legacy_plist=$launchagents_dir/com.rebelpaulo.vibenotch.sleepguard.plist
-legacy_sudoers=$sudoers_dir/vibenotch
+#
+# The identifiers below are HISTORICAL LITERALS: they name the old install and
+# must survive any future rename of this project, or the cleanup starts
+# deleting the install it just made.
+legacy_label=com.actionable.notchhud.sleepguard
+legacy_plist=$launchagents_dir/$legacy_label.plist
+legacy_sudoers=$sudoers_dir/notch-hud
+legacy_marker='# Installed by NotchHUD All-Nighter.'
 legacy_summary=absent
 
-if [ -f "$legacy_plist" ] && grep -q 'com.rebelpaulo.vibenotch.sleepguard' "$legacy_plist"; then
+if [ -f "$legacy_plist" ] && grep -q "$legacy_label" "$legacy_plist"; then
     if [ -n "${VIBENOTCH_GG_LAUNCHCTL:-}" ]; then
-        "$VIBENOTCH_GG_LAUNCHCTL" bootout "gui/$invoking_uid/com.rebelpaulo.vibenotch.sleepguard" >/dev/null 2>&1
+        "$VIBENOTCH_GG_LAUNCHCTL" bootout "gui/$invoking_uid/$legacy_label" >/dev/null 2>&1
     elif [ -z "${VIBENOTCH_GG_PREFIX:-}${VIBENOTCH_GG_LAUNCHAGENTS_DIR:-}${VIBENOTCH_GG_SUDOERS_DIR:-}" ]; then
-        /bin/launchctl bootout "gui/$invoking_uid/com.rebelpaulo.vibenotch.sleepguard" >/dev/null 2>&1
+        /bin/launchctl bootout "gui/$invoking_uid/$legacy_label" >/dev/null 2>&1
     fi
     backup_if_present "$legacy_plist"
     rm -f "$legacy_plist"
     legacy_summary=removed
 fi
 
-if [ -f "$legacy_sudoers" ] && grep -q 'Installed by Vibenotch' "$legacy_sudoers"; then
+if [ -f "$legacy_sudoers" ] && grep -qF "$legacy_marker" "$legacy_sudoers"; then
     backup_if_present "$legacy_sudoers"
     rm -f "$legacy_sudoers"
     legacy_summary=removed
 fi
 
 printf '%s\n' 'Gotta go! install summary:'
-printf '  legacy Vibenotch install: %s\n' "$legacy_summary"
+printf '  legacy NotchHUD install: %s\n' "$legacy_summary"
 printf '  sudoers: %s\n' "$sudoers_summary"
 printf '  vibenotch-sleepguard: %s\n' "$sleepguard_summary"
 printf '  watchdog: %s\n' "$watchdog_summary"

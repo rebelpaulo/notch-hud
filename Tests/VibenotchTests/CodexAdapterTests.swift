@@ -299,7 +299,7 @@ private func runInstaller(home: URL, prefix: URL, config: URL) throws -> (status
     process.arguments = [codexRepoRoot().appendingPathComponent("scripts/install-codex-adapter.sh").path]
     var environment = ProcessInfo.processInfo.environment
     environment["HOME"] = home.path
-    environment["VIBEVIBEVIBENOTCH_INSTALL_PREFIX"] = prefix.path
+    environment["VIBENOTCH_INSTALL_PREFIX"] = prefix.path
     environment["VIBENOTCH_CODEX_CONFIG"] = config.path
     process.environment = environment
     process.standardInput = FileHandle.nullDevice

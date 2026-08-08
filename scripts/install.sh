@@ -9,7 +9,7 @@
 #
 # Env overrides (mainly for tests / dry-runs — never needed for a normal
 # install):
-#   VIBEVIBENOTCH_INSTALL_PREFIX       default $HOME/.vibenotch
+#   VIBENOTCH_INSTALL_PREFIX       default $HOME/.vibenotch
 #   VIBENOTCH_INSTALL_CLAUDE_SETTINGS  default $HOME/.claude/settings.json
 #   VIBENOTCH_INSTALL_APPLICATIONS_DIR default /Applications
 #   VIBENOTCH_INSTALL_MAKE_APP         default $script_dir/make-app.sh (build step)
@@ -33,23 +33,23 @@ for arg in "$@"; do
         --uninstall) do_uninstall=1 ;;
         --help|-h)
             cat <<'USAGE'
-uso: scripts/install.sh [--yes] [--skip-claude-hooks] [--skip-codex] [--uninstall]
+usage: scripts/install.sh [--yes] [--skip-claude-hooks] [--skip-codex] [--uninstall]
 
-  --yes                 não pergunta nada (assume "sim" a tudo)
-  --skip-claude-hooks   não mexe em ~/.claude/settings.json
-  --skip-codex          não mexe no adaptador do Codex CLI
-  --uninstall           remove o que este instalador instalou
+  --yes                 answer yes to every prompt
+  --skip-claude-hooks   leave ~/.claude/settings.json alone
+  --skip-codex          leave the Codex CLI adapter alone
+  --uninstall           remove what this installer installed
 USAGE
             exit 0
             ;;
         *)
-            printf '%s\n' "vibenotch: opção desconhecida: $arg (usa --help)" >&2
+            printf '%s\n' "vibenotch: unknown option: $arg (see --help)" >&2
             exit 64
             ;;
     esac
 done
 
-notch_home=${VIBEVIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
+notch_home=${VIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
 install_bin=$notch_home/bin
 applications_dir=${VIBENOTCH_INSTALL_APPLICATIONS_DIR:-/Applications}
 app_target=$applications_dir/Vibenotch.app
@@ -57,7 +57,7 @@ app_target=$applications_dir/Vibenotch.app
 # --- uninstall -------------------------------------------------------------
 
 run_uninstall() {
-    printf '%s\n' "A desinstalar o Vibenotch..."
+    printf '%s\n' "Uninstalling Vibenotch..."
 
     bin_summary=skipped
     if [ -d "$install_bin" ]; then
@@ -67,7 +67,7 @@ run_uninstall() {
 
     hooks_summary=ignorado
     if [ "$skip_claude_hooks" -eq 0 ]; then
-        VIBEVIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-claude-hooks.sh" --uninstall
+        VIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-claude-hooks.sh" --uninstall
         hooks_summary="ver acima"
     fi
 
@@ -79,19 +79,19 @@ run_uninstall() {
 
     cat <<SUMMARY
 
-Resumo da desinstalação:
-  binários ($install_bin): $bin_summary
-  hooks do Claude Code: $hooks_summary
-  aplicação ($app_target): $app_summary
+Uninstall summary:
+  binaries ($install_bin): $bin_summary
+  Claude Code hooks: $hooks_summary
+  app ($app_target): $app_summary
 
-NÃO foi tocado (remove à mão se quiseres):
-  - regra sudoers do All-Nighter (/etc/sudoers.d/vibenotch)
-  - LaunchAgent do watchdog (~/Library/LaunchAgents/com.rebelpaulo.vibenotch.sleepguard.plist)
-  - ficheiro de emparelhamento do telemóvel (~/.vibenotch/remote.json)
+NOT touched (remove by hand if you want them gone):
+  - the Gotta go! sudoers rule (/etc/sudoers.d/vibenotch)
+  - the watchdog LaunchAgent (~/Library/LaunchAgents/com.rebelpaulo.vibenotch.sleepguard.plist)
+  - the phone pairing file (~/.vibenotch/remote.json)
 
-Nota: a linha de PATH no ~/.zshrc e a entrada "notify" no ~/.codex/config.toml
-adicionadas pelo adaptador Codex também ficam como estão — edita-as à mão se
-quiseres reverter (scripts/install-codex-adapter.sh não tem um modo de remoção).
+Note: the PATH line in ~/.zshrc and the "notify" entry in ~/.codex/config.toml
+added by the Codex adapter are also left as they are — edit them by hand to
+revert (scripts/install-codex-adapter.sh has no uninstall mode).
 SUMMARY
     exit 0
 }
@@ -107,7 +107,7 @@ preflight() {
     macos_major=${macos_version%%.*}
     case $macos_major in
         ''|*[!0-9]*)
-            printf '%s\n' "vibenotch: não foi possível determinar a versão do macOS." >&2
+            printf '%s\n' "vibenotch: could not determine the macOS version." >&2
             exit 1
             ;;
     esac
@@ -117,17 +117,17 @@ preflight() {
     fi
 
     if ! xcode-select -p >/dev/null 2>&1; then
-        printf '%s\n' "vibenotch: Xcode Command Line Tools em falta. Corre 'xcode-select --install' e tenta de novo." >&2
+        printf '%s\n' "vibenotch: Xcode Command Line Tools are missing. Run 'xcode-select --install' and try again." >&2
         exit 1
     fi
 
     if ! command -v swift >/dev/null 2>&1; then
-        printf '%s\n' "vibenotch: comando 'swift' não encontrado (verifica as Command Line Tools)." >&2
+        printf '%s\n' "vibenotch: 'swift' not found (check the Command Line Tools)." >&2
         exit 1
     fi
 
     if ! command -v jq >/dev/null 2>&1; then
-        printf '%s\n' "vibenotch: 'jq' em falta. Corre 'brew install jq' e tenta de novo." >&2
+        printf '%s\n' "vibenotch: 'jq' is missing. Run 'brew install jq' and try again." >&2
         exit 1
     fi
 
@@ -139,7 +139,7 @@ preflight() {
         MacBookPro18,*|Mac14,5|Mac14,6|Mac14,7|Mac14,9|Mac14,10|Mac14,15|Mac15,*)
             ;;
         *)
-            printf '%s\n' "aviso: não foi possível confirmar que este Mac tem notch (modelo: ${model:-desconhecido}) — a app usa uma pill flutuante como alternativa." >&2
+            printf '%s\n' "warning: could not confirm this Mac has a notch (model: ${model:-unknown}) — the app falls back to a floating pill." >&2
             ;;
     esac
 
@@ -156,7 +156,7 @@ build_and_bundle() {
 install_app_bundle() {
     app_source=$repo_root/build/Vibenotch.app
     [ -d "$app_source" ] || {
-        printf '%s\n' "vibenotch: build/Vibenotch.app não foi criado." >&2
+        printf '%s\n' "vibenotch: build/Vibenotch.app was not created." >&2
         exit 1
     }
 
@@ -165,17 +165,17 @@ install_app_bundle() {
     if [ -d "$app_target" ]; then
         if [ "$assume_yes" -eq 0 ]; then
             if [ -t 0 ]; then
-                printf '%s' "Já existe uma Vibenotch.app em $applications_dir. Substituir? [s/N] "
+                printf '%s' "Vibenotch.app already exists in $applications_dir. Replace it? [y/N] "
                 read -r reply
                 case $reply in
                     [sSyY]|[sSyY][iIeE][mMsS]) ;;
                     *)
-                        printf '%s\n' "A manter a aplicação existente."
+                        printf '%s\n' "Keeping the existing app."
                         return 0
                         ;;
                 esac
             else
-                printf '%s\n' "vibenotch: já existe $app_target; corre com --yes para substituir sem perguntar." >&2
+                printf '%s\n' "vibenotch: $app_target already exists; run with --yes to replace it without asking." >&2
                 exit 1
             fi
         fi
@@ -183,12 +183,12 @@ install_app_bundle() {
     fi
 
     cp -R "$app_source" "$app_target" || exit 1
-    printf '%s\n' "Aplicação instalada em $app_target"
+    printf '%s\n' "App installed at $app_target"
 }
 
 launch_app() {
     if [ -d "$app_target" ]; then
-        "${VIBENOTCH_INSTALL_OPEN:-open}" "$app_target" >/dev/null 2>&1 || printf '%s\n' "aviso: não foi possível abrir a aplicação automaticamente; abre $app_target manualmente." >&2
+        "${VIBENOTCH_INSTALL_OPEN:-open}" "$app_target" >/dev/null 2>&1 || printf '%s\n' "warning: could not open the app automatically; open $app_target yourself." >&2
     fi
 }
 
@@ -202,15 +202,15 @@ install_runtime_scripts() {
     done
     cp "$script_dir/codex-shim" "$install_bin/codex" || exit 1
     chmod +x "$install_bin/codex" || exit 1
-    printf '%s\n' "Scripts instalados em $install_bin"
+    printf '%s\n' "Scripts installed in $install_bin"
 }
 
 install_claude_hooks_step() {
     if [ "$skip_claude_hooks" -eq 1 ]; then
-        printf '%s\n' "Hooks do Claude Code: ignorado (--skip-claude-hooks)"
+        printf '%s\n' "Claude Code hooks: skipped (--skip-claude-hooks)"
         return 0
     fi
-    VIBEVIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-claude-hooks.sh"
+    VIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-claude-hooks.sh"
 }
 
 install_codex_step() {
@@ -218,7 +218,7 @@ install_codex_step() {
         printf '%s\n' "Adaptador Codex: ignorado (--skip-codex)"
         return 0
     fi
-    VIBEVIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-codex-adapter.sh"
+    VIBENOTCH_INSTALL_PREFIX=$notch_home "$script_dir/install-codex-adapter.sh"
 }
 
 # --- main --------------------------------------------------------------
@@ -231,20 +231,20 @@ install_runtime_scripts
 install_claude_hooks_step
 install_codex_step
 
-claude_hooks_summary=$([ "$skip_claude_hooks" -eq 1 ] && printf 'ignorado' || printf 'ver acima')
-codex_summary=$([ "$skip_codex" -eq 1 ] && printf 'ignorado' || printf 'ver acima')
+claude_hooks_summary=$([ "$skip_claude_hooks" -eq 1 ] && printf 'skipped' || printf 'see above')
+codex_summary=$([ "$skip_codex" -eq 1 ] && printf 'skipped' || printf 'see above')
 
 cat <<SUMMARY
 
-Vibenotch instalado.
-  Aplicação:            $app_target
-  Scripts:               $install_bin
-  Hooks do Claude Code:   $claude_hooks_summary
-  Adaptador Codex:        $codex_summary
+Vibenotch installed.
+  App:                 $app_target
+  Scripts:             $install_bin
+  Claude Code hooks:   $claude_hooks_summary
+  Codex adapter:       $codex_summary
 
-Passos opcionais:
-  - All-Nighter (manter o Mac acordado com a tampa fechada; precisa de sudo):
+Optional next steps:
+  - Gotta go! (keep the Mac awake with the lid closed; needs sudo):
       sudo scripts/install-gotta-go.sh
-  - Companion no telemóvel: consulta o README (secção "Phone companion") para
-    o repositório notch-remote e o processo de emparelhamento.
+  - Phone companion: see the README ("Phone companion") for the notch-remote
+    repository and the pairing steps.
 SUMMARY

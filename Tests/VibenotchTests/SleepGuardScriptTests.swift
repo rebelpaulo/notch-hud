@@ -116,8 +116,8 @@ private final class SleepGuardScriptFixture {
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = [executable.path] + arguments
         var environment = ProcessInfo.processInfo.environment
-        environment["NOTCH_vibenotch-sleepguard_PMSET"] = fakePmset.path
-        environment["NOTCH_vibenotch-sleepguard_PGREP"] = fakePgrep.path
+        environment["VIBENOTCH_SLEEPGUARD_PMSET"] = fakePmset.path
+        environment["VIBENOTCH_SLEEPGUARD_PGREP"] = fakePgrep.path
         environment["FAKE_PMSET_LOG"] = logURL.path
         environment["FAKE_SLEEP_DISABLED"] = String(statusValue)
         environment["FAKE_APP_RUNNING"] = appIsRunning ? "1" : "0"

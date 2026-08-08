@@ -27,7 +27,13 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>NSAppleEventsUsageDescription</key>
   <string>Vibenotch raises the terminal window of the agent session you click.</string>
 </dict>
+</plist>
 PLIST
+# The closing </plist> above was missing until now: the app still launched (the
+# real Info.plist is linked into the binary via -sectcreate) but plutil refused
+# the bundle copy, and anything reading it through CFBundle — LaunchServices
+# included — saw a malformed file. Fail the build rather than ship that again.
+plutil -lint "$APP/Contents/Info.plist" >/dev/null
 # Stable ad-hoc signature keyed to the bundle identifier (keeps TCC grants sticky).
 codesign --force --sign - --identifier com.rebelpaulo.vibenotch "$APP"
 codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature"

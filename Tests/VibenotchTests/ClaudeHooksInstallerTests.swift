@@ -151,6 +151,39 @@ import Testing
     #expect(try claudeHooksBackupNames(nextTo: settings).isEmpty)
 }
 
+@Test func claudeHooksInstallerRemovesThePreRenameNotchHUDEntries() throws {
+    // Upgrading users still have the old hooks pointing at ~/.notch-hud, whose
+    // spool the app no longer reads: left in place every session gets written
+    // twice, once into a directory nobody watches.
+    let scratch = try makeClaudeHooksScratch()
+    defer { try? FileManager.default.removeItem(at: scratch) }
+    let settings = scratch.appendingPathComponent("settings.json")
+    try """
+    {"hooks": {
+      "Stop": [{"hooks": [{"type": "command", "command": "/Users/x/.notch-hud/bin/notch-claude-hook done"}]}],
+      "PreToolUse": [
+        {"matcher": "*", "hooks": [{"type": "command", "command": "/Users/x/.notch-hud/bin/notch-claude-hook tool"}]},
+        {"matcher": "*", "hooks": [{"type": "command", "command": "rtk hook claude"}]}
+      ]
+    }}
+    """.write(to: settings, atomically: true, encoding: .utf8)
+
+    let result = try runClaudeHooksInstaller(
+        prefix: scratch.appendingPathComponent("prefix"),
+        settings: settings,
+        uninstall: false
+    )
+    #expect(result.status == 0)
+
+    let text = try String(contentsOf: settings, encoding: .utf8)
+    #expect(!text.contains(".notch-hud/bin/notch-claude-hook"))
+    #expect(text.contains("rtk hook claude"))
+    #expect(text.contains("vibenotch-claude-hook done"))
+    // The scratch directory name also contains "vibenotch-claude-hook", so count
+    // the installed path specifically.
+    #expect(text.components(separatedBy: "/bin/vibenotch-claude-hook").count - 1 == 5)
+}
+
 private func claudeHooksRepoRoot() -> URL {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -178,7 +211,7 @@ private func runClaudeHooksInstaller(
     }
     process.arguments = arguments
     var environment = ProcessInfo.processInfo.environment
-    environment["VIBEVIBENOTCH_INSTALL_PREFIX"] = prefix.path
+    environment["VIBENOTCH_INSTALL_PREFIX"] = prefix.path
     environment["VIBENOTCH_INSTALL_CLAUDE_SETTINGS"] = settings.path
     process.environment = environment
     process.standardInput = FileHandle.nullDevice
