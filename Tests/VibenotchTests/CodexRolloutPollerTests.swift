@@ -74,7 +74,7 @@ import Testing
     print("Generated parent envelope with subagents: \(json)")
     let envelope = try fixture.envelope()
     #expect(envelope.status == .working)
-    #expect(envelope.toolLine == "2 subagentes a trabalhar")
+    #expect(envelope.toolLine == "2 subagents working")
     let spoolEntries = try fixture.fileManager.contentsOfDirectory(atPath: fixture.spoolURL.path)
     #expect(spoolEntries == ["codex-app-123e4567.json"])
 }
@@ -128,7 +128,7 @@ import Testing
     #expect(envelope.cwd == "/tmp/projects/vibenotch")
     #expect(envelope.project == "vibenotch")
     #expect(envelope.status == .working)
-    #expect(envelope.toolLine == "1 subagente a trabalhar")
+    #expect(envelope.toolLine == "1 subagent working")
 }
 
 @MainActor
@@ -152,13 +152,13 @@ import Testing
     fixture.poller.poll(now: fixture.now)
     var envelope = try fixture.envelope()
     #expect(envelope.seq == 1)
-    #expect(envelope.toolLine == "2 subagentes a trabalhar")
+    #expect(envelope.toolLine == "2 subagents working")
 
     try fixture.setModificationDate(fixture.now.addingTimeInterval(-30), for: secondSubagentURL)
     fixture.poller.poll(now: fixture.now)
     envelope = try fixture.envelope()
     #expect(envelope.seq == 2)
-    #expect(envelope.toolLine == "1 subagente a trabalhar")
+    #expect(envelope.toolLine == "1 subagent working")
 
     fixture.poller.poll(now: fixture.now)
     #expect(try fixture.envelope().seq == 2)
@@ -182,7 +182,7 @@ import Testing
 
     fixture.poller.poll(now: fixture.now)
 
-    #expect(try fixture.envelope().toolLine == "1 subagente a trabalhar")
+    #expect(try fixture.envelope().toolLine == "1 subagent working")
 }
 
 @MainActor

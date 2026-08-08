@@ -88,6 +88,8 @@
 "Quit Vibenotch" = "Sair do Vibenotch";
 
 /* Session cards */
+"1 subagent working" = "1 subagente a trabalhar";
+"%d subagents working" = "%d subagentes a trabalhar";
 "Working" = "A trabalhar";
 "Needs me" = "Precisa de mim";
 "Done" = "Concluído";

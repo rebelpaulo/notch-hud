@@ -96,7 +96,7 @@ final class SleepGuardController {
                 try process.run()
                 process.waitUntilExit()
                 if process.terminationStatus != 0 {
-                    NSLog("Vibenotch sleepguard '%@' terminou com estado %d", action, process.terminationStatus)
+                    NSLog("Vibenotch sleepguard %@ exited with status %d", action, process.terminationStatus)
                 }
             } catch {
                 NSLog("Vibenotch could not run the sleepguard: %@", error.localizedDescription)
