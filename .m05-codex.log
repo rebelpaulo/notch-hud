@@ -1,7 +1,7 @@
 Reading additional input from stdin...
 OpenAI Codex v0.144.1
 --------
-workdir: /Users/coopersimson/Desktop/AI Projects/notch-hud
+workdir: /Users/coopersimson/Desktop/AI Projects/vibenotch
 model: gpt-5.6-sol
 provider: openai
 approval: never
@@ -19,17 +19,17 @@ I’ll first inspect the spec and the two existing Swift files, then make only t
   • Add the Package.swift test target and swift-testing tests
   • Review diffs and report every created or modified file
 exec
-/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M0.5-geometry-and-tests.md' -g 'HoverController.swift' -g 'NotchWindowManager.swift' -g 'Package.swift'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g 'specs/M0.5-geometry-and-tests.md' -g 'HoverController.swift' -g 'NotchWindowManager.swift' -g 'Package.swift'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-/Users/coopersimson/Desktop/AI Projects/notch-hud
+/Users/coopersimson/Desktop/AI Projects/vibenotch
 Package.swift
 specs/M0.5-geometry-and-tests.md
-Sources/NotchHUD/Notch/NotchWindowManager.swift
-Sources/NotchHUD/Notch/HoverController.swift
+Sources/Vibenotch/Notch/NotchWindowManager.swift
+Sources/Vibenotch/Notch/HoverController.swift
 vendor/DynamicNotchKit/Package.swift
 
 exec
-/bin/zsh -lc "sed -n '1,260p' specs/M0.5-geometry-and-tests.md && sed -n '1,260p' Sources/NotchHUD/Notch/HoverController.swift && sed -n '1,320p' Sources/NotchHUD/Notch/NotchWindowManager.swift && sed -n '1,260p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,260p' specs/M0.5-geometry-and-tests.md && sed -n '1,260p' Sources/Vibenotch/Notch/HoverController.swift && sed -n '1,320p' Sources/Vibenotch/Notch/NotchWindowManager.swift && sed -n '1,260p' Package.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 # M0.5 spec — Extract pure geometry + add unit tests (for GPT-5.6 Sol)
 
@@ -40,7 +40,7 @@ Goal: make the notch geometry testable and add a real `swift test` target. The h
 - DO NOT change hover thresholds, margins, debounce, or any runtime behavior. The values must stay IDENTICAL. You are only moving math into pure functions and adding tests.
 - Use `import Testing` (swift-testing) for the test target — the toolchain has libTestingMacros. Do NOT use XCTest.
 
-## 1. Create `Sources/NotchHUD/Model/NotchGeometry.swift`
+## 1. Create `Sources/Vibenotch/Model/NotchGeometry.swift`
 A pure, dependency-free enum with static functions (no AppKit types beyond CGRect/CGFloat so they're unit-testable without a screen):
 
 ```swift
@@ -72,11 +72,11 @@ Move the exact math currently inlined in `HoverController.notchRect(on:)`, the `
 
 ## 3. Add a test target in Package.swift
 ```swift
-.testTarget(name: "NotchHUDTests", dependencies: ["NotchHUD"], path: "Tests/NotchHUDTests")
+.testTarget(name: "VibenotchTests", dependencies: ["Vibenotch"], path: "Tests/VibenotchTests")
 ```
-Note: the executable target's linker has an `-sectcreate` Info.plist flag — make sure the test target still links (the tested types must be visible; if the executable can't be imported as a module, move `NotchGeometry` and any tested pure types into the target such that tests can reach them — simplest: they're already in the NotchHUD target which the test target depends on).
+Note: the executable target's linker has an `-sectcreate` Info.plist flag — make sure the test target still links (the tested types must be visible; if the executable can't be imported as a module, move `NotchGeometry` and any tested pure types into the target such that tests can reach them — simplest: they're already in the Vibenotch target which the test target depends on).
 
-## 4. Write `Tests/NotchHUDTests/NotchGeometryTests.swift` (swift-testing)
+## 4. Write `Tests/VibenotchTests/NotchGeometryTests.swift` (swift-testing)
 Cover, at minimum:
 - `notchRect` with realistic values (auxLeftMaxX 918, auxRightMinX 1138, frameMaxY 1329, safeTop 38) returns CGRect(x:918, y:1291, width:220, height:38).
 - `notchRect` returns nil when aux areas are nil or when rightMinX <= leftMaxX.
@@ -85,8 +85,8 @@ Cover, at minimum:
 - `fallbackRect` centers correctly.
 - `expandedContentRect` contains a top-center point and excludes a far-off point.
 
-## 5. Add `Tests/NotchHUDTests/AppEnvironmentTests.swift`
-- Assert `AppEnvironment().spoolURL` path ends with `.notch-hud/sessions` and is under the home dir. (If AppEnvironment creates the dir on init, that's fine.)
+## 5. Add `Tests/VibenotchTests/AppEnvironmentTests.swift`
+- Assert `AppEnvironment().spoolURL` path ends with `.vibenotch/sessions` and is under the home dir. (If AppEnvironment creates the dir on init, that's fine.)
 
 When done: print the list of files created/modified. Do not build.
 import AppKit
@@ -320,7 +320,7 @@ private final class HoverTrackingPanel: NSPanel {
 enum HoverDiag {
     static let enabled = ProcessInfo.processInfo.environment["NOTCHHUD_DEBUG"] == "1"
     static let url = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".notch-hud/hover.log")
+        .appendingPathComponent(".vibenotch/hover.log")
     static func log(_ msg: String) {
         guard enabled else { return }
         let line = "\(Date()) \(msg)\n"
@@ -370,7 +370,7 @@ final class NotchWindowManager {
 
     func repinToBuiltInScreen() {
         guard let screen = preferredScreen() else {
-            NSLog("NotchHUD could not find a screen to pin to.")
+            NSLog("Vibenotch could not find a screen to pin to.")
             return
         }
 
@@ -390,7 +390,7 @@ final class NotchWindowManager {
             if screen.safeAreaInsets.top > 0 {
                 await self.installNotchedHUD(on: screen, generation: generation)
             } else {
-                NSLog("NotchHUD found no notched display; using a top-center floating pill.")
+                NSLog("Vibenotch found no notched display; using a top-center floating pill.")
                 await self.installFloatingHUD(on: screen, generation: generation)
             }
 
@@ -566,7 +566,7 @@ extension NotchWindowManager: HoverControllerDelegate {
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -575,18 +575,18 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         )
@@ -596,26 +596,26 @@ let package = Package(
 codex
 The current formulas match the milestone’s stated constants: the notch uses the auxiliary-area gap and safe-top inset; fallback width is 300 with a minimum height of 32; hover expansion is 150 per side and 16 below; expanded content is 370 wide and `230 + notchHeight` tall. I’m preserving those expressions exactly in the extracted helpers.
 exec
-/bin/zsh -lc 'rg -n "struct AppEnvironment|final class AppEnvironment|class AppEnvironment|enum AppEnvironment|spoolURL" Sources/NotchHUD && find Sources/NotchHUD -maxdepth 2 -type d -print && rg -n "@testable import|import Testing|#expect|@Test|@Suite" Tests Sources 2>/dev/null || true' in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc 'rg -n "struct AppEnvironment|final class AppEnvironment|class AppEnvironment|enum AppEnvironment|spoolURL" Sources/Vibenotch && find Sources/Vibenotch -maxdepth 2 -type d -print && rg -n "@testable import|import Testing|#expect|@Test|@Suite" Tests Sources 2>/dev/null || true' in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
-Sources/NotchHUD/Notch/NotchWindowManager.swift:26:        _ = environment.spoolURL
-Sources/NotchHUD/App/AppEnvironment.swift:3:struct AppEnvironment {
-Sources/NotchHUD/App/AppEnvironment.swift:4:    let spoolURL: URL
-Sources/NotchHUD/App/AppEnvironment.swift:9:        spoolURL = fileManager.homeDirectoryForCurrentUser
-Sources/NotchHUD/App/AppEnvironment.swift:15:                at: spoolURL,
-Sources/NotchHUD/App/AppEnvironment.swift:21:                ofItemAtPath: spoolURL.path
-Sources/NotchHUD
-Sources/NotchHUD/Notch
-Sources/NotchHUD/Settings
-Sources/NotchHUD/Poller
-Sources/NotchHUD/App
-Sources/NotchHUD/Focus
-Sources/NotchHUD/Support
-Sources/NotchHUD/Model
-Sources/NotchHUD/Store
+Sources/Vibenotch/Notch/NotchWindowManager.swift:26:        _ = environment.spoolURL
+Sources/Vibenotch/App/AppEnvironment.swift:3:struct AppEnvironment {
+Sources/Vibenotch/App/AppEnvironment.swift:4:    let spoolURL: URL
+Sources/Vibenotch/App/AppEnvironment.swift:9:        spoolURL = fileManager.homeDirectoryForCurrentUser
+Sources/Vibenotch/App/AppEnvironment.swift:15:                at: spoolURL,
+Sources/Vibenotch/App/AppEnvironment.swift:21:                ofItemAtPath: spoolURL.path
+Sources/Vibenotch
+Sources/Vibenotch/Notch
+Sources/Vibenotch/Settings
+Sources/Vibenotch/Poller
+Sources/Vibenotch/App
+Sources/Vibenotch/Focus
+Sources/Vibenotch/Support
+Sources/Vibenotch/Model
+Sources/Vibenotch/Store
 
 exec
-/bin/zsh -lc "sed -n '1,180p' Sources/NotchHUD/App/AppEnvironment.swift && git status --short && git diff -- Package.swift Sources/NotchHUD/Notch/HoverController.swift Sources/NotchHUD/Notch/NotchWindowManager.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,180p' Sources/Vibenotch/App/AppEnvironment.swift && git status --short && git diff -- Package.swift Sources/Vibenotch/Notch/HoverController.swift Sources/Vibenotch/Notch/NotchWindowManager.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import Foundation
 
@@ -626,7 +626,7 @@ struct AppEnvironment {
 
     init(fileManager: FileManager = .default) {
         spoolURL = fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".notch-hud", isDirectory: true)
+            .appendingPathComponent(".vibenotch", isDirectory: true)
             .appendingPathComponent("sessions", isDirectory: true)
 
         do {
@@ -640,7 +640,7 @@ struct AppEnvironment {
                 ofItemAtPath: spoolURL.path
             )
         } catch {
-            NSLog("NotchHUD could not prepare its session spool: %@", error.localizedDescription)
+            NSLog("Vibenotch could not prepare its session spool: %@", error.localizedDescription)
         }
     }
 }
@@ -662,53 +662,53 @@ struct AppEnvironment {
 ?? vendor/
 
 exec
-/bin/zsh -lc "rg -n \"NotchGeometry|expandedContentRect|M0.5|peek edge|fallbackRect\" . --glob '"'!vendor/**'"' --glob '"'!.git/**'"'" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "rg -n \"NotchGeometry|expandedContentRect|M0.5|peek edge|fallbackRect\" . --glob '"'!vendor/**'"' --glob '"'!.git/**'"'" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 ./evals/hover_eval.sh:10:# center of notch, then peek edge (left of cutout)
 ./TASKS.md:17:- [~] M0.5: extract pure `NotchGeometry` + add `swift test` unit target (Codex writing, manager verifies)
 ./specs/M0.5-geometry-and-tests.md:1:# M0.5 spec — Extract pure geometry + add unit tests (for GPT-5.6 Sol)
-./specs/M0.5-geometry-and-tests.md:10:## 1. Create `Sources/NotchHUD/Model/NotchGeometry.swift`
+./specs/M0.5-geometry-and-tests.md:10:## 1. Create `Sources/Vibenotch/Model/NotchGeometry.swift`
 ./specs/M0.5-geometry-and-tests.md:16:enum NotchGeometry {
 ./specs/M0.5-geometry-and-tests.md:26:    static func fallbackRect(frameMidX: CGFloat, frameMaxY: CGFloat, visibleMaxY: CGFloat,
 ./specs/M0.5-geometry-and-tests.md:30:    static func expandedContentRect(frameMidX: CGFloat, frameMaxY: CGFloat,
 ./specs/M0.5-geometry-and-tests.md:36:## 2. Refactor callers to use NotchGeometry
 ./specs/M0.5-geometry-and-tests.md:37:- `HoverController.notchRect(on:)` and the hitRect block in `pin(to:)` call `NotchGeometry`. Keep the same defaults (sideMargin 150, bottomExtra 16). Behavior identical.
 ./specs/M0.5-geometry-and-tests.md:38:- `NotchWindowManager.containsExpandedContent(at:)` calls `NotchGeometry.expandedContentRect`.
-./specs/M0.5-geometry-and-tests.md:44:Note: the executable target's linker has an `-sectcreate` Info.plist flag — make sure the test target still links (the tested types must be visible; if the executable can't be imported as a module, move `NotchGeometry` and any tested pure types into the target such that tests can reach them — simplest: they're already in the NotchHUD target which the test target depends on).
-./specs/M0.5-geometry-and-tests.md:46:## 4. Write `Tests/NotchHUDTests/NotchGeometryTests.swift` (swift-testing)
+./specs/M0.5-geometry-and-tests.md:44:Note: the executable target's linker has an `-sectcreate` Info.plist flag — make sure the test target still links (the tested types must be visible; if the executable can't be imported as a module, move `NotchGeometry` and any tested pure types into the target such that tests can reach them — simplest: they're already in the Vibenotch target which the test target depends on).
+./specs/M0.5-geometry-and-tests.md:46:## 4. Write `Tests/VibenotchTests/NotchGeometryTests.swift` (swift-testing)
 ./specs/M0.5-geometry-and-tests.md:51:- **Regression test for the bug we fixed:** a point at the peek edge (x=850, y=1300) is OUTSIDE notchRect but INSIDE hitRect (this is exactly why hover was broken before). Assert `notchRect.contains == false` and `hitRect.contains == true`.
 ./specs/M0.5-geometry-and-tests.md:52:- `fallbackRect` centers correctly.
 ./specs/M0.5-geometry-and-tests.md:53:- `expandedContentRect` contains a top-center point and excludes a far-off point.
 
 apply patch
 patch: completed
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Package.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/NotchGeometry.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/AppEnvironmentTests.swift
-/Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/NotchGeometryTests.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Package.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/NotchGeometry.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/AppEnvironmentTests.swift
+/Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/NotchGeometryTests.swift
 diff --git a/Package.swift b/Package.swift
 index af9dcb3973c8d233c0e45cff066cb1cbbb12dcf1..2dcd6bb64412605a6cbb98f3391ed9fbe265037a
 --- a/Package.swift
 +++ b/Package.swift
 @@ -26,6 +26,11 @@
-                     "-Xlinker", "Sources/NotchHUD/Info.plist"
+                     "-Xlinker", "Sources/Vibenotch/Info.plist"
                  ])
              ]
 +        ),
 +        .testTarget(
-+            name: "NotchHUDTests",
-+            dependencies: ["NotchHUD"],
-+            path: "Tests/NotchHUDTests"
++            name: "VibenotchTests",
++            dependencies: ["Vibenotch"],
++            path: "Tests/VibenotchTests"
          )
      ]
  )
-diff --git a/Sources/NotchHUD/Model/NotchGeometry.swift b/Sources/NotchHUD/Model/NotchGeometry.swift
+diff --git a/Sources/Vibenotch/Model/NotchGeometry.swift b/Sources/Vibenotch/Model/NotchGeometry.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671c0de5765
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/NotchGeometry.swift
++++ b/Sources/Vibenotch/Model/NotchGeometry.swift
 @@ -0,0 +1,74 @@
 +import CoreGraphics
 +
@@ -784,10 +784,10 @@ index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671
 +        )
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574cfadb58b
---- a/Sources/NotchHUD/Notch/HoverController.swift
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
+--- a/Sources/Vibenotch/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -33,11 +33,10 @@
          // Widen the trigger zone so hovering the VISIBLE peek beside the cutout also expands.
          let sideMargin: CGFloat = 150
@@ -843,10 +843,10 @@ index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574
          )
      }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d187e115cb
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -132,10 +132,11 @@
              screen.frame.maxY - screen.visibleFrame.maxY
          )
@@ -863,33 +863,33 @@ index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d1
              width: width,
              height: height
          )
-diff --git a/Tests/NotchHUDTests/AppEnvironmentTests.swift b/Tests/NotchHUDTests/AppEnvironmentTests.swift
+diff --git a/Tests/VibenotchTests/AppEnvironmentTests.swift b/Tests/VibenotchTests/AppEnvironmentTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8de2eb94a4c24e0f93abb747d47498f3b659e02
 --- /dev/null
-+++ b/Tests/NotchHUDTests/AppEnvironmentTests.swift
++++ b/Tests/VibenotchTests/AppEnvironmentTests.swift
 @@ -0,0 +1,12 @@
 +import Foundation
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func spoolURLIsInHomeDirectory() {
 +    let environment = AppEnvironment()
 +    let spoolPath = environment.spoolURL.standardizedFileURL.path
 +    let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 +
-+    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
++    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
 +    #expect(spoolPath.hasPrefix(homePath + "/"))
 +}
-diff --git a/Tests/NotchHUDTests/NotchGeometryTests.swift b/Tests/NotchHUDTests/NotchGeometryTests.swift
+diff --git a/Tests/VibenotchTests/NotchGeometryTests.swift b/Tests/VibenotchTests/NotchGeometryTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c299983e2
 --- /dev/null
-+++ b/Tests/NotchHUDTests/NotchGeometryTests.swift
++++ b/Tests/VibenotchTests/NotchGeometryTests.swift
 @@ -0,0 +1,94 @@
 +import CoreGraphics
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func notchRectUsesAuxiliaryAreaGap() throws {
 +    let rect = try #require(NotchGeometry.notchRect(
@@ -987,22 +987,22 @@ index af9dcb3973c8d233c0e45cff066cb1cbbb12dcf1..2dcd6bb64412605a6cbb98f3391ed9fb
 --- a/Package.swift
 +++ b/Package.swift
 @@ -26,6 +26,11 @@
-                     "-Xlinker", "Sources/NotchHUD/Info.plist"
+                     "-Xlinker", "Sources/Vibenotch/Info.plist"
                  ])
              ]
 +        ),
 +        .testTarget(
-+            name: "NotchHUDTests",
-+            dependencies: ["NotchHUD"],
-+            path: "Tests/NotchHUDTests"
++            name: "VibenotchTests",
++            dependencies: ["Vibenotch"],
++            path: "Tests/VibenotchTests"
          )
      ]
  )
-diff --git a/Sources/NotchHUD/Model/NotchGeometry.swift b/Sources/NotchHUD/Model/NotchGeometry.swift
+diff --git a/Sources/Vibenotch/Model/NotchGeometry.swift b/Sources/Vibenotch/Model/NotchGeometry.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671c0de5765
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/NotchGeometry.swift
++++ b/Sources/Vibenotch/Model/NotchGeometry.swift
 @@ -0,0 +1,74 @@
 +import CoreGraphics
 +
@@ -1078,10 +1078,10 @@ index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671
 +        )
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574cfadb58b
---- a/Sources/NotchHUD/Notch/HoverController.swift
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
+--- a/Sources/Vibenotch/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -33,11 +33,10 @@
          // Widen the trigger zone so hovering the VISIBLE peek beside the cutout also expands.
          let sideMargin: CGFloat = 150
@@ -1137,10 +1137,10 @@ index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574
          )
      }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d187e115cb
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -132,10 +132,11 @@
              screen.frame.maxY - screen.visibleFrame.maxY
          )
@@ -1157,33 +1157,33 @@ index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d1
              width: width,
              height: height
          )
-diff --git a/Tests/NotchHUDTests/AppEnvironmentTests.swift b/Tests/NotchHUDTests/AppEnvironmentTests.swift
+diff --git a/Tests/VibenotchTests/AppEnvironmentTests.swift b/Tests/VibenotchTests/AppEnvironmentTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8de2eb94a4c24e0f93abb747d47498f3b659e02
 --- /dev/null
-+++ b/Tests/NotchHUDTests/AppEnvironmentTests.swift
++++ b/Tests/VibenotchTests/AppEnvironmentTests.swift
 @@ -0,0 +1,12 @@
 +import Foundation
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func spoolURLIsInHomeDirectory() {
 +    let environment = AppEnvironment()
 +    let spoolPath = environment.spoolURL.standardizedFileURL.path
 +    let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 +
-+    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
++    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
 +    #expect(spoolPath.hasPrefix(homePath + "/"))
 +}
-diff --git a/Tests/NotchHUDTests/NotchGeometryTests.swift b/Tests/NotchHUDTests/NotchGeometryTests.swift
+diff --git a/Tests/VibenotchTests/NotchGeometryTests.swift b/Tests/VibenotchTests/NotchGeometryTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c299983e2
 --- /dev/null
-+++ b/Tests/NotchHUDTests/NotchGeometryTests.swift
++++ b/Tests/VibenotchTests/NotchGeometryTests.swift
 @@ -0,0 +1,94 @@
 +import CoreGraphics
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func notchRectUsesAuxiliaryAreaGap() throws {
 +    let rect = try #require(NotchGeometry.notchRect(
@@ -1279,7 +1279,7 @@ index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c
 codex
 The geometry helper and both caller refactors are now written, along with the SwiftPM test target and two swift-testing files. I’m doing a source-only review of signatures, constants, and package syntax; no compiler or test command will be invoked.
 exec
-/bin/zsh -lc "sed -n '1,240p' Sources/NotchHUD/Model/NotchGeometry.swift && sed -n '20,75p' Sources/NotchHUD/Notch/HoverController.swift && sed -n '130,185p' Sources/NotchHUD/Notch/HoverController.swift && sed -n '120,165p' Sources/NotchHUD/Notch/NotchWindowManager.swift && sed -n '1,160p' Package.swift && sed -n '1,280p' Tests/NotchHUDTests/NotchGeometryTests.swift && sed -n '1,120p' Tests/NotchHUDTests/AppEnvironmentTests.swift" in /Users/coopersimson/Desktop/AI Projects/notch-hud
+/bin/zsh -lc "sed -n '1,240p' Sources/Vibenotch/Model/NotchGeometry.swift && sed -n '20,75p' Sources/Vibenotch/Notch/HoverController.swift && sed -n '130,185p' Sources/Vibenotch/Notch/HoverController.swift && sed -n '120,165p' Sources/Vibenotch/Notch/NotchWindowManager.swift && sed -n '1,160p' Package.swift && sed -n '1,280p' Tests/VibenotchTests/NotchGeometryTests.swift && sed -n '1,120p' Tests/VibenotchTests/AppEnvironmentTests.swift" in /Users/coopersimson/Desktop/AI Projects/vibenotch
  succeeded in 0ms:
 import CoreGraphics
 
@@ -1518,7 +1518,7 @@ private protocol NotchTrackingViewDelegate: AnyObject {
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     platforms: [
         .macOS(.v14)
     ],
@@ -1527,31 +1527,31 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         ),
         .testTarget(
-            name: "NotchHUDTests",
-            dependencies: ["NotchHUD"],
-            path: "Tests/NotchHUDTests"
+            name: "VibenotchTests",
+            dependencies: ["Vibenotch"],
+            path: "Tests/VibenotchTests"
         )
     ]
 )
 import CoreGraphics
 import Testing
-@testable import NotchHUD
+@testable import Vibenotch
 
 @Test func notchRectUsesAuxiliaryAreaGap() throws {
     let rect = try #require(NotchGeometry.notchRect(
@@ -1645,14 +1645,14 @@ import Testing
 }
 import Foundation
 import Testing
-@testable import NotchHUD
+@testable import Vibenotch
 
 @Test func spoolURLIsInHomeDirectory() {
     let environment = AppEnvironment()
     let spoolPath = environment.spoolURL.standardizedFileURL.path
     let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 
-    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
+    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
     #expect(spoolPath.hasPrefix(homePath + "/"))
 }
 
@@ -1661,22 +1661,22 @@ index af9dcb3973c8d233c0e45cff066cb1cbbb12dcf1..2dcd6bb64412605a6cbb98f3391ed9fb
 --- a/Package.swift
 +++ b/Package.swift
 @@ -26,6 +26,11 @@
-                     "-Xlinker", "Sources/NotchHUD/Info.plist"
+                     "-Xlinker", "Sources/Vibenotch/Info.plist"
                  ])
              ]
 +        ),
 +        .testTarget(
-+            name: "NotchHUDTests",
-+            dependencies: ["NotchHUD"],
-+            path: "Tests/NotchHUDTests"
++            name: "VibenotchTests",
++            dependencies: ["Vibenotch"],
++            path: "Tests/VibenotchTests"
          )
      ]
  )
-diff --git a/Sources/NotchHUD/Model/NotchGeometry.swift b/Sources/NotchHUD/Model/NotchGeometry.swift
+diff --git a/Sources/Vibenotch/Model/NotchGeometry.swift b/Sources/Vibenotch/Model/NotchGeometry.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671c0de5765
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/NotchGeometry.swift
++++ b/Sources/Vibenotch/Model/NotchGeometry.swift
 @@ -0,0 +1,74 @@
 +import CoreGraphics
 +
@@ -1752,10 +1752,10 @@ index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671
 +        )
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574cfadb58b
---- a/Sources/NotchHUD/Notch/HoverController.swift
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
+--- a/Sources/Vibenotch/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -33,11 +33,10 @@
          // Widen the trigger zone so hovering the VISIBLE peek beside the cutout also expands.
          let sideMargin: CGFloat = 150
@@ -1811,10 +1811,10 @@ index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574
          )
      }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d187e115cb
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -132,10 +132,11 @@
              screen.frame.maxY - screen.visibleFrame.maxY
          )
@@ -1831,33 +1831,33 @@ index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d1
              width: width,
              height: height
          )
-diff --git a/Tests/NotchHUDTests/AppEnvironmentTests.swift b/Tests/NotchHUDTests/AppEnvironmentTests.swift
+diff --git a/Tests/VibenotchTests/AppEnvironmentTests.swift b/Tests/VibenotchTests/AppEnvironmentTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8de2eb94a4c24e0f93abb747d47498f3b659e02
 --- /dev/null
-+++ b/Tests/NotchHUDTests/AppEnvironmentTests.swift
++++ b/Tests/VibenotchTests/AppEnvironmentTests.swift
 @@ -0,0 +1,12 @@
 +import Foundation
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func spoolURLIsInHomeDirectory() {
 +    let environment = AppEnvironment()
 +    let spoolPath = environment.spoolURL.standardizedFileURL.path
 +    let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 +
-+    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
++    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
 +    #expect(spoolPath.hasPrefix(homePath + "/"))
 +}
-diff --git a/Tests/NotchHUDTests/NotchGeometryTests.swift b/Tests/NotchHUDTests/NotchGeometryTests.swift
+diff --git a/Tests/VibenotchTests/NotchGeometryTests.swift b/Tests/VibenotchTests/NotchGeometryTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c299983e2
 --- /dev/null
-+++ b/Tests/NotchHUDTests/NotchGeometryTests.swift
++++ b/Tests/VibenotchTests/NotchGeometryTests.swift
 @@ -0,0 +1,94 @@
 +import CoreGraphics
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func notchRectUsesAuxiliaryAreaGap() throws {
 +    let rect = try #require(NotchGeometry.notchRect(
@@ -1960,22 +1960,22 @@ index af9dcb3973c8d233c0e45cff066cb1cbbb12dcf1..2dcd6bb64412605a6cbb98f3391ed9fb
 --- a/Package.swift
 +++ b/Package.swift
 @@ -26,6 +26,11 @@
-                     "-Xlinker", "Sources/NotchHUD/Info.plist"
+                     "-Xlinker", "Sources/Vibenotch/Info.plist"
                  ])
              ]
 +        ),
 +        .testTarget(
-+            name: "NotchHUDTests",
-+            dependencies: ["NotchHUD"],
-+            path: "Tests/NotchHUDTests"
++            name: "VibenotchTests",
++            dependencies: ["Vibenotch"],
++            path: "Tests/VibenotchTests"
          )
      ]
  )
-diff --git a/Sources/NotchHUD/Model/NotchGeometry.swift b/Sources/NotchHUD/Model/NotchGeometry.swift
+diff --git a/Sources/Vibenotch/Model/NotchGeometry.swift b/Sources/Vibenotch/Model/NotchGeometry.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671c0de5765
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/NotchGeometry.swift
++++ b/Sources/Vibenotch/Model/NotchGeometry.swift
 @@ -0,0 +1,74 @@
 +import CoreGraphics
 +
@@ -2051,10 +2051,10 @@ index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671
 +        )
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574cfadb58b
---- a/Sources/NotchHUD/Notch/HoverController.swift
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
+--- a/Sources/Vibenotch/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -33,11 +33,10 @@
          // Widen the trigger zone so hovering the VISIBLE peek beside the cutout also expands.
          let sideMargin: CGFloat = 150
@@ -2110,10 +2110,10 @@ index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574
          )
      }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d187e115cb
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -132,10 +132,11 @@
              screen.frame.maxY - screen.visibleFrame.maxY
          )
@@ -2130,33 +2130,33 @@ index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d1
              width: width,
              height: height
          )
-diff --git a/Tests/NotchHUDTests/AppEnvironmentTests.swift b/Tests/NotchHUDTests/AppEnvironmentTests.swift
+diff --git a/Tests/VibenotchTests/AppEnvironmentTests.swift b/Tests/VibenotchTests/AppEnvironmentTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8de2eb94a4c24e0f93abb747d47498f3b659e02
 --- /dev/null
-+++ b/Tests/NotchHUDTests/AppEnvironmentTests.swift
++++ b/Tests/VibenotchTests/AppEnvironmentTests.swift
 @@ -0,0 +1,12 @@
 +import Foundation
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func spoolURLIsInHomeDirectory() {
 +    let environment = AppEnvironment()
 +    let spoolPath = environment.spoolURL.standardizedFileURL.path
 +    let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 +
-+    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
++    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
 +    #expect(spoolPath.hasPrefix(homePath + "/"))
 +}
-diff --git a/Tests/NotchHUDTests/NotchGeometryTests.swift b/Tests/NotchHUDTests/NotchGeometryTests.swift
+diff --git a/Tests/VibenotchTests/NotchGeometryTests.swift b/Tests/VibenotchTests/NotchGeometryTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c299983e2
 --- /dev/null
-+++ b/Tests/NotchHUDTests/NotchGeometryTests.swift
++++ b/Tests/VibenotchTests/NotchGeometryTests.swift
 @@ -0,0 +1,94 @@
 +import CoreGraphics
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func notchRectUsesAuxiliaryAreaGap() throws {
 +    let rect = try #require(NotchGeometry.notchRect(
@@ -2254,36 +2254,36 @@ Implemented `specs/M0.5-geometry-and-tests.md` exactly. No build or test command
 
 Created:
 
-- [NotchGeometry.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/NotchGeometry.swift>)
-- [NotchGeometryTests.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/NotchGeometryTests.swift>)
-- [AppEnvironmentTests.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/AppEnvironmentTests.swift>)
+- [NotchGeometry.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/NotchGeometry.swift>)
+- [NotchGeometryTests.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/NotchGeometryTests.swift>)
+- [AppEnvironmentTests.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/AppEnvironmentTests.swift>)
 
 Modified:
 
-- [HoverController.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift>)
-- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift>)
-- [Package.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Package.swift>)
+- [HoverController.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift>)
+- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift>)
+- [Package.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Package.swift>)
 diff --git a/Package.swift b/Package.swift
 index af9dcb3973c8d233c0e45cff066cb1cbbb12dcf1..2dcd6bb64412605a6cbb98f3391ed9fbe265037a
 --- a/Package.swift
 +++ b/Package.swift
 @@ -26,6 +26,11 @@
-                     "-Xlinker", "Sources/NotchHUD/Info.plist"
+                     "-Xlinker", "Sources/Vibenotch/Info.plist"
                  ])
              ]
 +        ),
 +        .testTarget(
-+            name: "NotchHUDTests",
-+            dependencies: ["NotchHUD"],
-+            path: "Tests/NotchHUDTests"
++            name: "VibenotchTests",
++            dependencies: ["Vibenotch"],
++            path: "Tests/VibenotchTests"
          )
      ]
  )
-diff --git a/Sources/NotchHUD/Model/NotchGeometry.swift b/Sources/NotchHUD/Model/NotchGeometry.swift
+diff --git a/Sources/Vibenotch/Model/NotchGeometry.swift b/Sources/Vibenotch/Model/NotchGeometry.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671c0de5765
 --- /dev/null
-+++ b/Sources/NotchHUD/Model/NotchGeometry.swift
++++ b/Sources/Vibenotch/Model/NotchGeometry.swift
 @@ -0,0 +1,74 @@
 +import CoreGraphics
 +
@@ -2359,10 +2359,10 @@ index 0000000000000000000000000000000000000000..b6153fc644b505929bbc85c8ff211671
 +        )
 +    }
 +}
-diff --git a/Sources/NotchHUD/Notch/HoverController.swift b/Sources/NotchHUD/Notch/HoverController.swift
+diff --git a/Sources/Vibenotch/Notch/HoverController.swift b/Sources/Vibenotch/Notch/HoverController.swift
 index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574cfadb58b
---- a/Sources/NotchHUD/Notch/HoverController.swift
-+++ b/Sources/NotchHUD/Notch/HoverController.swift
+--- a/Sources/Vibenotch/Notch/HoverController.swift
++++ b/Sources/Vibenotch/Notch/HoverController.swift
 @@ -33,11 +33,10 @@
          // Widen the trigger zone so hovering the VISIBLE peek beside the cutout also expands.
          let sideMargin: CGFloat = 150
@@ -2418,10 +2418,10 @@ index 47c0d2ab95b6d5ca70530533f21b888b3249eab6..7ddd7455f30420e9356186b996731574
          )
      }
  }
-diff --git a/Sources/NotchHUD/Notch/NotchWindowManager.swift b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+diff --git a/Sources/Vibenotch/Notch/NotchWindowManager.swift b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d187e115cb
---- a/Sources/NotchHUD/Notch/NotchWindowManager.swift
-+++ b/Sources/NotchHUD/Notch/NotchWindowManager.swift
+--- a/Sources/Vibenotch/Notch/NotchWindowManager.swift
++++ b/Sources/Vibenotch/Notch/NotchWindowManager.swift
 @@ -132,10 +132,11 @@
              screen.frame.maxY - screen.visibleFrame.maxY
          )
@@ -2438,33 +2438,33 @@ index 980a6c2defc391c142b08d3e633a6d1a8ad95c8a..5b647efc19bb4788dbefb3a41bcdd8d1
              width: width,
              height: height
          )
-diff --git a/Tests/NotchHUDTests/AppEnvironmentTests.swift b/Tests/NotchHUDTests/AppEnvironmentTests.swift
+diff --git a/Tests/VibenotchTests/AppEnvironmentTests.swift b/Tests/VibenotchTests/AppEnvironmentTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..a8de2eb94a4c24e0f93abb747d47498f3b659e02
 --- /dev/null
-+++ b/Tests/NotchHUDTests/AppEnvironmentTests.swift
++++ b/Tests/VibenotchTests/AppEnvironmentTests.swift
 @@ -0,0 +1,12 @@
 +import Foundation
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func spoolURLIsInHomeDirectory() {
 +    let environment = AppEnvironment()
 +    let spoolPath = environment.spoolURL.standardizedFileURL.path
 +    let homePath = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
 +
-+    #expect(spoolPath.hasSuffix("/.notch-hud/sessions"))
++    #expect(spoolPath.hasSuffix("/.vibenotch/sessions"))
 +    #expect(spoolPath.hasPrefix(homePath + "/"))
 +}
-diff --git a/Tests/NotchHUDTests/NotchGeometryTests.swift b/Tests/NotchHUDTests/NotchGeometryTests.swift
+diff --git a/Tests/VibenotchTests/NotchGeometryTests.swift b/Tests/VibenotchTests/NotchGeometryTests.swift
 new file mode 100644
 index 0000000000000000000000000000000000000000..2644699c895b5d4f7bdd99e703f8697c299983e2
 --- /dev/null
-+++ b/Tests/NotchHUDTests/NotchGeometryTests.swift
++++ b/Tests/VibenotchTests/NotchGeometryTests.swift
 @@ -0,0 +1,94 @@
 +import CoreGraphics
 +import Testing
-+@testable import NotchHUD
++@testable import Vibenotch
 +
 +@Test func notchRectUsesAuxiliaryAreaGap() throws {
 +    let rect = try #require(NotchGeometry.notchRect(
@@ -2563,12 +2563,12 @@ Implemented `specs/M0.5-geometry-and-tests.md` exactly. No build or test command
 
 Created:
 
-- [NotchGeometry.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Model/NotchGeometry.swift>)
-- [NotchGeometryTests.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/NotchGeometryTests.swift>)
-- [AppEnvironmentTests.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Tests/NotchHUDTests/AppEnvironmentTests.swift>)
+- [NotchGeometry.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Model/NotchGeometry.swift>)
+- [NotchGeometryTests.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/NotchGeometryTests.swift>)
+- [AppEnvironmentTests.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Tests/VibenotchTests/AppEnvironmentTests.swift>)
 
 Modified:
 
-- [HoverController.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/HoverController.swift>)
-- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Sources/NotchHUD/Notch/NotchWindowManager.swift>)
-- [Package.swift](</Users/coopersimson/Desktop/AI Projects/notch-hud/Package.swift>)
+- [HoverController.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/HoverController.swift>)
+- [NotchWindowManager.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Sources/Vibenotch/Notch/NotchWindowManager.swift>)
+- [Package.swift](</Users/coopersimson/Desktop/AI Projects/vibenotch/Package.swift>)

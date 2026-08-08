@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "NotchHUD",
+    name: "Vibenotch",
     defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
@@ -13,11 +13,11 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "NotchHUD",
+            name: "Vibenotch",
             dependencies: [
                 .product(name: "DynamicNotchKit", package: "DynamicNotchKit")
             ],
-            path: "Sources/NotchHUD",
+            path: "Sources/Vibenotch",
             exclude: ["Info.plist"],
             resources: [.process("Resources")],
             linkerSettings: [
@@ -25,14 +25,14 @@ let package = Package(
                     "-Xlinker", "-sectcreate",
                     "-Xlinker", "__TEXT",
                     "-Xlinker", "__info_plist",
-                    "-Xlinker", "Sources/NotchHUD/Info.plist"
+                    "-Xlinker", "Sources/Vibenotch/Info.plist"
                 ])
             ]
         ),
         .testTarget(
-            name: "NotchHUDTests",
-            dependencies: ["NotchHUD"],
-            path: "Tests/NotchHUDTests"
+            name: "VibenotchTests",
+            dependencies: ["Vibenotch"],
+            path: "Tests/VibenotchTests"
         )
     ]
 )

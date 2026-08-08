@@ -1,10 +1,10 @@
 #!/bin/bash
-# Safety eval: with the panel EXPANDED, no NotchHUD window may be larger than 1000x700,
+# Safety eval: with the panel EXPANDED, no Vibenotch window may be larger than 1000x700,
 # and window layer must be <= 25 (statusBar), never screensaver (1000).
 set +e
 cd "$(dirname "$0")/.."
-pkill -f "NotchHUD.app" 2>/dev/null; sleep 1
-open build/NotchHUD.app; sleep 4
+pkill -f "Vibenotch.app" 2>/dev/null; sleep 1
+open build/Vibenotch.app; sleep 4
 # expand via hover
 for y in 60 30 10 4 3; do ./tools/movemouse 1028 $y >/dev/null 2>&1; sleep 0.2; done
 sleep 1.2
@@ -24,5 +24,5 @@ INTERACTIVE_AFTER=$(./tools/notchwindows | awk '/w=6[0-9][0-9]\.|w=7[0-5][0-9]\.
 echo "interactive panels before=$INTERACTIVE_BEFORE after=$INTERACTIVE_AFTER"
 if [ "${INTERACTIVE_BEFORE:-0}" -lt 1 ]; then echo "FAIL: interactive panel never appeared"; FAIL=1; fi
 if [ "${INTERACTIVE_AFTER:-0}" -gt 0 ]; then echo "FAIL: interactive panel survived outside click"; FAIL=1; fi
-pkill -f "NotchHUD.app" 2>/dev/null
+pkill -f "Vibenotch.app" 2>/dev/null
 [ "$FAIL" -eq 0 ] && echo "WINDOW SAFETY EVAL: PASS" || { echo "WINDOW SAFETY EVAL: FAIL"; exit 1; }

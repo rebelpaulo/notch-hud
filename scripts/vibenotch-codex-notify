@@ -1,0 +1,97 @@
+#!/bin/sh
+
+payload=
+for argument do
+    payload=$argument
+done
+
+script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
+notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
+emitter=$script_dir/vibenotch-emit
+if [ ! -x "$emitter" ]; then
+    emitter=$notch_home/bin/vibenotch-emit
+fi
+
+payload_type=
+if command -v jq >/dev/null 2>&1; then
+    payload_type=$(printf '%s' "$payload" | jq -r '
+        if type == "object" and (.type | type) == "string" then .type else empty end
+    ' 2>/dev/null)
+fi
+
+status=
+case $payload_type in
+    agent-turn-complete)
+        status=done
+        ;;
+    *[Aa][Pp][Pp][Rr][Oo][Vv][Aa][Ll]*)
+        status=needs_me
+        ;;
+esac
+
+if [ -n "$status" ] && [ -x "$emitter" ]; then
+    payload_client=$(printf '%s' "$payload" | jq -r '.client // empty' 2>/dev/null)
+    payload_id=$(printf '%s' "$payload" | jq -r '
+        [
+            .["thread-id"], .thread_id, (try .thread.id),
+            .["conversation-id"], .conversation_id, (try .conversation.id)
+        ]
+        | map(select(type == "string" or type == "number"))
+        | first
+        // empty
+        | tostring
+    ' 2>/dev/null)
+
+    if [ -n "${NOTCH_CODEX_SESSION_ID:-}" ] || [ "$payload_client" != "Codex Desktop" ]; then
+        # Shim/CLI path. Update-only: notify never CREATES these sessions.
+        # The shim owns the lifecycle; codex fires notify asynchronously, so a
+        # late turn-complete arriving after the shim's exit --remove would
+        # otherwise resurrect the entry as a ghost (and shim-less codex runs
+        # would spawn done-only ghosts).
+        session_id=${NOTCH_CODEX_SESSION_ID:-}
+        if [ -z "$session_id" ]; then
+            if [ -n "$payload_id" ]; then
+                session_id=codex-$payload_id
+            else
+                session_id=codex-$PPID
+            fi
+        fi
+        if [ -f "$notch_home/sessions/$session_id.json" ]; then
+            "$emitter" "$session_id" codex "$status" --source codex >/dev/null 2>&1 || :
+        fi
+    elif [ -n "$payload_id" ]; then
+        # Codex Desktop app turn: creation allowed — the entry is backed by a
+        # real app session (same codex-app-<uuid8> keying as the rollout
+        # poller), and StalenessSweeper drops it 15min after the last turn.
+        session_id=codex-app-$(printf '%s' "$payload_id" | cut -c 1-8)
+        payload_cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
+        set -- --source codex-desktop
+        if [ -n "$payload_cwd" ]; then
+            set -- "$@" --cwd "$payload_cwd" --project "$(basename "$payload_cwd")"
+        fi
+        "$emitter" "$session_id" codex "$status" "$@" >/dev/null 2>&1 || :
+    fi
+fi
+
+chain_file=$notch_home/codex-notify-chain.json
+if [ -f "$chain_file" ] && command -v jq >/dev/null 2>&1; then
+    chain_arguments=$(jq -r '
+        if type == "array"
+           and length > 0
+           and all(.[]; type == "string")
+        then @sh
+        else empty
+        end
+    ' "$chain_file" 2>/dev/null)
+    if [ -n "$chain_arguments" ]; then
+        # jq @sh supplies the quoting needed to restore each JSON array element.
+        # shellcheck disable=SC2294
+        eval "set -- $chain_arguments"
+        if [ -n "$payload" ]; then
+            set -- "$@" "$payload"
+        fi
+        "$@" || :
+    fi
+fi
+
+exit 0

@@ -1,20 +1,20 @@
 #!/bin/sh
 
-# Additively merges NotchHUD's five Claude Code hooks into settings.json.
+# Additively merges Vibenotch's five Claude Code hooks into settings.json.
 # Never touches unrelated keys or unrelated hook entries (e.g. an existing
 # `rtk hook claude` PreToolUse matcher). Idempotent: re-running detects our
-# entries by the notch-claude-hook path and skips. `--uninstall` reverses
+# entries by the vibenotch-claude-hook path and skips. `--uninstall` reverses
 # it by removing only entries whose command contains that path.
 #
 # Env overrides (used by tests so they never touch the real files):
-#   NOTCH_HUD_INSTALL_PREFIX      default $HOME/.notch-hud
-#   NOTCH_INSTALL_CLAUDE_SETTINGS default $HOME/.claude/settings.json
+#   VIBENOTCH_INSTALL_PREFIX      default $HOME/.vibenotch
+#   VIBENOTCH_INSTALL_CLAUDE_SETTINGS default $HOME/.claude/settings.json
 
 set -eu
 
-install_prefix=${NOTCH_HUD_INSTALL_PREFIX:-"$HOME/.notch-hud"}
-settings_path=${NOTCH_INSTALL_CLAUDE_SETTINGS:-"$HOME/.claude/settings.json"}
-hook_path=$install_prefix/bin/notch-claude-hook
+install_prefix=${VIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
+settings_path=${VIBENOTCH_INSTALL_CLAUDE_SETTINGS:-"$HOME/.claude/settings.json"}
+hook_path=$install_prefix/bin/vibenotch-claude-hook
 timestamp=$(date -u +%Y%m%d%H%M%S)
 
 mode=install
@@ -22,13 +22,13 @@ case ${1:-} in
     --uninstall) mode=uninstall ;;
     "") ;;
     *)
-        printf '%s\n' "notch-hud: opção desconhecida para install-claude-hooks.sh: $1" >&2
+        printf '%s\n' "vibenotch: unknown option for install-claude-hooks.sh: $1" >&2
         exit 64
         ;;
 esac
 
 command -v python3 >/dev/null 2>&1 || {
-    printf '%s\n' "notch-hud: 'python3' em falta; não é possível atualizar $settings_path" >&2
+    printf '%s\n' "vibenotch: 'python3' is missing; cannot update $settings_path" >&2
     exit 1
 }
 
@@ -53,10 +53,10 @@ if raw.strip():
     try:
         data = json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"notch-hud: {path} não é JSON válido ({exc}); não foi tocado", file=sys.stderr)
+        print(f"vibenotch: {path} is not valid JSON ({exc}); left untouched", file=sys.stderr)
         sys.exit(1)
     if not isinstance(data, dict):
-        print(f"notch-hud: {path} não contém um objeto JSON; não foi tocado", file=sys.stderr)
+        print(f"vibenotch: {path} does not contain a JSON object; left untouched", file=sys.stderr)
         sys.exit(1)
 else:
     data = {}
@@ -65,7 +65,7 @@ hooks = data.get("hooks")
 if hooks is None:
     hooks = {}
 elif not isinstance(hooks, dict):
-    print(f"notch-hud: {path} tem uma chave \"hooks\" que não é um objeto; não foi tocado", file=sys.stderr)
+    print(f"vibenotch: {path} has a \"hooks\" key that is not an object; left untouched", file=sys.stderr)
     sys.exit(1)
 data["hooks"] = hooks
 
@@ -78,16 +78,60 @@ OUR_EVENTS = [
 ]
 
 
-def has_our_hook(entry):
+# Historical literal: the pre-rename hook path. Upgrading users still have
+# these five entries pointing at ~/.notch-hud, which writes to a spool the app
+# no longer reads — so every session would be recorded twice, once into a
+# directory nobody watches. Must NOT be swept along by a future rename.
+LEGACY_HOOK_PATH = "/.notch-hud/bin/notch-claude-hook"
+
+
+def hook_commands(entry):
     if not isinstance(entry, dict):
-        return False
-    for h in entry.get("hooks", []):
-        if isinstance(h, dict) and hook_path in str(h.get("command", "")):
-            return True
-    return False
+        return []
+    return [str(h.get("command", "")) for h in entry.get("hooks", []) if isinstance(h, dict)]
+
+
+def has_our_hook(entry):
+    return any(hook_path in command for command in hook_commands(entry))
+
+
+def is_legacy_hook(entry):
+    return any(LEGACY_HOOK_PATH in command for command in hook_commands(entry))
+
+
+def drop_legacy():
+    """Strip the legacy command, keeping anything sharing the same entry.
+
+    An entry's "hooks" array can hold several commands. Dropping the whole
+    entry because one of them is ours would silently delete the others.
+    """
+    for event in list(hooks.keys()):
+        entries = hooks.get(event)
+        if not isinstance(entries, list):
+            continue
+        remaining = []
+        for entry in entries:
+            if not is_legacy_hook(entry):
+                remaining.append(entry)
+                continue
+            kept = [
+                h for h in entry.get("hooks", [])
+                if not (isinstance(h, dict) and LEGACY_HOOK_PATH in str(h.get("command", "")))
+            ]
+            if kept:
+                remaining.append({**entry, "hooks": kept})
+        if len(remaining) == len(entries) and all(
+            a is b for a, b in zip(remaining, entries)
+        ):
+            continue
+        if remaining:
+            hooks[event] = remaining
+        else:
+            del hooks[event]
 
 
 def install():
+    drop_legacy()
     for event, matcher, verb in OUR_EVENTS:
         entries = hooks.get(event)
         if not isinstance(entries, list):
@@ -103,6 +147,7 @@ def install():
 
 
 def uninstall():
+    drop_legacy()
     for event in list(hooks.keys()):
         entries = hooks.get(event)
         if not isinstance(entries, list):
@@ -132,9 +177,9 @@ PY
 
 if [ "$after" = "$before" ]; then
     if [ "$mode" = uninstall ]; then
-        printf '%s\n' "Hooks do Claude Code: skipped (nada para remover)"
+        printf '%s\n' "Claude Code hooks: skipped (nothing to remove)"
     else
-        printf '%s\n' "Hooks do Claude Code: skipped (já instalados)"
+        printf '%s\n' "Claude Code hooks: skipped (already installed)"
     fi
     exit 0
 fi
@@ -147,7 +192,7 @@ printf '%s\n' "$after" > "$temp_file" || exit 1
 mv "$temp_file" "$settings_path" || exit 1
 
 if [ "$mode" = uninstall ]; then
-    printf '%s\n' "Hooks do Claude Code: changed (removidos; cópia de segurança em $settings_path.bak.$timestamp)"
+    printf '%s\n' "Claude Code hooks: changed (removed; backup at $settings_path.bak.$timestamp)"
 else
-    printf '%s\n' "Hooks do Claude Code: changed (cópia de segurança em $settings_path.bak.$timestamp)"
+    printf '%s\n' "Claude Code hooks: changed (backup at $settings_path.bak.$timestamp)"
 fi

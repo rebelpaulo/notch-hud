@@ -1,0 +1,20 @@
+#!/bin/sh
+
+script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd) || exit 1
+sleepguard=$script_dir/vibenotch-sleepguard
+
+if ! "$sleepguard" status >/dev/null 2>&1; then
+    exit 0
+fi
+
+if [ -n "${VIBENOTCH_SLEEPGUARD_PGREP:-}" ]; then
+    "$VIBENOTCH_SLEEPGUARD_PGREP" -f 'Vibenotch.app/Contents/MacOS/Vibenotch' >/dev/null 2>&1
+else
+    /usr/bin/pgrep -f 'Vibenotch.app/Contents/MacOS/Vibenotch' >/dev/null 2>&1
+fi
+
+if [ "$?" -eq 0 ]; then
+    exit 0
+fi
+
+exec "$sleepguard" off

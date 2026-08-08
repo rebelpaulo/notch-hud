@@ -1,9 +1,9 @@
 #!/bin/sh
 
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
-install_prefix=${NOTCH_HUD_INSTALL_PREFIX:-"$HOME/.notch-hud"}
+install_prefix=${VIBENOTCH_INSTALL_PREFIX:-"$HOME/.vibenotch"}
 install_bin=$install_prefix/bin
-codex_config=${NOTCH_HUD_CODEX_CONFIG:-"$HOME/.codex/config.toml"}
+codex_config=${VIBENOTCH_CODEX_CONFIG:-"$HOME/.codex/config.toml"}
 zshrc=$HOME/.zshrc
 timestamp=$(date -u +%Y%m%d%H%M%S)
 
@@ -24,10 +24,10 @@ install_file() {
     return 0
 }
 
-if install_file "$script_dir/notch-emit" "$install_bin/notch-emit"; then
+if install_file "$script_dir/vibenotch-emit" "$install_bin/vibenotch-emit"; then
     bin_summary=changed
 fi
-if install_file "$script_dir/notch-codex-notify" "$install_bin/notch-codex-notify"; then
+if install_file "$script_dir/vibenotch-codex-notify" "$install_bin/vibenotch-codex-notify"; then
     bin_summary=changed
 fi
 if install_file "$script_dir/codex-shim" "$install_bin/codex"; then
@@ -40,7 +40,7 @@ mkdir -p "$config_dir" || exit 1
 
 notify_line=$(sed -n '/^[[:space:]]*notify[[:space:]]*=/p' "$codex_config" | sed -n '1p')
 notify_value=$(printf '%s\n' "$notify_line" | sed 's/^[[:space:]]*notify[[:space:]]*=[[:space:]]*//')
-notify_target=$install_bin/notch-codex-notify
+notify_target=$install_bin/vibenotch-codex-notify
 
 already_installed=0
 if [ -n "$notify_value" ] && printf '%s\n' "$notify_value" | \
@@ -58,12 +58,23 @@ if [ "$already_installed" -eq 0 ]; then
             jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
                 >/dev/null 2>&1
         then
-            printf '%s\n' "$notify_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+            # An upgrade finds notify pointing at OUR pre-rename notifier.
+            # Chaining that would keep the obsolete wrapper running forever,
+            # writing into a spool the app no longer reads — so drop it
+            # instead of adopting it as somebody else's notifier.
+            # Historical literal: must survive future renames.
+            chain_value=$(printf '%s\n' "$notify_value" | \
+                jq -c 'map(select(test("/\\.notch-hud/bin/notch-codex-notify$") | not))') || exit 1
+            if [ "$chain_value" = "[]" ]; then
+                rm -f "$install_prefix/codex-notify-chain.json" || exit 1
+            else
+                printf '%s\n' "$chain_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+            fi
         else
             # Refuse loudly rather than silently dropping an existing notify
             # command we cannot parse (single-quoted TOML, trailing comment,
             # multiline array...).
-            printf '%s\n' "notch-hud: existing notify has an unsupported format; not touching $codex_config" >&2
+            printf '%s\n' "vibenotch: existing notify has an unsupported format; not touching $codex_config" >&2
             printf '%s\n' "  value: $notify_value" >&2
             rm -f "$codex_config.bak.$timestamp"
             exit 1
@@ -97,7 +108,7 @@ if [ "$already_installed" -eq 0 ]; then
     config_summary=changed
 fi
 
-marker='# notch-hud codex shim'
+marker='# vibenotch codex shim'
 if [ -f "$zshrc" ] && grep -F "$marker" "$zshrc" >/dev/null 2>&1; then
     :
 elif [ -f "$zshrc" ] && grep -F "$install_bin" "$zshrc" >/dev/null 2>&1; then
