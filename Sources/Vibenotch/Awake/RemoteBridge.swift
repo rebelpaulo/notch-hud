@@ -217,6 +217,42 @@ final class RemoteBridge {
         let isOnACPower: Bool
     }
 
+    /// The last snapshot published, so an unchanged session list is not
+    /// rewritten every tick. Elapsed time is derived on the phone from
+    /// `started`, so a ticking clock is not itself a change.
+    private var lastPublishedSessions: [PublishedSession]?
+
+    /// What leaves the machine. Deliberately narrow: no prompt, no tool line,
+    /// no path — those are the sensitive part of what the notch shows, and the
+    /// phone only needs to answer "which one needs me?".
+    private struct PublishedSession: Equatable, Encodable {
+        let id: String
+        let project: String
+        let agent: String
+        let status: String
+        let startedAt: String
+        let subagents: Int
+
+        enum CodingKeys: String, CodingKey {
+            case id, project, agent, status, subagents
+            case startedAt = "started_at"
+        }
+
+        init(_ session: Session, formatter: ISO8601DateFormatter) {
+            id = session.id
+            project = session.project
+            agent = session.agent
+            status = switch session.displayStatus {
+            case .working: "working"
+            case .needsMe: "needs_me"
+            case .done: "done"
+            case .idle: "idle"
+            }
+            startedAt = formatter.string(from: session.startedAt ?? session.updatedAt)
+            subagents = session.subagents
+        }
+    }
+
     // nil until the first successful reconcile; then the on/off value both
     // sides last agreed on, so a local toggle can be told apart from a stale
     // remote flag.
@@ -309,6 +345,7 @@ final class RemoteBridge {
         }
         await reconcileSettings(remote)
         await publishBatteryIfChanged()
+        await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
     }
 
     private func reconcileDesiredState(_ desired: Bool) async {
@@ -375,6 +412,36 @@ final class RemoteBridge {
         }
     }
 
+    /// Publishes the session list so the phone can show which agent needs you,
+    /// not merely that one does. On change only — the list is stable for
+    /// minutes at a time and /api/state is a write.
+    private func publishSessionsIfChanged(remoteCount: Int) async {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        // Capped to match the server's own limit, so the two agree on what a
+        // full snapshot is rather than the server silently truncating.
+        let snapshot = sessionStore.sessions.prefix(20).map {
+            PublishedSession($0, formatter: formatter)
+        }
+        guard Array(snapshot) != lastPublishedSessions else { return }
+
+        // Nothing to say when both sides are already empty — but an empty list
+        // over a non-empty remote IS worth a write, or a phone keeps showing
+        // sessions that ended before the Mac last restarted.
+        if snapshot.isEmpty, remoteCount == 0 {
+            lastPublishedSessions = []
+            return
+        }
+
+        guard let payload = try? JSONEncoder().encode(["sessions": Array(snapshot)]),
+              let body = String(data: payload, encoding: .utf8)
+        else { return }
+
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedSessions = Array(snapshot)
+        }
+    }
+
     private func push(title: String, body: String, tag: String? = nil) async {
         var arguments = [title, body]
         if let tag {
@@ -405,6 +472,7 @@ final class RemoteBridge {
         // newly paired phone shows no charge until the percentage happens to
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
+        lastPublishedSessions = nil
         lastSyncedActive = nil
     }
 
@@ -522,14 +590,20 @@ private struct RemoteSettingsPayload: Decodable {
     var reminderHours: Double?
 }
 
+/// Field-less on purpose: only the count is needed, to tell "the remote still
+/// lists sessions that have ended" from "both sides are already empty".
+private struct RemoteSessionCount: Decodable {}
+
 private struct RemoteStateWithSettings: Decodable {
     let keepAwakeEnabled: Bool?
     let settings: RemoteSettingsPayload?
+    let sessions: [RemoteSessionCount]?
     let settingsRev: Int?
 
     enum CodingKeys: String, CodingKey {
         case keepAwakeEnabled = "keep_awake_enabled"
         case settings
+        case sessions
         case settingsRev = "settings_rev"
     }
 }

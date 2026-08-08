@@ -156,11 +156,48 @@ import Testing
     // No battery/needs-me *notifications* while off, but state and settings
     // reconcile so the phone can both configure and start the next session —
     // and the charge is published so the phone can show it.
+    // Two writes, each saying one thing: the charge, and the session list.
     let calls = await fixture.runner.recordedCalls()
-    #expect(calls == [["--state"], ["--state-put"]])
-    let body = try #require(await fixture.runner.lastStatePutBody())
-    #expect(body.contains("\"percent\":10"))
-    #expect(body.contains("\"on_ac\":false"))
+    #expect(calls == [["--state"], ["--state-put"], ["--state-put"]])
+    let bodies = await fixture.runner.statePutBodies()
+    let battery = try #require(bodies.first { $0.contains("battery") })
+    #expect(battery.contains("\"percent\":10"))
+    #expect(battery.contains("\"on_ac\":false"))
+}
+
+@MainActor
+@Test func remoteBridgePublishesOnlyTheNarrowSessionFields() async throws {
+    // The privacy contract, pinned: the phone gets enough to answer "which one
+    // needs me?" and nothing that reveals what is being written or where. A
+    // future field added to Session must not silently ride along.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    fixture.store.sessions = [
+        remoteSession(id: "s1", project: "vibenotch", status: .working)
+    ]
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.statePutBodies().first { $0.contains("sessions") })
+    let sessions = try #require(
+        JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: [[String: Any]]]
+    )["sessions"]
+    let fields = Set(try #require(sessions?.first).keys)
+    #expect(fields == ["id", "project", "agent", "status", "started_at", "subagents"])
+}
+
+@MainActor
+@Test func remoteBridgeDoesNotRepublishAnUnchangedSessionList() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    fixture.store.sessions = [
+        remoteSession(id: "s1", project: "vibenotch", status: .working)
+    ]
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.statePutBodies().filter { $0.contains("sessions") }.count == 1)
 }
 
 @MainActor
@@ -488,6 +525,14 @@ private actor FakeRemoteCommandRunner: CommandRunning {
     func lastStatePutBody() -> String? {
         guard let index = calls.lastIndex(of: ["--state-put"]) else { return nil }
         return stdins[index]
+    }
+
+    /// Every `--state-put` body, so a test can name the write it means rather
+    /// than assume which one happened to be last.
+    func statePutBodies() -> [String] {
+        zip(calls, stdins)
+            .filter { $0.0 == ["--state-put"] }
+            .compactMap { $0.1 }
     }
 }
 

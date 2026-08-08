@@ -10,6 +10,7 @@ struct SessionEnvelope: Codable, Sendable {
     let task: String?
     let prompt: String?
     let toolLine: String?
+    let subagents: Int?
     let model: String?
     let updated: String
     let started: String?
@@ -29,6 +30,7 @@ struct SessionEnvelope: Codable, Sendable {
         case task
         case prompt
         case toolLine
+        case subagents
         case model
         case updated
         case started
@@ -49,6 +51,7 @@ struct SessionEnvelope: Codable, Sendable {
         task: String? = nil,
         prompt: String? = nil,
         toolLine: String? = nil,
+        subagents: Int? = nil,
         model: String? = nil,
         updated: String,
         started: String? = nil,
@@ -67,6 +70,7 @@ struct SessionEnvelope: Codable, Sendable {
         self.task = task
         self.prompt = prompt
         self.toolLine = toolLine
+        self.subagents = subagents
         self.model = model
         self.updated = updated
         self.started = started
@@ -88,6 +92,7 @@ struct SessionEnvelope: Codable, Sendable {
         task = try container.decodeIfPresent(String.self, forKey: .task)
         prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
         toolLine = try container.decodeIfPresent(String.self, forKey: .toolLine)
+        subagents = try container.decodeIfPresent(Int.self, forKey: .subagents)
         model = try container.decodeIfPresent(String.self, forKey: .model)
         updated = try container.decode(String.self, forKey: .updated)
         started = try container.decodeIfPresent(String.self, forKey: .started)
