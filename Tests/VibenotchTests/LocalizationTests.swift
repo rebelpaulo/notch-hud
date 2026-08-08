@@ -46,28 +46,56 @@ import Testing
     #expect(untranslated.sorted() == [])
 }
 
+/// Portuguese vocabulary this app actually uses. A heuristic, deliberately:
+/// a false positive costs an identifier rename, a miss ships untranslated UI
+/// to every English user.
+private let portugueseWords = [
+    "trabalhar", "subagente", "concluíd", "desligad", "ligad", "está", "não",
+    "ficheiro", "pasta", "sessão", "sessões", "bateria", "tampa", "ecrã",
+    "definiç", "aprovaç", "precisa", "enquanto", "agentes", "utilizador",
+    "acordado", "dormir", "terminou", "guardar", "alterar", "telemóvel",
+]
+
+private func looksPortuguese(_ line: some StringProtocol) -> Bool {
+    let accented = CharacterSet(charactersIn: "ãõçáéíóúâêôàÃÕÇÁÉÍÓÚÂÊÔÀ")
+    if line.rangeOfCharacter(from: accented) != nil { return true }
+    let lowered = line.lowercased()
+    return portugueseWords.contains { lowered.contains($0) }
+}
+
 @Test func noPortugueseIsHardcodedOutsideTheStringsTable() throws {
-    // The completeness scan above only sees strings that go through t(), so it
-    // was blind to a literal that skipped it entirely — which is exactly how
-    // "1 subagente a trabalhar" shipped inside an English-source file.
+    // The completeness scan only sees strings that reach t(), so it was blind
+    // to a literal that skipped t() entirely — which is how "1 subagente a
+    // trabalhar" shipped inside an English-source file.
     let sources = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .deletingLastPathComponent()
         .appendingPathComponent("Sources/Vibenotch")
-    let portugueseOnly = CharacterSet(charactersIn: "ãõçáéíóúâêôàÃÕÇÁÉÍÓÚÂÊÔÀ")
     var offenders: [String] = []
 
-    let files = FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
-    for case let url as URL in files! where url.pathExtension == "swift" {
+    let files = try #require(
+        FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil)
+    )
+    for case let url as URL in files where url.pathExtension == "swift" {
         let text = try String(contentsOf: url, encoding: .utf8)
         for (number, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-        where line.rangeOfCharacter(from: portugueseOnly) != nil {
+        where looksPortuguese(line) {
             offenders.append("\(url.lastPathComponent):\(number + 1) \(line.trimmingCharacters(in: .whitespaces))")
         }
     }
 
     #expect(offenders == [])
+}
+
+@Test func theGuardCatchesTheLineThatCausedIt() {
+    // Accented characters alone do NOT match this phrase — every letter in it
+    // is ASCII, which is exactly why the first version of this guard would
+    // have let its own regression through. Pin the detector to the real line.
+    #expect(looksPortuguese(#"            ? "1 subagente a trabalhar""#))
+    #expect(looksPortuguese(#"        return "\(count) subagentes a trabalhar""#))
+    // And does not fire on the English that replaced it.
+    #expect(!looksPortuguese(#"            ? t("1 subagent working")"#))
 }
 
 private func portugueseBundle() throws -> Bundle {
