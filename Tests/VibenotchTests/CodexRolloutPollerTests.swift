@@ -303,6 +303,39 @@ import Testing
 }
 
 @MainActor
+@Test func upgradeBackfillsTheSubagentCountOnAnOtherwiseUnchangedEntry() throws {
+    // An entry written by a build that had no `subagents` field, still active.
+    // status, updated and toolLine all match, so the no-op check used to
+    // return before the new field was ever written — and Session decoded the
+    // missing value as 0, publishing a wrong count until the rollout changed.
+    let fixture = try RolloutFixture()
+    defer { fixture.remove() }
+    let parentURL = try fixture.writeRollout(originator: "Codex Desktop")
+    let subagentURL = try fixture.writeSubagentRollout(parentID: fixture.parentID, name: "researcher")
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-30), for: parentURL)
+    try fixture.setModificationDate(fixture.now.addingTimeInterval(-5), for: subagentURL)
+
+    fixture.poller.poll(now: fixture.now)
+    let written = try #require(
+        try JSONSerialization.jsonObject(with: Data(contentsOf: fixture.spoolFileURL)) as? [String: Any]
+    )
+    #expect(written["subagents"] as? Int == 1)
+
+    // Strip the field, exactly as the previous version would have left it.
+    var downgraded = written
+    downgraded.removeValue(forKey: "subagents")
+    try JSONSerialization.data(withJSONObject: downgraded, options: [.sortedKeys])
+        .write(to: fixture.spoolFileURL)
+
+    fixture.poller.poll(now: fixture.now)
+
+    let upgraded = try #require(
+        try JSONSerialization.jsonObject(with: Data(contentsOf: fixture.spoolFileURL)) as? [String: Any]
+    )
+    #expect(upgraded["subagents"] as? Int == 1)
+}
+
+@MainActor
 private final class RolloutFixture {
     let fileManager = FileManager.default
     let rootURL: URL
