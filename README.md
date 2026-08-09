@@ -170,7 +170,10 @@ the session's own identifier — the key is generated once on your machine and
 never published, so nobody holding the digest can work back to the id. Never
 your prompts, the tool lines, or the paths you work in.
 
-<img src="docs/images/phone.png" alt="Vibenotch Remote on a phone" width="320">
+<p>
+  <img src="docs/images/phone.png" alt="Vibenotch Remote: state, both buttons, live and past sessions" width="300">
+  <img src="docs/images/phone-settings.png" alt="Settings, split between this phone and the Mac" width="300">
+</p>
 
 It's your own deployment (Vercel + Supabase + a shared secret you choose), not
 a service anyone else runs.
