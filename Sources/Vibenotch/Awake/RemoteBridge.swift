@@ -751,33 +751,64 @@ final class RemoteBridge {
             return
         }
 
-        let counts = sessionStore.sessions.reduce(into: (working: 0, needsMe: 0)) { totals, session in
-            switch session.displayStatus {
-            case .working: totals.working += 1
-            case .needsMe: totals.needsMe += 1
-            default: break
-            }
-        }
-        var parts = [engine.isActive ? t("Gotta go! on") : t("Gotta go! off")]
-        if counts.working > 0 { parts.append(t("%d working", counts.working)) }
-        if counts.needsMe > 0 { parts.append(t("%d need you", counts.needsMe)) }
-        let power = powerSourceProvider.snapshot()
-        if let percent = power.percent {
-            parts.append(power.isOnACPower ? t("%d%% charging", percent) : t("%d%%", percent))
+        let sessions = sessionStore.sessions
+        let working = sessions.filter { $0.displayStatus == .working }.count
+        let needsMe = sessions.filter { $0.displayStatus == .needsMe }.count
+
+        // The headline is whatever would make you pick the phone up: someone
+        // waiting on you beats work in progress, which beats nothing running.
+        let title: String
+        if needsMe > 0 {
+            title = t("%d need you", needsMe)
+        } else if working > 0 {
+            title = t("%d working", working)
+        } else {
+            title = t("No agents running")
         }
 
-        let line = parts.joined(separator: " · ")
-        guard line != lastStatusLine else { return }
+        // One line per session, like the notch itself, then the Mac's own
+        // state last — it is the least surprising thing on the list.
+        var lines = sessions.prefix(Self.statusStripSessionLines).map {
+            "\($0.project) · \(Self.statusWord($0.displayStatus))"
+        }
+        if sessions.count > Self.statusStripSessionLines {
+            lines.append(t("+%d more", sessions.count - Self.statusStripSessionLines))
+        }
+
+        var macState = [engine.isActive ? t("Gotta go! on") : t("Gotta go! off")]
+        let power = powerSourceProvider.snapshot()
+        if let percent = power.percent {
+            macState.append(power.isOnACPower ? t("%d%% charging", percent) : t("%d%%", percent))
+        }
+        lines.append(macState.joined(separator: " · "))
+
+        let body = lines.joined(separator: "\n")
+        // Compared as one value: the strip should move when anything shown on
+        // it moves, and not otherwise.
+        let rendered = title + "\n" + body
+        guard rendered != lastStatusLine else { return }
 
         // A tag of its own: replacing itself is the point, and it must never
         // replace a real "needs you" alert.
         //
-        // Cached only on success. Recording the line before knowing the push
-        // landed means one transient failure suppresses every retry — and on
-        // a Mac sitting at 100% on AC with nothing running, the line may not
-        // change again for hours, so the strip would simply never appear.
-        if await run(["Vibenotch", line, "status", "--silent"]).exitCode == 0 {
-            lastStatusLine = line
+        // Cached only on success. Recording it before knowing the push landed
+        // means one transient failure suppresses every retry — and on a Mac at
+        // 100% on AC with nothing running, the line may not change again for
+        // hours, so the strip would simply never appear.
+        if await run([title, body, "status", "--silent"]).exitCode == 0 {
+            lastStatusLine = rendered
+        }
+    }
+
+    /// Enough lines to be useful, few enough that the shade stays readable.
+    private static let statusStripSessionLines = 3
+
+    private static func statusWord(_ status: DisplayStatus) -> String {
+        switch status {
+        case .working: t("working")
+        case .needsMe: t("needs you")
+        case .done: t("done")
+        case .idle: t("idle")
         }
     }
 
