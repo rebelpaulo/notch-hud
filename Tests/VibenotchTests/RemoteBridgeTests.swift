@@ -247,6 +247,43 @@ import Testing
 }
 
 @MainActor
+@Test func statusStripIsOptInAndOnlySentWhenTheLineChanges() async throws {
+    // A strip that re-sent on every tick would cost battery and train the user
+    // to turn the app's notifications off, taking the real alerts with them.
+    let off = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: false)
+    defer { off.remove() }
+    off.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .working)]
+    await off.bridge.checkNow(pollRemoteState: true)
+    #expect(await off.runner.recordedCalls().contains { $0.contains("status") } == false)
+
+    let on = try RemoteBridgeFixture(
+        mode: .manual,
+        percent: 80,
+        onAC: false,
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"status_notification":true}"#
+    )
+    defer { on.remove() }
+    on.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .working)]
+
+    await on.bridge.checkNow(pollRemoteState: true)
+    let first = await on.runner.recordedCalls().filter { $0.contains("status") }
+    #expect(first.count == 1)
+    let line = try #require(first.first)[1]
+    #expect(line.contains("1 working"))
+    #expect(line.contains("80%"))
+    #expect(try #require(first.first).contains("--silent"))
+
+    // Nothing changed: no second push.
+    await on.bridge.checkNow(pollRemoteState: true)
+    #expect(await on.runner.recordedCalls().filter { $0.contains("status") }.count == 1)
+
+    // Something a human would notice did change.
+    on.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
+    await on.bridge.checkNow(pollRemoteState: true)
+    #expect(await on.runner.recordedCalls().filter { $0.contains("status") }.count == 2)
+}
+
+@MainActor
 @Test func remoteBridgePublishesSessionsBeforeAwaitingANotification() async throws {
     // The needs-me push allows ten seconds for its transfer. Awaiting it
     // before publishing would put the delay right back where this removed it.

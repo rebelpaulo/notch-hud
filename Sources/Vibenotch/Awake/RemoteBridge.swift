@@ -272,6 +272,11 @@ final class RemoteBridge {
     /// nobody asked for.
     private var cachedConversations: (at: Date, value: [ClaudeConversation])?
 
+    /// The status line last sent. Comparing the rendered text is the whole
+    /// rate limit: the strip only moves when something a human would notice
+    /// moves, so a percentage ticking down does not send a push per percent.
+    private var lastStatusLine: String?
+
     /// What the phone sees of a past conversation. The title is already on the
     /// user's phone in the Claude app, and the project name is already
     /// published for live sessions — the directory is not, and never is.
@@ -429,6 +434,7 @@ final class RemoteBridge {
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
         await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
+        await updateStatusStrip(enabled: remote.statusNotification == true)
         await runPendingCommand(remote.command)
     }
 
@@ -734,6 +740,40 @@ final class RemoteBridge {
         }
     }
 
+    /// A silent, always-replaced notification carrying the state at a glance.
+    ///
+    /// Opt-in, and sent only when the line itself changes — a strip that
+    /// re-sent on every tick would cost battery and train the user to turn the
+    /// app's notifications off, which would take the real alerts with them.
+    private func updateStatusStrip(enabled: Bool) async {
+        guard enabled else {
+            lastStatusLine = nil
+            return
+        }
+
+        let counts = sessionStore.sessions.reduce(into: (working: 0, needsMe: 0)) { totals, session in
+            switch session.displayStatus {
+            case .working: totals.working += 1
+            case .needsMe: totals.needsMe += 1
+            default: break
+            }
+        }
+        var parts = [engine.isActive ? t("Gotta go! on") : t("Gotta go! off")]
+        if counts.working > 0 { parts.append(t("%d working", counts.working)) }
+        if counts.needsMe > 0 { parts.append(t("%d need you", counts.needsMe)) }
+        let power = powerSourceProvider.snapshot()
+        if let percent = power.percent {
+            parts.append(power.isOnACPower ? t("%d%% charging", percent) : t("%d%%", percent))
+        }
+
+        let line = parts.joined(separator: " · ")
+        guard line != lastStatusLine else { return }
+        lastStatusLine = line
+        // A tag of its own: replacing itself is the point, and it must never
+        // replace a real "needs you" alert.
+        _ = await run(["Vibenotch", line, "status", "--silent"])
+    }
+
     private func push(title: String, body: String, tag: String? = nil) async {
         var arguments = [title, body]
         if let tag {
@@ -899,6 +939,7 @@ private struct RemoteStateWithSettings: Decodable {
     let sessions: [RemoteSessionCount]?
     let resumable: [RemoteSessionCount]?
     let remoteControl: Bool?
+    let statusNotification: Bool?
     let settingsRev: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -907,6 +948,7 @@ private struct RemoteStateWithSettings: Decodable {
         case sessions
         case resumable
         case remoteControl = "remote_control"
+        case statusNotification = "status_notification"
         // The column is `pending_command`, and GET returns it under that name.
         // Decoding "command" silently found nothing, so the Mac never saw a
         // request — and the unit test missed it because its fixture used the

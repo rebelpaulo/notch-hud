@@ -14,9 +14,29 @@ import Testing
     #expect(arguments.contains("Content-Type: application/json"))
     let payload = try #require(arguments.element(after: "--data"))
     let json = try #require(
-        JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: String]
+        JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]
     )
-    #expect(json == ["title": "Aviso", "body": "Corpo com espaços", "tag": "tag-1"])
+    #expect(json["title"] as? String == "Aviso")
+    #expect(json["body"] as? String == "Corpo com espaços")
+    #expect(json["tag"] as? String == "tag-1")
+    #expect(json["silent"] as? Bool == false)
+}
+
+@Test func remotePushMarksTheStatusStripSilent() throws {
+    // The strip replaces itself whenever anything on the Mac moves. Alerting
+    // on that would get the app's notifications turned off, taking the real
+    // ones with them.
+    let fixture = try RemotePushScriptFixture(configured: true)
+    defer { fixture.remove() }
+
+    #expect(try fixture.run("Vibenotch", "Gotta go! on · 2 working", "status", "--silent").status == 0)
+
+    let payload = try #require(try fixture.arguments().element(after: "--data"))
+    let json = try #require(
+        JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any]
+    )
+    #expect(json["silent"] as? Bool == true)
+    #expect(json["tag"] as? String == "status")
 }
 
 @Test func remotePushMissingPairingFileExitsZeroSilently() throws {
