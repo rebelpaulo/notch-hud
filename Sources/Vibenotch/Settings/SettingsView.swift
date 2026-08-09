@@ -16,7 +16,10 @@ struct SettingsView: View {
     @State private var remoteStatus = t("checking…")
     @State private var pushResult: RemoteActionResult?
     @State private var isSendingTestPush = false
-    @State private var scriptsAreOutOfDate = false
+    // Observed, not copied: the whole point of the warning is that you read
+    // it, run the installer, and it goes away — which it cannot do if it was
+    // snapshotted when the window opened.
+    @AppStorage(RemoteBridge.scriptMismatchKey) private var scriptsAreOutOfDate = false
 
     init(
         keepAwakeEngine: KeepAwakeEngine,
@@ -390,7 +393,6 @@ struct SettingsView: View {
     }
 
     private func refreshRemoteStatus() async {
-        scriptsAreOutOfDate = UserDefaults.standard.bool(forKey: RemoteBridge.scriptMismatchKey)
         remotePairing = RemotePairing.load(from: remoteConfigURL)
         guard remotePairing != nil else {
             remoteStatus = t("not configured")
