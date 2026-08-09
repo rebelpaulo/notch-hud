@@ -247,6 +247,23 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgePublishesSessionsBeforeAwaitingANotification() async throws {
+    // The needs-me push allows ten seconds for its transfer. Awaiting it
+    // before publishing would put the delay right back where this removed it.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
+
+    await fixture.bridge.checkNow()
+
+    let calls = await fixture.runner.recordedCalls()
+    let publish = try #require(calls.lastIndex(of: ["--state-put"]))
+    let notify = try #require(calls.lastIndex { $0.count == 3 && $0[2].hasPrefix("needs-me-") })
+    #expect(publish < notify)
+}
+
+@MainActor
 @Test func remoteBridgeDoesNotPublishSessionsBeforeItHasSeenTheRemote() async throws {
     // Without a reading of the remote there is nothing to compare an empty
     // list against, so the first word should come from a poll, not a guess.
