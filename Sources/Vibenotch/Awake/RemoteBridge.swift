@@ -463,7 +463,10 @@ final class RemoteBridge {
             await push(
                 title: "Vibenotch",
                 body: t("Gotta go! turned on remotely ✓"),
-                tag: "remote-on"
+                // One tag for both directions: they are the same fact, and
+                // separate tags meant an on and an off sat side by side in the
+                // shade saying opposite things.
+                tag: "remote-toggle"
             )
         } else {
             engine.setMode(.off, now: Date())
@@ -471,7 +474,7 @@ final class RemoteBridge {
             await push(
                 title: "Vibenotch",
                 body: t("Gotta go! turned off remotely ✓"),
-                tag: "remote-off"
+                tag: "remote-toggle"
             )
         }
     }

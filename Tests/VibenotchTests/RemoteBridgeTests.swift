@@ -81,7 +81,7 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(await fixture.runner.recordedCalls() == [
         ["--state"],
-        ["Vibenotch", "Gotta go! turned off remotely ✓", "remote-off"]
+        ["Vibenotch", "Gotta go! turned off remotely ✓", "remote-toggle"]
     ])
 }
 
@@ -99,7 +99,7 @@ import Testing
 
     #expect(fixture.engine.mode == fixture.engine.config.defaultMode)
     #expect(await fixture.runner.recordedCalls().contains(
-        ["Vibenotch", "Gotta go! turned on remotely ✓", "remote-on"]
+        ["Vibenotch", "Gotta go! turned on remotely ✓", "remote-toggle"]
     ))
 }
 
