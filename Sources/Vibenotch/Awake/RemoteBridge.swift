@@ -768,10 +768,17 @@ final class RemoteBridge {
 
         let line = parts.joined(separator: " · ")
         guard line != lastStatusLine else { return }
-        lastStatusLine = line
+
         // A tag of its own: replacing itself is the point, and it must never
         // replace a real "needs you" alert.
-        _ = await run(["Vibenotch", line, "status", "--silent"])
+        //
+        // Cached only on success. Recording the line before knowing the push
+        // landed means one transient failure suppresses every retry — and on
+        // a Mac sitting at 100% on AC with nothing running, the line may not
+        // change again for hours, so the strip would simply never appear.
+        if await run(["Vibenotch", line, "status", "--silent"]).exitCode == 0 {
+            lastStatusLine = line
+        }
     }
 
     private func push(title: String, body: String, tag: String? = nil) async {
@@ -806,6 +813,7 @@ final class RemoteBridge {
         lastPublishedBattery = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
+        lastStatusLine = nil
         lastSyncedActive = nil
     }
 
