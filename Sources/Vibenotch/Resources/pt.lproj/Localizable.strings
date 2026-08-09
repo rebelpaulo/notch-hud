@@ -88,6 +88,12 @@
 
 "No project to start remote control in — open one on the Mac first" = "Sem projeto onde arrancar o controlo remoto — abre um no Mac primeiro";
 
+"Gotta go! on" = "Gotta go! ligado";
+"Gotta go! off" = "Gotta go! desligado";
+"%d working" = "%d a trabalhar";
+"%d need you" = "%d precisam de ti";
+"%d%% charging" = "%d%% a carregar";
+
 /* Menu bar */
 "Pause approvals" = "Pausar aprovações";
 "Collapse panel" = "Recolher painel";

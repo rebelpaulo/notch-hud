@@ -45,6 +45,14 @@ case ${1:-} in
         exit 64
         ;;
     *)
+        # A 4th argument marks the push silent. Only the status strip uses it:
+        # it replaces itself whenever anything moves, and a buzz per change
+        # would get the app's notifications turned off entirely.
+        silent=false
+        if [ "$#" -eq 4 ] && [ "$4" = "--silent" ]; then
+            silent=true
+            set -- "$1" "$2" "$3"
+        fi
         [ "$#" -eq 2 ] || [ "$#" -eq 3 ] || {
             printf '%s\n' 'usage: vibenotch-remote-push <title> <body> [tag] | --state | --state-put | --settings-put' >&2
             exit 64
@@ -54,7 +62,8 @@ case ${1:-} in
                 --arg title "$1" \
                 --arg body "$2" \
                 --arg tag "$3" \
-                '{title:$title,body:$body,tag:$tag}') || exit $?
+                --argjson silent "$silent" \
+                '{title:$title,body:$body,tag:$tag,silent:$silent}') || exit $?
         else
             payload=$("$jq_bin" -cn \
                 --arg title "$1" \
