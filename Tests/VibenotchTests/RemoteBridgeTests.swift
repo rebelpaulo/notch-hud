@@ -268,10 +268,13 @@ import Testing
     await on.bridge.checkNow(pollRemoteState: true)
     let first = await on.runner.recordedCalls().filter { $0.contains("status") }
     #expect(first.count == 1)
-    let line = try #require(first.first)[1]
-    #expect(line.contains("1 working"))
-    #expect(line.contains("80%"))
-    #expect(try #require(first.first).contains("--silent"))
+    let call = try #require(first.first)
+    // Title carries the headline, body the detail — like the notification it
+    // is trying to look like.
+    #expect(call[0] == "1 working")
+    #expect(call[1].contains("vibenotch · working"))
+    #expect(call[1].contains("80%"))
+    #expect(call.contains("--silent"))
 
     // Nothing changed: no second push.
     await on.bridge.checkNow(pollRemoteState: true)
@@ -281,6 +284,37 @@ import Testing
     on.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
     await on.bridge.checkNow(pollRemoteState: true)
     #expect(await on.runner.recordedCalls().filter { $0.contains("status") }.count == 2)
+}
+
+@MainActor
+@Test func statusStripListsSessionsAndCapsTheList() async throws {
+    // The point of going multi-line is naming the projects. Capped so the
+    // shade stays readable rather than becoming a scrolling list.
+    let fixture = try RemoteBridgeFixture(
+        mode: .manual,
+        percent: 55,
+        onAC: true,
+        stateOutput: #"{"keep_awake_enabled":false,"settings":{},"settings_rev":0,"status_notification":true}"#
+    )
+    defer { fixture.remove() }
+    fixture.store.sessions = [
+        remoteSession(id: "s1", project: "alpha", status: .needs_me),
+        remoteSession(id: "s2", project: "beta", status: .working),
+        remoteSession(id: "s3", project: "gamma", status: .working),
+        remoteSession(id: "s4", project: "delta", status: .working),
+        remoteSession(id: "s5", project: "epsilon", status: .working),
+    ]
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let call = try #require(await fixture.runner.recordedCalls().first { $0.contains("status") })
+    // Someone waiting on you outranks work in progress in the headline.
+    #expect(call[0] == "1 need you")
+    let lines = call[1].split(separator: "\n").map(String.init)
+    #expect(lines.count == 5) // 3 sessions + "+2 more" + the Mac's own state
+    #expect(lines[0] == "alpha · needs you")
+    #expect(lines[3] == "+2 more")
+    #expect(lines[4].contains("55% charging"))
 }
 
 @MainActor
@@ -886,7 +920,9 @@ private actor FakeRemoteCommandRunner: CommandRunning {
         if arguments == ["--state-put"], statePutFails {
             return CommandRunResult(stdout: "", exitCode: 1)
         }
-        if pushesFail, arguments.first == "Vibenotch" {
+        // Identified by shape, not by title: the status strip's title is now
+        // computed, so matching on a literal silently stopped matching.
+        if pushesFail, arguments.count >= 3 {
             return CommandRunResult(stdout: "", exitCode: 1)
         }
         return CommandRunResult(

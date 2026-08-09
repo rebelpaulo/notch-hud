@@ -19,7 +19,12 @@ import Testing
 }
 
 @Test func everyLocalizedStringHasAPortugueseTranslation() throws {
-    let pt = try portugueseBundle()
+    // The table is read directly rather than asked through the bundle.
+    // localizedString(forKey:value:table:) returns the KEY when there is no
+    // translation and `value` is empty — so the previous check, which looked
+    // for an empty result, could never fail. It passed all session while
+    // testing nothing.
+    let table = try portugueseTable()
     let sources = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -37,7 +42,7 @@ import Testing
         for match in call.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
             guard let range = Range(match.range(at: 1), in: text) else { continue }
             let key = String(text[range])
-            if pt.localizedString(forKey: key, value: "", table: nil).isEmpty {
+            if table[key] == nil {
                 untranslated.append(key)
             }
         }
@@ -80,7 +85,10 @@ private func looksPortuguese(_ line: some StringProtocol) -> Bool {
     for case let url as URL in files where url.pathExtension == "swift" {
         let text = try String(contentsOf: url, encoding: .utf8)
         for (number, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-        where looksPortuguese(line) {
+        // Comment-only lines are prose, and prose is allowed to quote the
+        // wrong output it is explaining. A hardcoded string never lives on a
+        // line that starts with a comment marker, so nothing is lost.
+        where !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") && looksPortuguese(line) {
             offenders.append("\(url.lastPathComponent):\(number + 1) \(line.trimmingCharacters(in: .whitespaces))")
         }
     }
@@ -96,6 +104,17 @@ private func looksPortuguese(_ line: some StringProtocol) -> Bool {
     #expect(looksPortuguese(#"        return "\(count) subagentes a trabalhar""#))
     // And does not fire on the English that replaced it.
     #expect(!looksPortuguese(#"            ? t("1 subagent working")"#))
+}
+
+/// The pt table as a dictionary, so "is this key present" is answerable
+/// without going through an API that substitutes a fallback.
+private func portugueseTable() throws -> [String: String] {
+    let url = try #require(
+        Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "pt.lproj")
+    )
+    let contents = try Data(contentsOf: url)
+    let parsed = try PropertyListSerialization.propertyList(from: contents, format: nil)
+    return try #require(parsed as? [String: String])
 }
 
 private func portugueseBundle() throws -> Bundle {
