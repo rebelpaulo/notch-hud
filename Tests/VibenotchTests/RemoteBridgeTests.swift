@@ -227,6 +227,55 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgePublishesASessionChangeWithoutWaitingForTheNextPoll() async throws {
+    // The Mac knows the instant a session changes. Waiting for the ten-second
+    // tick to say so left the phone up to fifteen seconds behind, which reads
+    // as "it did not update" and gets answered with a manual refresh.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .working)]
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterPoll = await fixture.runner.statePutBodies().filter { $0.contains("sessions") }.count
+
+    // An observation tick: no poll, just the store changing.
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
+    await fixture.bridge.checkNow()
+
+    let bodies = await fixture.runner.statePutBodies().filter { $0.contains("sessions") }
+    #expect(bodies.count == afterPoll + 1)
+    #expect(try #require(bodies.last).contains("needs_me"))
+}
+
+@MainActor
+@Test func remoteBridgePublishesSessionsBeforeAwaitingANotification() async throws {
+    // The needs-me push allows ten seconds for its transfer. Awaiting it
+    // before publishing would put the delay right back where this removed it.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    fixture.store.sessions = [remoteSession(id: "s1", project: "vibenotch", status: .needs_me)]
+
+    await fixture.bridge.checkNow()
+
+    let calls = await fixture.runner.recordedCalls()
+    let publish = try #require(calls.lastIndex(of: ["--state-put"]))
+    let notify = try #require(calls.lastIndex { $0.count == 3 && $0[2].hasPrefix("needs-me-") })
+    #expect(publish < notify)
+}
+
+@MainActor
+@Test func remoteBridgeDoesNotPublishSessionsBeforeItHasSeenTheRemote() async throws {
+    // Without a reading of the remote there is nothing to compare an empty
+    // list against, so the first word should come from a poll, not a guess.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow()
+
+    #expect(await fixture.runner.recordedCalls().isEmpty)
+}
+
+@MainActor
 @Test func remoteBridgeDoesNotRepublishAnUnchangedSessionList() async throws {
     let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
     defer { fixture.remove() }

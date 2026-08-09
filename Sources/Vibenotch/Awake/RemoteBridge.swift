@@ -223,13 +223,26 @@ final class RemoteBridge {
             // active-only.)
             if pollRemoteState || toggledLocally {
                 await reconcileRemote()
+            } else {
+                // A session changing is known here the instant it happens.
+                // Waiting for the next ten-second tick to say so put the phone
+                // up to fifteen seconds behind the Mac, which reads as "it did
+                // not update" and gets answered with a manual refresh.
+                await publishSessionsIfChanged(remoteCount: nil)
             }
             return
         }
 
-        await evaluateNeedsMeSessions()
+        // Sessions FIRST. evaluateNeedsMeSessions() awaits a push, and that
+        // curl allows ten seconds for the transfer — so a slow notification
+        // endpoint would put the delay right back where this change removed
+        // it from.
         if pollRemoteState || toggledLocally {
             await reconcileRemote()
+            await evaluateNeedsMeSessions()
+        } else {
+            await publishSessionsIfChanged(remoteCount: nil)
+            await evaluateNeedsMeSessions()
         }
     }
 
@@ -486,7 +499,32 @@ final class RemoteBridge {
     /// Publishes the session list so the phone can show which agent needs you,
     /// not merely that one does. On change only — the list is stable for
     /// minutes at a time and /api/state is a write.
-    private func publishSessionsIfChanged(remoteCount: Int) async {
+    /// Serialises publishes. `observeChanges()` re-arms before an in-flight
+    /// POST returns, so two curls could otherwise carry an older and a newer
+    /// snapshot at once — and whichever the server wrote last would win,
+    /// which is not necessarily the newer one.
+    private var isPublishingSessions = false
+    private var sessionsChangedWhilePublishing = false
+
+    private func publishSessionsIfChanged(remoteCount: Int?) async {
+        guard !isPublishingSessions else {
+            sessionsChangedWhilePublishing = true
+            return
+        }
+        isPublishingSessions = true
+        defer { isPublishingSessions = false }
+
+        await publishSessionsNow(remoteCount: remoteCount)
+
+        // Anything that arrived while the write was in flight is published
+        // after it, in order, rather than racing it.
+        while sessionsChangedWhilePublishing {
+            sessionsChangedWhilePublishing = false
+            await publishSessionsNow(remoteCount: remoteCount)
+        }
+    }
+
+    private func publishSessionsNow(remoteCount: Int?) async {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         // Capped to match the server's own limit, so the two agree on what a
@@ -499,11 +537,16 @@ final class RemoteBridge {
 
         // Nothing to say when both sides are already empty — but an empty list
         // over a non-empty remote IS worth a write, or a phone keeps showing
-        // sessions that ended before the Mac last restarted.
-        if snapshot.isEmpty, remoteCount == 0 {
+        // sessions that ended before the Mac last restarted. Only relevant
+        // before the first publish; after that the comparison above decides.
+        if snapshot.isEmpty, lastPublishedSessions == nil, remoteCount == 0 {
             lastPublishedSessions = []
             return
         }
+
+        // Nothing published yet and no reading of the remote to compare
+        // against: leave it to the next poll rather than guess.
+        if lastPublishedSessions == nil, remoteCount == nil { return }
 
         guard let payload = try? JSONEncoder().encode(["sessions": Array(snapshot)]),
               let body = String(data: payload, encoding: .utf8)
