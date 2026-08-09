@@ -153,8 +153,16 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
 A request from the phone carries an opaque id and an action from a fixed list
 — never a path, a command or an argument. The Mac resolves that id against
 conversations it indexed and published itself and builds the command, so an id
-it never published is refused. The worst a leaked pairing secret buys is
-reopening a conversation that is already on that machine.
+it never published is refused. That bound applies to the resume command
+specifically: it cannot be steered into running something of the caller's
+choosing.
+
+**Treat the pairing secret as a credential to your Mac.** Anyone holding it can
+do everything the phone can: turn Gotta go! on or off, change the Mac-side
+settings, start or stop a Remote Control server, and read the session and
+conversation metadata listed below. It is a bearer token with no second factor,
+so keep it out of screenshots and shared notes, and change it (in Vercel and in
+`~/.vibenotch/remote.json`) if it ever leaks.
 
 What leaves your Mac is deliberately narrow: project name, agent, status,
 start time, subagent count, and a per-session id that is a keyed digest, not
