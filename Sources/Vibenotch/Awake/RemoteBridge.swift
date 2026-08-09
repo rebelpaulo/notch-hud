@@ -85,6 +85,9 @@ final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
     private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
     private static let sessionIDKeyKey = "remoteBridge.sessionIDKey"
+    /// Read by the Settings window, which runs the same script from a
+    /// different place and would otherwise have no way to know.
+    static let scriptMismatchKey = "remoteBridge.scriptMismatch"
     private static let pairedRemoteURLKey = "remoteBridge.pairedRemoteURL"
 
     private let engine: any RemoteKeepAwakeEngine
@@ -276,6 +279,10 @@ final class RemoteBridge {
     /// rate limit: the strip only moves when something a human would notice
     /// moves, so a percentage ticking down does not send a push per percent.
     private var lastStatusLine: String?
+
+    /// `EX_USAGE`, which is what the script exits with when it does not
+    /// recognise its arguments.
+    private static let usageError: Int32 = 64
 
     /// What the phone sees of a past conversation. The title is already on the
     /// user's phone in the Claude app, and the project name is already
@@ -911,7 +918,19 @@ final class RemoteBridge {
     @discardableResult
     private func run(_ arguments: [String], stdin: String? = nil) async -> CommandRunResult {
         let result = await commandRunner.run(arguments: arguments, stdin: stdin)
-        if result.exitCode != 0 {
+        // 64 is the script's usage error: it did not understand what it was
+        // asked for. That means the installed scripts are older than this app
+        // — the app keeps calling, the script keeps refusing, and nothing
+        // says so. It cost an afternoon once; it should be visible.
+        if result.exitCode == Self.usageError {
+            NSLog(
+                "Vibenotch: installed scripts are out of date (rejected %@). Run ./scripts/install.sh",
+                arguments.first ?? ""
+            )
+            userDefaults.set(true, forKey: Self.scriptMismatchKey)
+        } else if result.exitCode == 0 {
+            userDefaults.set(false, forKey: Self.scriptMismatchKey)
+        } else {
             NSLog(
                 "Vibenotch vibenotch-remote-push %@ exited with status %d",
                 arguments.first ?? "",
