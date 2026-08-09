@@ -131,13 +131,30 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   with the same sprites and status colours, so "which one needs me?" has an
   answer from the sofa. A list that stops being updated dims and freezes
   rather than going on claiming work is still running.
+- **Reopen a past conversation.** A conversation the Claude app shows as
+  *Disconnected* has no way back from the phone — only from the machine it ran
+  on. Tapping **Reopen** asks the Mac to run `claude --remote-control --resume`
+  for it, which is what brings Remote Control back with the history intact.
+- **Start or stop a Remote Control server** with **Remote on / Remote off**,
+  which is what puts the Mac under *Devices* in the Claude app so new sessions
+  can be started from the phone. The button shows which state you are in.
+- **Tap a live session** to bring the agent's own app to the front — the Claude
+  app or the Codex app, whichever is running it.
 - **The Mac's battery**, so "is it about to die?" does not require walking
   over to look.
+- **The last 20 alerts**, so "what did I miss?" still has an answer after the
+  phone's notification shade has cleared itself.
 - **Change the settings** from the phone, split by which machine they change:
   *this phone* (notifications) and *the Mac* (default mode, battery floor,
   grace period, closed-lid, the lot).
 - **Push notifications** for battery thresholds (50 / 30 / 20 %), for "an agent
   needs you", and for "all agents finished".
+
+A request from the phone carries an opaque id and an action from a fixed list
+— never a path, a command or an argument. The Mac resolves that id against
+conversations it indexed and published itself and builds the command, so an id
+it never published is refused. The worst a leaked pairing secret buys is
+reopening a conversation that is already on that machine.
 
 What leaves your Mac is deliberately narrow: project name, agent, status,
 start time, subagent count, and a per-session id that is a keyed digest, not
