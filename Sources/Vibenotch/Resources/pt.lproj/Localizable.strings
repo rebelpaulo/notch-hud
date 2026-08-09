@@ -57,6 +57,7 @@
 "Secret" = "Segredo";
 "Not paired yet. Create ~/.vibenotch/remote.json and see the remote setup docs in the project." = "Ainda não emparelhado. Cria ~/.vibenotch/remote.json e consulta a documentação de configuração remota no projeto.";
 "Remote state" = "Estado remoto";
+"Installed scripts are out of date — run ./scripts/install.sh" = "Os scripts instalados estão desatualizados — corre ./scripts/install.sh";
 "Send test push" = "Enviar push de teste";
 "Version" = "Versão";
 "Sessions directory" = "Diretório de sessões";

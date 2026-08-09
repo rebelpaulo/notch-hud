@@ -16,6 +16,7 @@ struct SettingsView: View {
     @State private var remoteStatus = t("checking…")
     @State private var pushResult: RemoteActionResult?
     @State private var isSendingTestPush = false
+    @State private var scriptsAreOutOfDate = false
 
     init(
         keepAwakeEngine: KeepAwakeEngine,
@@ -206,6 +207,14 @@ struct SettingsView: View {
                     .settingsExplanation()
             }
             fixedInfoRow(t("Remote state"), value: remoteStatus)
+            if scriptsAreOutOfDate {
+                // The app keeps calling and the script keeps refusing, so
+                // nothing else in the interface would ever mention it.
+                Text(t("Installed scripts are out of date — run ./scripts/install.sh"))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.orange.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 10) {
                 Button(t("Send test push")) {
                     sendTestPush()
@@ -381,6 +390,7 @@ struct SettingsView: View {
     }
 
     private func refreshRemoteStatus() async {
+        scriptsAreOutOfDate = UserDefaults.standard.bool(forKey: RemoteBridge.scriptMismatchKey)
         remotePairing = RemotePairing.load(from: remoteConfigURL)
         guard remotePairing != nil else {
             remoteStatus = t("not configured")

@@ -318,6 +318,27 @@ import Testing
 }
 
 @MainActor
+@Test func aScriptThatRejectsItsArgumentsIsRecordedAsOutOfDate() async throws {
+    // The real failure: the app is newer than the installed scripts, so it
+    // keeps asking for something they do not understand and they keep
+    // refusing. Nothing in the interface said so, and it cost an afternoon.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: false)
+    defer { fixture.remove() }
+    await fixture.runner.setExitCode(64)
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(fixture.defaults.bool(forKey: RemoteBridge.scriptMismatchKey))
+
+    // And it clears itself once the scripts are updated, rather than warning
+    // forever about a problem that is gone.
+    await fixture.runner.setExitCode(0)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(!fixture.defaults.bool(forKey: RemoteBridge.scriptMismatchKey))
+}
+
+@MainActor
 @Test func statusStripRetriesAfterAFailedPush() async throws {
     // Caching the line before knowing the push landed means one transient
     // failure suppresses every retry — and on a Mac at 100% on AC with
@@ -758,7 +779,7 @@ private final class RemoteBridgeFixture {
     let bridge: RemoteBridge
 
     private let suiteName: String
-    private let userDefaults: UserDefaults
+    let defaults: UserDefaults
 
     init(
         mode: KeepAwakeMode = .manual,
@@ -782,14 +803,14 @@ private final class RemoteBridgeFixture {
         runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
         power = FakeRemotePowerSource(percent: percent, isOnACPower: onAC)
         suiteName = "RemoteBridgeTests.\(UUID().uuidString)"
-        userDefaults = UserDefaults(suiteName: suiteName)!
+        defaults = UserDefaults(suiteName: suiteName)!
         bridge = RemoteBridge(
             engine: engine,
             sessionStore: store,
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,
-            userDefaults: userDefaults,
+            userDefaults: defaults,
             resumer: resumer,
             // Never spawn a real pgrep from a test: the answer would depend on
             // what happens to be running on the machine.
@@ -805,14 +826,14 @@ private final class RemoteBridgeFixture {
         runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
         power = other.power
         suiteName = other.suiteName
-        userDefaults = other.userDefaults
+        defaults = other.defaults
         bridge = RemoteBridge(
             engine: engine,
             sessionStore: other.store,
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,
-            userDefaults: userDefaults,
+            userDefaults: defaults,
             resumer: resumer,
             remoteControlServer: RemoteControlServer(runProcess: { _, _ in 1 })
         )
@@ -844,7 +865,7 @@ private final class RemoteBridgeFixture {
 
     func remove() {
         try? FileManager.default.removeItem(at: scratch)
-        userDefaults.removePersistentDomain(forName: suiteName)
+        defaults.removePersistentDomain(forName: suiteName)
     }
 }
 
@@ -894,6 +915,11 @@ private actor FakeRemoteCommandRunner: CommandRunning {
     private var settingsPutExitCode: Int32 = 0
     private var statePutFails = false
     private var pushesFail = false
+    private var forcedExitCode: Int32?
+
+    func setExitCode(_ code: Int32?) {
+        forcedExitCode = code
+    }
 
     func failStatePut(_ value: Bool) {
         statePutFails = value
@@ -914,6 +940,12 @@ private actor FakeRemoteCommandRunner: CommandRunning {
     func run(arguments: [String], stdin: String?) async -> CommandRunResult {
         calls.append(arguments)
         stdins.append(stdin)
+        if let forcedExitCode {
+            return CommandRunResult(
+                stdout: arguments == ["--state"] ? stateOutput : "{}",
+                exitCode: forcedExitCode
+            )
+        }
         if arguments == ["--settings-put"] {
             return CommandRunResult(stdout: "", exitCode: settingsPutExitCode)
         }
