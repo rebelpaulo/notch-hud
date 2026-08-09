@@ -807,7 +807,9 @@ final class RemoteBridge {
         switch status {
         case .working: t("working")
         case .needsMe: t("needs you")
-        case .done: t("done")
+        // Not t("done"): that key is the plural count in the notch header, so
+        // a single session read "alpha · concluídos".
+        case .done: t("finished")
         case .idle: t("idle")
         }
     }
