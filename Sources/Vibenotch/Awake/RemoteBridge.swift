@@ -253,12 +253,14 @@ final class RemoteBridge {
     // The last battery reading published, so the Mac stops re-sending a number
     // the phone already has. A percent change or a plug/unplug is worth a
     // write; ten identical readings a minute are not.
-    private var lastPublishedMachineState: PublishedMachineState?
+    private var lastPublishedBattery: PublishedBattery?
+    private var lastPublishedThermal: String?
+    private var isPublishingMachineState = false
+    private var machineStateChangedWhilePublishing = false
 
-    private struct PublishedMachineState: Equatable {
-        let percent: Int?
+    private struct PublishedBattery: Equatable {
+        let percent: Int
         let isOnACPower: Bool
-        let thermal: String
     }
 
     /// The last snapshot published, so an unchanged session list is not
@@ -504,26 +506,52 @@ final class RemoteBridge {
     /// it matters most in the situation the phone exists for — the Mac working
     /// with the lid shut, where you cannot feel how hot it has become.
     private func publishMachineStateIfChanged() async {
+        // Serialised like the session publisher, and for the same reason:
+        // @MainActor does not prevent reentrancy across an `await`, so two
+        // ticks could both pass the guard, and the older curl finishing last
+        // would leave the phone — and the cache — holding the stale reading.
+        guard !isPublishingMachineState else {
+            machineStateChangedWhilePublishing = true
+            return
+        }
+        isPublishingMachineState = true
+        defer { isPublishingMachineState = false }
+
+        await publishMachineStateNow()
+
+        if machineStateChangedWhilePublishing {
+            machineStateChangedWhilePublishing = false
+            await publishMachineStateNow()
+        }
+    }
+
+    private func publishMachineStateNow() async {
         let snapshot = powerSourceProvider.snapshot()
         let thermal = engine.thermalState.wireName
-        let reading = PublishedMachineState(
-            percent: snapshot.percent,
-            isOnACPower: snapshot.isOnACPower,
-            thermal: thermal
-        )
-        guard reading != lastPublishedMachineState else { return }
+        let battery = snapshot.percent.map {
+            PublishedBattery(percent: $0, isOnACPower: snapshot.isOnACPower)
+        }
+
+        // Two caches, not one, because the wire has no way to say "the battery
+        // reading is gone": /api/state is a partial update, so omitting the
+        // field preserves whatever was there. A combined cache would record the
+        // absence as published and then suppress the correction forever.
+        var fields: [String] = []
+        if let battery, battery != lastPublishedBattery {
+            fields.append(#""battery":{"percent":\#(battery.percent),"on_ac":\#(battery.isOnACPower)}"#)
+        }
+        if thermal != lastPublishedThermal {
+            fields.append(#""thermal_state":"\#(thermal)""#)
+        }
+        guard !fields.isEmpty else { return }
 
         // Battery and heat ONLY. Sending the on/off flag alongside would write
         // back a value read before the poll, so a toggle made on the phone in
         // that window would be silently overwritten instead of obeyed.
-        var fields = [#""thermal_state":"\#(thermal)""#]
-        if let percent = snapshot.percent {
-            fields.insert(#""battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}"#, at: 0)
-        }
         let body = "{" + fields.joined(separator: ",") + "}"
-        if await run(["--state-put"], stdin: body).exitCode == 0 {
-            lastPublishedMachineState = reading
-        }
+        guard await run(["--state-put"], stdin: body).exitCode == 0 else { return }
+        if let battery { lastPublishedBattery = battery }
+        lastPublishedThermal = thermal
     }
 
     /// Publishes the session list so the phone can show which agent needs you,
@@ -873,7 +901,8 @@ final class RemoteBridge {
         // Everything cached about the old remote is now wrong. Without this a
         // newly paired phone shows no charge until the percentage happens to
         // move — and at 100% on AC that can be hours.
-        lastPublishedMachineState = nil
+        lastPublishedBattery = nil
+        lastPublishedThermal = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastStatusLine = nil

@@ -636,6 +636,28 @@ final class Stopped: @unchecked Sendable {
 }
 
 @MainActor
+@Test func remoteBridgeKeepsPublishingTheBatteryAfterAReadingGoesMissing() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: false)
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    // /api/state is a partial update, so there is no way to say "the battery
+    // reading is gone" — omitting the field preserves the last one. Recording
+    // the absence as published is what would suppress the correction forever.
+    fixture.power.percent = nil
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    fixture.power.percent = 79
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let bodies = await fixture.runner.statePutBodies()
+    #expect(bodies.filter { $0.contains("\"battery\"") } == [
+        #"{"battery":{"percent":80,"on_ac":false},"thermal_state":"nominal"}"#,
+        #"{"battery":{"percent":79,"on_ac":false}}"#
+    ])
+}
+
+@MainActor
 @Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReadingButStillPublishesHeat() async throws {
     let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
     defer { fixture.remove() }

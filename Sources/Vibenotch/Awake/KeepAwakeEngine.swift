@@ -34,6 +34,9 @@ final class KeepAwakeEngine {
     private var graceDeadline: Date?
     private var noAgentSince: Date?
     private var didPostIdleReminder = false
+    /// Re-armed when the Mac leaves `critical`, so a second episode is reported
+    /// but a single one is not reported sixty times a minute.
+    private var didReportCriticalHeat = false
 
     private(set) var mode: KeepAwakeMode = .off
     private(set) var lastOffReason: KeepAwakeOffReason?
@@ -124,6 +127,16 @@ final class KeepAwakeEngine {
     }
 
     func setMode(_ newMode: KeepAwakeMode, now: Date = Date()) {
+        // Refused here rather than left for the next tick to undo. Turning on
+        // into a critical Mac would light the bolt, post a shutdown notice five
+        // seconds later, and do the same again on the next attempt — from the
+        // notch, from the phone, and from the remote reconciler, each one
+        // costing a notification.
+        thermalState = thermalStateProvider.thermalState
+        if newMode != .off, thermalState == .critical {
+            reportCriticalHeat(now: now)
+            return
+        }
         applyMode(newMode, now: now, offReason: nil)
     }
 
@@ -157,6 +170,7 @@ final class KeepAwakeEngine {
         let powerSource = powerSourceProvider.snapshot()
         isOnACPower = powerSource.isOnACPower
         thermalState = thermalStateProvider.thermalState
+        if thermalState != .critical { didReportCriticalHeat = false }
         guard isActive else {
             releaseAssertions()
             return
@@ -176,7 +190,7 @@ final class KeepAwakeEngine {
         // Mac awake past that point buys nothing: the agents are being throttled
         // anyway, and the heat has nowhere to go with the lid shut.
         if thermalState == .critical {
-            turnOff(notification: t("Gotta go!: Mac too hot, going to sleep"), now: now)
+            reportCriticalHeat(now: now)
             return
         }
 
@@ -257,6 +271,20 @@ final class KeepAwakeEngine {
         let activeHours = max(1, Int(now.timeIntervalSince(activeSince ?? now) / 3_600))
         notificationPoster.post(t("Gotta go! on for %dh with no agents working", activeHours))
         didPostIdleReminder = true
+    }
+
+    /// Shuts down for heat, and says so ONCE per critical episode.
+    ///
+    /// The latch is the point. Without it a Mac sitting at critical posts a
+    /// notification every five seconds, and every rejected attempt to turn
+    /// Gotta go! back on posts another — which is how a safety feature turns
+    /// into the reason someone mutes the app's notifications entirely.
+    private func reportCriticalHeat(now: Date) {
+        turnOff(
+            notification: didReportCriticalHeat ? nil : t("Gotta go!: Mac too hot, going to sleep"),
+            now: now
+        )
+        didReportCriticalHeat = true
     }
 
     private func turnOff(

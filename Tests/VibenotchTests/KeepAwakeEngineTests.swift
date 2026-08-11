@@ -68,6 +68,35 @@ import Testing
 }
 
 @MainActor
+@Test func criticalHeatReportsOncePerEpisodeAndRefusesToTurnBackOn() {
+    let fixture = KeepAwakeFixture(thermalState: .critical)
+    fixture.engine.setMode(.manual)
+
+    // Refused outright: turning on, then shutting down five seconds later, is
+    // the loop this prevents.
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.assertions.activeIDs.isEmpty)
+
+    // Ticking at critical, and trying again from the notch or the phone, must
+    // not post the same warning over and over.
+    fixture.engine.tick()
+    fixture.engine.setMode(.manual)
+    fixture.engine.tick()
+    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
+
+    // Cooled down: it can be turned on again, and a second episode is reported.
+    fixture.thermal.state = .nominal
+    fixture.engine.tick()
+    fixture.engine.setMode(.manual)
+    #expect(fixture.engine.mode == .manual)
+
+    fixture.thermal.state = .critical
+    fixture.engine.tick()
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.notifications.messages.count == 2)
+}
+
+@MainActor
 @Test func timerExpiryTurnsEngineOffAndReportsNoRemainingTime() {
     let fixture = KeepAwakeFixture()
     let start = Date(timeIntervalSince1970: 2_000_000)

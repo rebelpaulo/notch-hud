@@ -76,6 +76,7 @@
 "Gotta go!: Mac too hot, going to sleep" = "Gotta go!: Mac demasiado quente, a dormir";
 "The Mac is running hot" = "O Mac está a aquecer";
 "The Mac is overheating — Gotta go! is turning off" = "O Mac está a sobreaquecer — o Gotta go! vai desligar-se";
+"The Mac is overheating" = "O Mac está a sobreaquecer";
 "hot" = "quente";
 "overheating" = "a sobreaquecer";
 "Gotta go! finished" = "Gotta go! terminou";

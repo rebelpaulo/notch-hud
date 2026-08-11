@@ -247,7 +247,14 @@ struct NotchPanelView: View {
         case .serious:
             (Color(nsColor: .systemOrange), t("The Mac is running hot"))
         case .critical:
-            (Color(nsColor: .systemRed), t("The Mac is overheating — Gotta go! is turning off"))
+            // Promising a shutdown that already happened — or that was never
+            // running — is worse than saying nothing about it.
+            (
+                Color(nsColor: .systemRed),
+                keepAwakeEngine.isActive
+                    ? t("The Mac is overheating — Gotta go! is turning off")
+                    : t("The Mac is overheating")
+            )
         default:
             nil
         }
