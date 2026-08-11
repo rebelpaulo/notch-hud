@@ -81,7 +81,9 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(await fixture.runner.recordedCalls() == [
         ["--state"],
-        ["Vibenotch", "Gotta go! turned off remotely ✓", "remote-toggle"]
+        ["Vibenotch", "Gotta go! turned off remotely ✓", "remote-toggle"],
+        // Heat publishes on every first poll, with or without a battery reading.
+        ["--state-put"]
     ])
 }
 
@@ -634,13 +636,16 @@ final class Stopped: @unchecked Sendable {
 }
 
 @MainActor
-@Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReading() async throws {
+@Test func remoteBridgeSkipsTheBatteryWhenThereIsNoReadingButStillPublishesHeat() async throws {
     let fixture = try RemoteBridgeFixture(mode: .manual, percent: nil, onAC: true)
     defer { fixture.remove() }
 
     await fixture.bridge.checkNow(pollRemoteState: true)
 
-    #expect(await fixture.runner.recordedCalls() == [["--state"]])
+    // A Mac with no battery reading still has a temperature, and heat is the
+    // half of this write that matters with the lid shut.
+    let bodies = await fixture.runner.statePutBodies()
+    #expect(bodies == [#"{"thermal_state":"nominal"}"#])
 }
 
 @MainActor
@@ -655,7 +660,7 @@ final class Stopped: @unchecked Sendable {
     #expect(fixture.engine.config.defaultMode == .whileAppsRunning)
     #expect(!fixture.engine.config.allowDisplaySleep)
     #expect(fixture.engine.config.batteryFloorPercent == 30)
-    #expect(await fixture.runner.recordedCalls() == [["--state"]])
+    #expect(await fixture.runner.recordedCalls() == [["--state"], ["--state-put"]])
     #expect(await fixture.runner.recordedCalls().contains(["--settings-put"]) == false)
 }
 
@@ -873,6 +878,7 @@ private final class RemoteBridgeFixture {
 private final class FakeRemoteEngine: RemoteKeepAwakeEngine {
     var mode: KeepAwakeMode
     var isOnACPower: Bool
+    var thermalState: ProcessInfo.ThermalState = .nominal
     var lastOffReason: KeepAwakeOffReason?
     var config: KeepAwakeConfig
     var isActive: Bool { mode != .off }

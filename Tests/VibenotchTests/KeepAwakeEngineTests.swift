@@ -47,6 +47,27 @@ import Testing
 }
 
 @MainActor
+@Test func criticalHeatForcesOffButSeriousDoesNot() {
+    // `serious` is a normal MacBook under a long build. Turning off there would
+    // end Gotta go! during exactly the work it exists to protect, so the line
+    // is drawn at `critical` — where macOS is already shedding performance.
+    let fixture = KeepAwakeFixture(thermalState: .serious)
+    fixture.engine.setMode(.manual)
+
+    fixture.engine.tick()
+    #expect(fixture.engine.mode == .manual)
+    #expect(fixture.engine.thermalState == .serious)
+    #expect(fixture.notifications.messages.isEmpty)
+
+    fixture.thermal.state = .critical
+    fixture.engine.tick()
+
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.assertions.activeIDs.isEmpty)
+    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
+}
+
+@MainActor
 @Test func timerExpiryTurnsEngineOffAndReportsNoRemainingTime() {
     let fixture = KeepAwakeFixture()
     let start = Date(timeIntervalSince1970: 2_000_000)
@@ -190,18 +211,23 @@ private final class KeepAwakeFixture {
     private let suiteName: String
     private let defaults: UserDefaults
 
+    let thermal: FakeThermalState
+
     init(
         percent: Int? = 100,
         isOnACPower: Bool = true,
+        thermalState: ProcessInfo.ThermalState = .nominal,
         applications: FakeRunningApplications = FakeRunningApplications()
     ) {
         suiteName = "KeepAwakeEngineTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
+        thermal = FakeThermalState(state: thermalState)
         engine = KeepAwakeEngine(
             sessionStore: store,
             assertionProvider: assertions,
             runningApplicationsProvider: applications,
             powerSourceProvider: FakePowerSource(percent: percent, isOnACPower: isOnACPower),
+            thermalStateProvider: thermal,
             notificationPoster: notifications,
             userDefaults: defaults
         )
@@ -242,6 +268,16 @@ private final class FakeRunningApplications: RunningApplicationsProviding, @unch
     func runningBundleIdentifiers() -> Set<String> {
         bundleIDs
     }
+}
+
+private final class FakeThermalState: ThermalStateProviding, @unchecked Sendable {
+    var state: ProcessInfo.ThermalState
+
+    init(state: ProcessInfo.ThermalState = .nominal) {
+        self.state = state
+    }
+
+    var thermalState: ProcessInfo.ThermalState { state }
 }
 
 private final class FakePowerSource: PowerSourceProviding, @unchecked Sendable {

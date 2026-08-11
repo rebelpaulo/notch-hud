@@ -65,6 +65,7 @@ struct RemoteScriptCommandRunner: CommandRunning {
 protocol RemoteKeepAwakeEngine: AnyObject {
     var isActive: Bool { get }
     var isOnACPower: Bool { get }
+    var thermalState: ProcessInfo.ThermalState { get }
     var mode: KeepAwakeMode { get }
     var lastOffReason: KeepAwakeOffReason? { get }
     var config: KeepAwakeConfig { get set }
@@ -252,11 +253,12 @@ final class RemoteBridge {
     // The last battery reading published, so the Mac stops re-sending a number
     // the phone already has. A percent change or a plug/unplug is worth a
     // write; ten identical readings a minute are not.
-    private var lastPublishedBattery: PublishedBattery?
+    private var lastPublishedMachineState: PublishedMachineState?
 
-    private struct PublishedBattery: Equatable {
-        let percent: Int
+    private struct PublishedMachineState: Equatable {
+        let percent: Int?
         let isOnACPower: Bool
+        let thermal: String
     }
 
     /// The last snapshot published, so an unchanged session list is not
@@ -437,7 +439,7 @@ final class RemoteBridge {
             await reconcileDesiredState(desired)
         }
         await reconcileSettings(remote)
-        await publishBatteryIfChanged()
+        await publishMachineStateIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
         await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
@@ -497,18 +499,30 @@ final class RemoteBridge {
     /// The phone warns about the battery but could never show it. Published on
     /// change only — the state endpoint is a write, and an unchanged percentage
     /// is not news.
-    private func publishBatteryIfChanged() async {
+    ///
+    /// Heat rides along in the same write: it moves on the same timescale, and
+    /// it matters most in the situation the phone exists for — the Mac working
+    /// with the lid shut, where you cannot feel how hot it has become.
+    private func publishMachineStateIfChanged() async {
         let snapshot = powerSourceProvider.snapshot()
-        guard let percent = snapshot.percent else { return }
-        let reading = PublishedBattery(percent: percent, isOnACPower: snapshot.isOnACPower)
-        guard reading != lastPublishedBattery else { return }
+        let thermal = engine.thermalState.wireName
+        let reading = PublishedMachineState(
+            percent: snapshot.percent,
+            isOnACPower: snapshot.isOnACPower,
+            thermal: thermal
+        )
+        guard reading != lastPublishedMachineState else { return }
 
-        // Battery ONLY. Sending the on/off flag alongside would write back a
-        // value read before the poll, so a toggle made on the phone in that
-        // window would be silently overwritten instead of obeyed.
-        let body = #"{"battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}}"#
+        // Battery and heat ONLY. Sending the on/off flag alongside would write
+        // back a value read before the poll, so a toggle made on the phone in
+        // that window would be silently overwritten instead of obeyed.
+        var fields = [#""thermal_state":"\#(thermal)""#]
+        if let percent = snapshot.percent {
+            fields.insert(#""battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}"#, at: 0)
+        }
+        let body = "{" + fields.joined(separator: ",") + "}"
         if await run(["--state-put"], stdin: body).exitCode == 0 {
-            lastPublishedBattery = reading
+            lastPublishedMachineState = reading
         }
     }
 
@@ -790,6 +804,12 @@ final class RemoteBridge {
         if let percent = power.percent {
             macState.append(power.isOnACPower ? t("%d%% charging", percent) : t("%d%%", percent))
         }
+        // Only when it is bad news. The strip is glanced at, not read.
+        switch engine.thermalState {
+        case .serious: macState.append(t("hot"))
+        case .critical: macState.append(t("overheating"))
+        default: break
+        }
         lines.append(macState.joined(separator: " · "))
 
         let body = lines.joined(separator: "\n")
@@ -853,7 +873,7 @@ final class RemoteBridge {
         // Everything cached about the old remote is now wrong. Without this a
         // newly paired phone shows no charge until the percentage happens to
         // move — and at 100% on AC that can be hours.
-        lastPublishedBattery = nil
+        lastPublishedMachineState = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastStatusLine = nil

@@ -162,6 +162,19 @@ struct NotchPanelView: View {
             .help(keepAwakeEngine.isActive ? t("Turn off Gotta go!") : t("Turn on Gotta go!"))
             .accessibilityLabel(keepAwakeEngine.isActive ? t("Turn off Gotta go!") : t("Turn on Gotta go!"))
 
+            // Only when it is worth knowing. A thermometer that is always there
+            // is furniture; one that only appears when the Mac is struggling is
+            // information — and with the lid shut this is the one thing Gotta
+            // go! can make worse.
+            if let heat = heatWarning {
+                Image(systemName: "thermometer.high")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(heat.color)
+                    .frame(width: 18, height: 20)
+                    .help(heat.label)
+                    .accessibilityLabel(heat.label)
+            }
+
             Menu {
                 modeButton(t("While agents are working"), mode: .whileAgentsWork)
                 modeButton(t("While the apps are open"), mode: .whileAppsRunning)
@@ -225,6 +238,18 @@ struct NotchPanelView: View {
     private func timerButton(_ title: String, seconds: TimeInterval) -> some View {
         Button(title) {
             keepAwakeEngine.setMode(.timer(until: Date().addingTimeInterval(seconds)))
+        }
+    }
+
+    /// Nothing below `serious`: `nominal` and `fair` are a Mac doing its job.
+    private var heatWarning: (color: Color, label: String)? {
+        switch keepAwakeEngine.thermalState {
+        case .serious:
+            (Color(nsColor: .systemOrange), t("The Mac is running hot"))
+        case .critical:
+            (Color(nsColor: .systemRed), t("The Mac is overheating — Gotta go! is turning off"))
+        default:
+            nil
         }
     }
 

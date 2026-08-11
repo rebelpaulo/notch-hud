@@ -24,6 +24,7 @@ final class KeepAwakeEngine {
     private let assertionProvider: any SleepAssertionProviding
     private let runningApplicationsProvider: any RunningApplicationsProviding
     private let powerSourceProvider: any PowerSourceProviding
+    private let thermalStateProvider: any ThermalStateProviding
     private let notificationPoster: any NotificationPosting
     private let userDefaults: UserDefaults
 
@@ -38,6 +39,9 @@ final class KeepAwakeEngine {
     private(set) var lastOffReason: KeepAwakeOffReason?
     private(set) var activeSince: Date?
     private(set) var isOnACPower: Bool
+    /// Refreshed on the tick rather than read live, so the notch and the phone
+    /// always show the same reading the auto-off decision was made from.
+    private(set) var thermalState: ProcessInfo.ThermalState = .nominal
     private(set) var remainingTime: TimeInterval?
     var config: KeepAwakeConfig {
         didSet {
@@ -61,6 +65,7 @@ final class KeepAwakeEngine {
         assertionProvider: any SleepAssertionProviding = SystemSleepAssertionProvider(),
         runningApplicationsProvider: any RunningApplicationsProviding = SystemRunningApplicationsProvider(),
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
+        thermalStateProvider: any ThermalStateProviding = SystemThermalStateProvider(),
         notificationPoster: any NotificationPosting = SystemNotificationPoster(),
         userDefaults: UserDefaults = .standard
     ) {
@@ -68,10 +73,12 @@ final class KeepAwakeEngine {
         self.assertionProvider = assertionProvider
         self.runningApplicationsProvider = runningApplicationsProvider
         self.powerSourceProvider = powerSourceProvider
+        self.thermalStateProvider = thermalStateProvider
         self.notificationPoster = notificationPoster
         self.userDefaults = userDefaults
         self.assertionLease = KeepAwakeAssertionLease(provider: assertionProvider)
         self.isOnACPower = powerSourceProvider.snapshot().isOnACPower
+        self.thermalState = thermalStateProvider.thermalState
         let restoreTime = Date()
 
         if let data = userDefaults.data(forKey: Self.configKey),
@@ -149,6 +156,7 @@ final class KeepAwakeEngine {
     func tick(now: Date = Date()) {
         let powerSource = powerSourceProvider.snapshot()
         isOnACPower = powerSource.isOnACPower
+        thermalState = thermalStateProvider.thermalState
         guard isActive else {
             releaseAssertions()
             return
@@ -158,6 +166,17 @@ final class KeepAwakeEngine {
            let percent = powerSource.percent,
            percent <= max(10, config.batteryFloorPercent) {
             turnOff(notification: t("Gotta go!: battery low, going to sleep"), now: now)
+            return
+        }
+
+        // Critical only. macOS reports `serious` for any sustained load — a long
+        // build hits it on a healthy machine — so acting there would turn Gotta
+        // go! off during exactly the work it exists to protect. `critical` means
+        // the system is already shedding performance to survive, and holding the
+        // Mac awake past that point buys nothing: the agents are being throttled
+        // anyway, and the heat has nowhere to go with the lid shut.
+        if thermalState == .critical {
+            turnOff(notification: t("Gotta go!: Mac too hot, going to sleep"), now: now)
             return
         }
 
