@@ -497,9 +497,18 @@ final class NotchWindowManager {
 
     private func updateRenderedPanelSize(_ size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        // The ceiling is the screen, not a constant. It used to be a flat 560,
+        // which silently clipped anything taller — the quota tab asks for far
+        // more than a session list, and the cards below the fold simply were
+        // not drawn. Leave room for the notch band and a margin so the panel
+        // never runs off the bottom of a short display.
+        let screen = interactivePanel?.screen ?? NSScreen.main
+        let band = screen.map { max($0.safeAreaInsets.top, $0.frame.maxY - $0.visibleFrame.maxY) } ?? 0
+        let available = screen?.visibleFrame.height ?? 560
+        let ceiling = max(560, available - band - 80)
         renderedPanelSize = CGSize(
             width: ceil(min(size.width, 720)),
-            height: ceil(min(size.height, 560))
+            height: ceil(min(size.height, ceiling))
         )
         positionInteractivePanel()
         if isExpanded, interactivePanel?.isVisible != true {

@@ -27,9 +27,23 @@ struct NotchPanelView: View {
         case limits
     }
 
-    private let maximumPanelHeight: CGFloat = 520
+    /// The quota tab is taller on purpose: two provider cards, each with a
+    /// gauge pair and a month of daily bars, do not fit in the height a
+    /// session list needs. Growing only on that tab keeps the common case —
+    /// glancing at what is running — the same size it has always been.
+    private var maximumPanelHeight: CGFloat {
+        tab == .limits ? 820 : 520
+    }
+
     private var maximumSessionListHeight: CGFloat {
         pendingStore.hasPending ? 205 : 468
+    }
+
+    /// Enough for both cards and both charts without an inner scrollbar in
+    /// the ordinary case. It still scrolls when a provider reports extra
+    /// model-scoped windows, which is the one thing that varies.
+    private var maximumUsageHeight: CGFloat {
+        pendingStore.hasPending ? 505 : 768
     }
 
     private let panelShape = UnevenRoundedRectangle(
@@ -228,7 +242,7 @@ struct NotchPanelView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(maxHeight: maximumSessionListHeight)
+        .frame(maxHeight: maximumUsageHeight)
     }
 
     private var allNighterControl: some View {
