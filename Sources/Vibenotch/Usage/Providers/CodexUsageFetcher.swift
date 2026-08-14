@@ -69,6 +69,26 @@ struct CodexUsageFetcher: UsageFetching {
         }
         return windows
     }
+
+    /// `reset_at` is epoch SECONDS today. Nothing in the payload says so, and a
+    /// service that quietly switched to milliseconds would not be caught by any
+    /// of the other guards: the field is present, numeric, and decodes — it
+    /// would simply place the reset tens of thousands of years out, and the
+    /// countdown would read as an enormous, confident lie.
+    ///
+    /// So the value has to land somewhere plausible, not merely exist. Outside
+    /// that, the date is dropped and the quota shows without a countdown, which
+    /// is the honest degradation.
+    static func resetDate(fromEpochSeconds value: Double?) -> Date? {
+        guard let value else { return nil }
+        let date = Date(timeIntervalSince1970: value)
+        // These windows are hours or days long, so a reset is always near. Two
+        // years of slack each way absorbs clock skew and any sane future window
+        // length while still catching a unit change by orders of magnitude.
+        let slack: TimeInterval = 2 * 365 * 24 * 3600
+        guard abs(date.timeIntervalSinceNow) < slack else { return nil }
+        return date
+    }
 }
 
 private extension UsageWindow {
@@ -85,13 +105,14 @@ private extension UsageWindow {
             // printed "Session" over a weekly quota.
             kind: .classify(lengthSeconds: window.limitWindowSeconds),
             percentUsed: percent,
-            resetsAt: window.resetAt.map { Date(timeIntervalSince1970: $0) },
+            resetsAt: CodexUsageFetcher.resetDate(fromEpochSeconds: window.resetAt),
             windowLength: window.limitWindowSeconds,
             scopeLabel: scopeLabel,
             // Codex reports no severity of its own.
             severity: .derived(fromPercentUsed: percent)
         )
     }
+
 }
 
 /// Decoding target for `GET /backend-api/wham/usage`. Every field is

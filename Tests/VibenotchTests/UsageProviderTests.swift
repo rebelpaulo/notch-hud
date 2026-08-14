@@ -199,3 +199,13 @@ private let codexFixture = Data("""
         // expected
     }
 }
+
+@Test func codexRejectsAnEpochThatIsNotInSeconds() {
+    // The same instant, sent the two ways a service might send it. Only one of
+    // them can be right, and the wrong one is not detectable by asking whether
+    // the field is present — which is why it needs its own guard.
+    let seconds = Date().timeIntervalSince1970 + 3600
+    #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: seconds) != nil)
+    #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: seconds * 1000) == nil)
+    #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: Double?.none) == nil)
+}
