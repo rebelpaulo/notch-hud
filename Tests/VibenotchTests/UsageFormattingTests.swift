@@ -106,3 +106,16 @@ struct UsageFormattingTests {
         #expect(UsageFormatting.projectionPhrase(pace, now: now) == "Runs out in 5h 4m")
     }
 }
+
+@Test func tokenCountsCompactWithoutLosingTheDistinctionBetweenBillions() {
+    #expect(UsageFormatting.tokenCount(0) == "0")
+    #expect(UsageFormatting.tokenCount(999) == "999")
+    #expect(UsageFormatting.tokenCount(1_500) == "1.5K")
+    #expect(UsageFormatting.tokenCount(85_000_000) == "85M")
+    // The two that must not collapse into each other: this account really
+    // does run to billions, and "16B" vs "1.6B" is an order of magnitude.
+    #expect(UsageFormatting.tokenCount(1_600_000_000) == "1.6B")
+    #expect(UsageFormatting.tokenCount(16_100_000_000) == "16B")
+    // A whole number keeps no pointless decimal.
+    #expect(UsageFormatting.tokenCount(2_000_000) == "2M")
+}

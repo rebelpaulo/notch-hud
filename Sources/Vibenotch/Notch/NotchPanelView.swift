@@ -164,6 +164,7 @@ struct NotchPanelView: View {
             tab = tab == .sessions ? .limits : .sessions
             if tab == .limits {
                 usageStore.refreshIfStale()
+                usageStore.scanLocalIfNeeded()
             }
         } label: {
             Image(systemName: tab == .sessions ? "gauge.with.needle" : "list.bullet")
@@ -182,19 +183,33 @@ struct NotchPanelView: View {
         ScrollView(.vertical) {
             VStack(spacing: 10) {
                 ForEach(UsageProviderKind.allCases, id: \.rawValue) { provider in
-                    switch usageStore.entries[provider] {
-                    case let .loaded(snapshot):
-                        UsageCardView(
-                            snapshot: snapshot,
-                            paceByWindowID: usageStore.pace(for: snapshot)
+                    VStack(alignment: .leading, spacing: 10) {
+                        switch usageStore.entries[provider] {
+                        case let .loaded(snapshot):
+                            UsageCardView(
+                                snapshot: snapshot,
+                                paceByWindowID: usageStore.pace(for: snapshot)
+                            )
+                        case let .failed(reason):
+                            UsageCardView(provider: provider, unavailable: reason)
+                        case .loading, .none:
+                            // Never a zeroed gauge while we do not know yet: an
+                            // empty bar reads as "nothing used", which is a claim.
+                            UsageCardView(provider: provider, unavailable: .network(t("Checking…")))
+                        }
+
+                        UsageHistoryChart(
+                            provider: provider,
+                            points: usageStore.localSeries?.points ?? [],
+                            today: usageStore.tokens(for: provider, today: true),
+                            trailing: usageStore.tokens(for: provider, today: false),
+                            isCounting: usageStore.isScanningLocal
                         )
-                    case let .failed(reason):
-                        UsageCardView(provider: provider, unavailable: reason)
-                    case .loading, .none:
-                        // Never a zeroed gauge while we do not know yet: an
-                        // empty bar reads as "nothing used", which is a claim.
-                        UsageCardView(provider: provider, unavailable: .network(t("Checking…")))
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
                     }
+                    .background(Color.notchBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
             .frame(maxWidth: .infinity)

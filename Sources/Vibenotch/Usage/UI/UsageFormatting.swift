@@ -80,3 +80,29 @@ enum UsageFormatting {
         return runsOut(at: runsOutAt, from: now)
     }
 }
+
+extension UsageFormatting {
+    /// Token counts run to billions here, so a raw integer is a wall of
+    /// digits nobody parses at a glance. One decimal below ten so 1.4B and
+    /// 9.8B stay distinguishable; none above, where the extra digit is noise.
+    static func tokenCount(_ tokens: Int) -> String {
+        let value = Double(tokens)
+        switch value {
+        case 1e9...:
+            return compact(value / 1e9, suffix: "B")
+        case 1e6...:
+            return compact(value / 1e6, suffix: "M")
+        case 1e3...:
+            return compact(value / 1e3, suffix: "K")
+        default:
+            return "\(tokens)"
+        }
+    }
+
+    private static func compact(_ value: Double, suffix: String) -> String {
+        let text = value < 10
+            ? String(format: "%.1f", value)
+            : String(format: "%.0f", value)
+        return (text.hasSuffix(".0") ? String(text.dropLast(2)) : text) + suffix
+    }
+}

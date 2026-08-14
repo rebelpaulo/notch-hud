@@ -154,3 +154,10 @@
 "Show the quota limits" = "Ver os limites";
 "Show the sessions" = "Ver as sessões";
 "Checking…" = "A verificar…";
+"Today" = "Hoje";
+"Last 31 days" = "Últimos 31 dias";
+"Counting the local logs…" = "A contar os logs locais…";
+"No local usage recorded" = "Sem utilização local registada";
+"Top model: %@" = "Modelo principal: %@";
+"Day" = "Dia";
+"Tokens" = "Tokens";

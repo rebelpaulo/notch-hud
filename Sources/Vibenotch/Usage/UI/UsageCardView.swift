@@ -54,7 +54,11 @@ struct UsageCardView: View {
             }
         }
         .padding(12)
-        .frame(width: 300, alignment: .leading)
+        // Fills the notch drawer rather than sitting in a 300pt column: the
+        // panel is 680pt wide, and a gauge that spans it resolves to about
+        // twice the pixels per percent, which is the whole readability of a
+        // 6pt bar you glance at.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.notchBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {

@@ -25,12 +25,49 @@ final class UsageStore {
     /// request, short enough that a number you act on is not from last hour.
     static let staleAfter: TimeInterval = 120
 
+    /// Local token history. Separate from `entries` because it comes from
+    /// disk rather than the network and moves on a completely different
+    /// timescale — the first walk over gigabytes of logs takes minutes, every
+    /// one after it takes a fraction of a second.
+    private(set) var localSeries: LocalUsageSeries?
+    private(set) var isScanningLocal = false
+
     private let fetchers: [any UsageFetching]
+    private let scanner: LocalUsageScanner
     private let paceEngine = UsagePaceEngine()
     private var inFlight: Task<Void, Never>?
+    private var localScan: Task<Void, Never>?
 
-    init(fetchers: [any UsageFetching] = [ClaudeUsageFetcher(), CodexUsageFetcher()]) {
+    init(
+        fetchers: [any UsageFetching] = [ClaudeUsageFetcher(), CodexUsageFetcher()],
+        scanner: LocalUsageScanner = LocalUsageScanner()
+    ) {
         self.fetchers = fetchers
+        self.scanner = scanner
+    }
+
+    func tokens(for provider: UsageProviderKind, today: Bool) -> Int {
+        guard let localSeries else { return 0 }
+        let days = today
+            ? localSeries.points.filter { $0.provider == provider && Calendar.current.isDateInToday($0.day) }
+            : localSeries.points.filter { $0.provider == provider }
+        return days.reduce(0) { $0 + $1.totalTokens }
+    }
+
+    /// Kicked off when the tab opens. The scan is the slow one, so it runs
+    /// once per launch and then rides its own on-disk cache.
+    func scanLocalIfNeeded() {
+        guard localScan == nil, localSeries == nil else { return }
+        isScanningLocal = true
+        localScan = Task { [weak self, scanner] in
+            let series = await scanner.scan()
+            await self?.applyLocal(series)
+        }
+    }
+
+    private func applyLocal(_ series: LocalUsageSeries) {
+        localSeries = series
+        isScanningLocal = false
     }
 
     /// Pace for every window of a snapshot, keyed the way the card wants it.
