@@ -18,6 +18,10 @@ final class NotchWindowManager {
     private let pendingStore: PendingStore
     private let focusDispatcher: FocusDispatcher
     private let keepAwakeEngine: KeepAwakeEngine
+    /// Owned here rather than made per-panel: the panel is rebuilt every time
+    /// it opens, and a store that died with it would re-request the quotas on
+    /// every glance.
+    private let usageStore = UsageStore()
     private let sleepGuardController: SleepGuardController
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
@@ -332,6 +336,7 @@ final class NotchWindowManager {
             focusDispatcher: focusDispatcher,
             decisionWriter: decisionWriter,
             keepAwakeEngine: keepAwakeEngine,
+            usageStore: usageStore,
             closedLidModeAvailable: closedLidModeAvailable,
             onOpenSettings: { [weak self] in
                 self?.openSettings()

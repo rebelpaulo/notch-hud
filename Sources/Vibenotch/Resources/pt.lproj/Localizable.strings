@@ -151,3 +151,6 @@
 "Couldn't reach %@" = "Não foi possível contactar %@";
 "Couldn't read %@ usage" = "Não foi possível ler o uso do %@";
 "No usage data" = "Sem dados de uso";
+"Show the quota limits" = "Ver os limites";
+"Show the sessions" = "Ver as sessões";
+"Checking…" = "A verificar…";

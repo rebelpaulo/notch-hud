@@ -7,6 +7,7 @@ struct NotchPanelView: View {
     let focusDispatcher: FocusDispatcher
     let decisionWriter: ApprovalDecisionWriter
     @Bindable var keepAwakeEngine: KeepAwakeEngine
+    let usageStore: UsageStore
     let closedLidModeAvailable: Bool
     let onOpenSettings: @MainActor () -> Void
     let onApprovalDismiss: @MainActor (String) -> Void
@@ -15,6 +16,16 @@ struct NotchPanelView: View {
 
     @State private var feedback: [String: SessionRowFeedback] = [:]
     @State private var sessionListHeight: CGFloat?
+    /// Which half of the panel you are looking at. One or the other, never
+    /// both: the panel is already the height of a notch drawer, and stacking
+    /// quotas under a session list would push the sessions off the bottom —
+    /// the thing you open this for most often.
+    @State private var tab: PanelTab = .sessions
+
+    private enum PanelTab {
+        case sessions
+        case limits
+    }
 
     private let maximumPanelHeight: CGFloat = 520
     private var maximumSessionListHeight: CGFloat {
@@ -43,6 +54,9 @@ struct NotchPanelView: View {
                 )
             }
 
+            if tab == .limits {
+                usageTab
+            } else {
             TimelineView(.periodic(from: .now, by: 30)) { context in
                 if store.sessions.isEmpty {
                     emptyState
@@ -79,6 +93,7 @@ struct NotchPanelView: View {
                         )
                     )
                 }
+            }
             }
         }
         .padding(.horizontal, 14)
@@ -124,6 +139,8 @@ struct NotchPanelView: View {
 
             allNighterControl
 
+            tabToggle
+
             Button(action: onOpenSettings) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 12, weight: .medium))
@@ -136,6 +153,53 @@ struct NotchPanelView: View {
             .accessibilityLabel(t("Settings"))
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
+    }
+
+    /// Swaps the panel between the session list and the quota gauges. One
+    /// button rather than a segmented control: there are exactly two places to
+    /// be, and the icon can then show where you would GO, which is the thing
+    /// worth a glance in a strip this narrow.
+    private var tabToggle: some View {
+        Button {
+            tab = tab == .sessions ? .limits : .sessions
+            if tab == .limits {
+                usageStore.refreshIfStale()
+            }
+        } label: {
+            Image(systemName: tab == .sessions ? "gauge.with.needle" : "list.bullet")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.55))
+                .frame(width: 22, height: 20)
+                .background(.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
+        .accessibilityLabel(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
+    }
+
+    private var usageTab: some View {
+        ScrollView(.vertical) {
+            VStack(spacing: 10) {
+                ForEach(UsageProviderKind.allCases, id: \.rawValue) { provider in
+                    switch usageStore.entries[provider] {
+                    case let .loaded(snapshot):
+                        UsageCardView(
+                            snapshot: snapshot,
+                            paceByWindowID: usageStore.pace(for: snapshot)
+                        )
+                    case let .failed(reason):
+                        UsageCardView(provider: provider, unavailable: reason)
+                    case .loading, .none:
+                        // Never a zeroed gauge while we do not know yet: an
+                        // empty bar reads as "nothing used", which is a claim.
+                        UsageCardView(provider: provider, unavailable: .network(t("Checking…")))
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxHeight: maximumSessionListHeight)
     }
 
     private var allNighterControl: some View {

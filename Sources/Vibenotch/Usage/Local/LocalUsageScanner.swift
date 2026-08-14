@@ -389,7 +389,7 @@ actor LocalUsageScanner {
     /// rename that key — every line with a usage object contains the literal
     /// bytes `"usage"`, so rejecting lines without it can never reject one
     /// that would have counted.
-    private static let usageMarker = Data("\"usage\"".utf8)
+    private static let usageMarker: [UInt8] = Array("\"usage\"".utf8)
 
     private func parseClaudeFile(_ url: URL, startOffset: Int, seenMessageKeys: Set<String>) -> ParseResult {
         var perDay: [Date: [String: TokenTally]] = [:]
@@ -400,7 +400,7 @@ actor LocalUsageScanner {
             in: url,
             startOffset: startOffset,
             limit: Self.maxLinesPerFile,
-            prefilter: { $0.range(of: Self.usageMarker) != nil }
+            prefilter: { Self.containsMarker(Self.usageMarker, in: $0) }
         ) { line in
             guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
                   object["type"] as? String == "assistant",
@@ -458,8 +458,8 @@ actor LocalUsageScanner {
     /// `turn_context` line — both are literal `"type"` values in Codex's
     /// rollouts, never escaped, so rejecting lines with neither substring can
     /// never reject one that would have counted or one that carries a model.
-    private static let tokenCountMarker = Data("token_count".utf8)
-    private static let turnContextMarker = Data("turn_context".utf8)
+    private static let tokenCountMarker: [UInt8] = Array("token_count".utf8)
+    private static let turnContextMarker: [UInt8] = Array("turn_context".utf8)
 
     private func parseCodexFile(_ url: URL, startOffset: Int, seedModel: String) -> ParseResult {
         var perDay: [Date: [String: TokenTally]] = [:]
@@ -470,7 +470,9 @@ actor LocalUsageScanner {
             in: url,
             startOffset: startOffset,
             limit: Self.maxLinesPerFile,
-            prefilter: { $0.range(of: Self.tokenCountMarker) != nil || $0.range(of: Self.turnContextMarker) != nil }
+            prefilter: {
+                Self.containsMarker(Self.tokenCountMarker, in: $0) || Self.containsMarker(Self.turnContextMarker, in: $0)
+            }
         ) { line in
             guard let object = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
                   let type = object["type"] as? String,
@@ -524,6 +526,32 @@ actor LocalUsageScanner {
 
     private static func parseTimestamp(_ string: String) -> Date? {
         isoFormatterWithFraction.date(from: string) ?? isoFormatter.date(from: string)
+    }
+
+    /// Plain byte-for-byte substring search over a raw line, used by every
+    /// `prefilter`. `Data.range(of:)` measured far slower here than this loop
+    /// — Foundation's implementation bridges through `NSData` per call, which
+    /// dominates when it runs on every one of ~430,000 lines rather than the
+    /// tiny minority that actually match. `marker` is always under 16 bytes,
+    /// so the naive nested loop (no Boyer-Moore skip table) is the right
+    /// amount of code for the amount of win.
+    private static func containsMarker(_ marker: [UInt8], in data: Data) -> Bool {
+        let markerCount = marker.count
+        let dataCount = data.count
+        guard markerCount > 0, dataCount >= markerCount else { return false }
+
+        return data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Bool in
+            let bytes = raw.bindMemory(to: UInt8.self)
+            let lastStart = dataCount - markerCount
+            var i = 0
+            while i <= lastStart {
+                var j = 0
+                while j < markerCount, bytes[i + j] == marker[j] { j += 1 }
+                if j == markerCount { return true }
+                i += 1
+            }
+            return false
+        }
     }
 
     /// Streams `url` in fixed-size chunks starting at `startOffset`, calling
