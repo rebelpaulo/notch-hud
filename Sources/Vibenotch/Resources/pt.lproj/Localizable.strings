@@ -126,3 +126,28 @@
 "Deny" = "Negar";
 "Allow Once" = "Permitir uma vez";
 "Bypass" = "Ignorar";
+
+/* Usage card */
+"Session" = "Sessão";
+"Weekly" = "Semanal";
+"Model" = "Modelo";
+"Resetting…" = "A reiniciar…";
+"Resets in %@" = "Reinicia em %@";
+"Runs out in %@" = "Esgota em %@";
+"<1% used" = "<1% usado";
+"%d%% used" = "%d%% usado";
+"<1% left" = "<1% restante";
+"%d%% left" = "%d%% restante";
+"updated just now" = "atualizado agora mesmo";
+"updated %dm ago" = "atualizado há %dm";
+"updated %dh ago" = "atualizado há %dh";
+"updated %dd ago" = "atualizado há %dd";
+"On pace" = "No ritmo";
+"Ahead of pace" = "Acima do ritmo";
+"Behind pace" = "Abaixo do ritmo";
+"Lasts until reset" = "Dura até reiniciar";
+"Not logged in" = "Sem sessão iniciada";
+"Login expired" = "Sessão expirada";
+"Couldn't reach %@" = "Não foi possível contactar %@";
+"Couldn't read %@ usage" = "Não foi possível ler o uso do %@";
+"No usage data" = "Sem dados de uso";
