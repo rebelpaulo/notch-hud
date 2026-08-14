@@ -46,6 +46,13 @@ final class UsageStore {
         self.scanner = scanner
     }
 
+    /// True only before the first round has come back. Distinguishes "we have
+    /// not asked yet" from "we asked and nobody is signed in", which the empty
+    /// state has to word differently.
+    var isLoading: Bool {
+        entries.isEmpty || entries.values.contains { $0 == .loading }
+    }
+
     func tokens(for provider: UsageProviderKind, today: Bool) -> Int {
         guard let localSeries else { return 0 }
         let days = today

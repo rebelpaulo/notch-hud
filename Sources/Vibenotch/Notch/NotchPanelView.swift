@@ -179,24 +179,38 @@ struct NotchPanelView: View {
         .accessibilityLabel(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
     }
 
+    /// Only the providers that actually answered. A card reading
+    /// "unavailable" for a tool you do not use is noise about someone else's
+    /// product; absence says the same thing without occupying the drawer.
+    ///
+    /// A provider that answered once and then failed keeps its card, because
+    /// UsageStore holds the last good snapshot — a dropped request is not
+    /// evidence you logged out.
     private var usageTab: some View {
-        ScrollView(.vertical) {
+        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageSnapshot)? in
+            if case let .loaded(snapshot) = usageStore.entries[provider] {
+                return (provider, snapshot)
+            }
+            return nil
+        }
+
+        return ScrollView(.vertical) {
             VStack(spacing: 10) {
-                ForEach(UsageProviderKind.allCases, id: \.rawValue) { provider in
+                if shown.isEmpty {
+                    // Not a per-card badge: one quiet line, and only when
+                    // there is genuinely nothing to draw.
+                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude or codex to see quotas"))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.35))
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+
+                ForEach(shown, id: \.0.rawValue) { provider, snapshot in
                     VStack(alignment: .leading, spacing: 10) {
-                        switch usageStore.entries[provider] {
-                        case let .loaded(snapshot):
-                            UsageCardView(
-                                snapshot: snapshot,
-                                paceByWindowID: usageStore.pace(for: snapshot)
-                            )
-                        case let .failed(reason):
-                            UsageCardView(provider: provider, unavailable: reason)
-                        case .loading, .none:
-                            // Never a zeroed gauge while we do not know yet: an
-                            // empty bar reads as "nothing used", which is a claim.
-                            UsageCardView(provider: provider, unavailable: .network(t("Checking…")))
-                        }
+                        UsageCardView(
+                            snapshot: snapshot,
+                            paceByWindowID: usageStore.pace(for: snapshot)
+                        )
 
                         UsageHistoryChart(
                             provider: provider,
