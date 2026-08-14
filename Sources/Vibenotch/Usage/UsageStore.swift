@@ -142,6 +142,19 @@ final class UsageStore {
     }
 
     private func apply(_ entry: Entry, for kind: UsageProviderKind) {
+        // Logged because a quota that never appears is otherwise indis-
+        // tinguishable from one that is simply not published yet: the panel
+        // shows nothing either way, by design. Without this the only way to
+        // tell a signed-out account from a broken endpoint is a rebuild.
+        // The reason only — never the token, never the account.
+        if case let .failed(reason) = entry {
+            // Plain %@: NSLog does not understand os_log's %{public}@ and
+            // prints the specifier verbatim. The unified log redacts this to
+            // <private>, so read it by running the binary from a terminal —
+            // which is how the publish failure below was actually found.
+            NSLog("Vibenotch usage: %@ unavailable (%@)", kind.rawValue, String(describing: reason))
+        }
+
         // A provider that failed this time keeps its last good numbers rather
         // than blanking: a dropped request is not evidence the quota changed.
         if case .failed = entry, case .loaded = entries[kind] {
