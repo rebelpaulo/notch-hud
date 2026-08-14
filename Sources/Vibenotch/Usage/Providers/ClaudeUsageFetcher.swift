@@ -49,6 +49,10 @@ struct ClaudeUsageFetcher: UsageFetching {
             provider: .claude,
             account: nil,
             plan: nil,
+            // We authenticate with the OAuth token Claude Code stores for a
+            // signed-in subscription; there is no API-key path through this
+            // fetcher, so anything it can reach is a plan.
+            billing: .plan(nil),
             windows: Self.windows(from: payload),
             capturedAt: now
         )

@@ -3,9 +3,12 @@ import Foundation
 /// Tokens for one model on one day, broken down by how they are priced.
 ///
 /// `cachedInputTokens` is the cache-*read* portion; `inputTokens` is
-/// everything else billed at the plain input rate (for Claude that already
-/// includes `cache_creation_input_tokens` — see `LocalUsagePricing`'s doc
-/// comment for why).
+/// everything else. Kept split even though nothing prices them today: the two
+/// are what the logs report, and collapsing them here would throw away the
+/// only place the distinction still exists.
+///
+/// Codex counts its cached tokens INSIDE `input_tokens`; Claude reports them
+/// alongside. Reading both the same way inflates one of them silently.
 private struct TokenTally: Sendable, Equatable, Codable {
     var inputTokens = 0
     var cachedInputTokens = 0
@@ -22,16 +25,16 @@ private struct TokenTally: Sendable, Equatable, Codable {
     }
 }
 
-/// One provider's token/cost totals on one calendar day.
+/// One provider's token total on one calendar day.
+///
+/// Tokens only, no money. Both accounts here are subscriptions, so no
+/// per-token charge exists to report — a dollar figure would have to be
+/// invented from published API rates and then labelled as something the user
+/// did not pay. Tokens are the exact, checkable quantity.
 struct LocalUsageDayPoint: Sendable, Equatable, Identifiable {
     let day: Date
     let provider: UsageProviderKind
     let totalTokens: Int
-    /// See `LocalUsagePricing`: an estimate of API-rate cost, not money spent.
-    let notionalCostUSD: Double
-    /// Tokens that went into `totalTokens` but not `notionalCostUSD` because
-    /// their model has no entry in `LocalUsagePricing.rates`.
-    let unpricedTokens: Int
     /// The model that accounted for the most tokens this day, or nil if no
     /// record that day carried a model id.
     let topModel: String?
@@ -39,20 +42,14 @@ struct LocalUsageDayPoint: Sendable, Equatable, Identifiable {
     var id: String { "\(provider.rawValue)-\(Int(day.timeIntervalSince1970))" }
 }
 
-/// Tokens and notional cost summed over a span of days.
+/// Tokens summed over a span of days.
 struct LocalUsageTotals: Sendable, Equatable {
     let totalTokens: Int
-    let notionalCostUSD: Double
-    let unpricedTokens: Int
 
-    static let zero = LocalUsageTotals(totalTokens: 0, notionalCostUSD: 0, unpricedTokens: 0)
+    static let zero = LocalUsageTotals(totalTokens: 0)
 
     static func + (lhs: LocalUsageTotals, rhs: LocalUsageTotals) -> LocalUsageTotals {
-        LocalUsageTotals(
-            totalTokens: lhs.totalTokens + rhs.totalTokens,
-            notionalCostUSD: lhs.notionalCostUSD + rhs.notionalCostUSD,
-            unpricedTokens: lhs.unpricedTokens + rhs.unpricedTokens
-        )
+        LocalUsageTotals(totalTokens: lhs.totalTokens + rhs.totalTokens)
     }
 }
 
@@ -243,20 +240,11 @@ actor LocalUsageScanner {
 
     private static func point(day: Date, provider: UsageProviderKind, models: [String: TokenTally]) -> LocalUsageDayPoint {
         var totalTokens = 0
-        var cost = 0.0
-        var unpriced = 0
         var bestModel: String?
         var bestTokens = -1
 
         for (model, tally) in models.sorted(by: { $0.key < $1.key }) {
             totalTokens += tally.totalTokens
-            if let rates = LocalUsagePricing.rates[model] {
-                cost += Double(tally.inputTokens) / 1_000_000 * rates.inputPerMillion
-                cost += Double(tally.cachedInputTokens) / 1_000_000 * rates.cachedInputPerMillion
-                cost += Double(tally.outputTokens) / 1_000_000 * rates.outputPerMillion
-            } else {
-                unpriced += tally.totalTokens
-            }
             if tally.totalTokens > bestTokens {
                 bestTokens = tally.totalTokens
                 bestModel = model
@@ -267,8 +255,6 @@ actor LocalUsageScanner {
             day: day,
             provider: provider,
             totalTokens: totalTokens,
-            notionalCostUSD: cost,
-            unpricedTokens: unpriced,
             topModel: bestModel == Self.unknownModelKey ? nil : bestModel
         )
     }
@@ -613,6 +599,6 @@ actor LocalUsageScanner {
 
 private extension LocalUsageDayPoint {
     var totals: LocalUsageTotals {
-        LocalUsageTotals(totalTokens: totalTokens, notionalCostUSD: notionalCostUSD, unpricedTokens: unpricedTokens)
+        LocalUsageTotals(totalTokens: totalTokens)
     }
 }

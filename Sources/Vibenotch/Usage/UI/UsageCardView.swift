@@ -214,6 +214,7 @@ struct UsageCardView: View {
             provider: .claude,
             account: "paulo@originaly.dev",
             plan: "Max 20x",
+            billing: .plan("Max 20x"),
             windows: [
                 UsageWindow(
                     kind: .session,
@@ -249,6 +250,7 @@ struct UsageCardView: View {
             provider: .codex,
             account: "paulo@originaly.dev",
             plan: "Pro",
+            billing: .plan("Pro"),
             windows: [
                 UsageWindow(
                     kind: .session,
@@ -288,6 +290,7 @@ struct UsageCardView: View {
             provider: .claude,
             account: "paulo@originaly.dev",
             plan: "Max 20x",
+            billing: .plan("Max 20x"),
             windows: [
                 UsageWindow(
                     kind: .session,

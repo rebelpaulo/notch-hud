@@ -106,11 +106,31 @@ struct UsagePace: Sendable, Equatable {
     var willLastToReset: Bool { runsOutAt == nil }
 }
 
+/// How this account is paid for, which decides whether money is a sensible
+/// thing to show at all.
+///
+/// On a subscription there is no per-token charge, so a dollar figure could
+/// only be invented from published API rates and then shown next to usage the
+/// user did not pay for. Tokens are the exact quantity; money is not our
+/// number to state. Both accounts here are subscriptions, so the `apiKey` case
+/// is recorded rather than acted on — it exists so the distinction is in the
+/// model instead of in someone's head.
+enum UsageBilling: Sendable, Equatable {
+    case plan(String?)
+    case apiKey
+
+    var isSubscription: Bool {
+        if case .plan = self { return true }
+        return false
+    }
+}
+
 /// Everything one provider can tell us in one poll.
 struct UsageSnapshot: Sendable, Equatable {
     let provider: UsageProviderKind
     let account: String?
     let plan: String?
+    let billing: UsageBilling
     let windows: [UsageWindow]
     let capturedAt: Date
 

@@ -77,8 +77,6 @@ import Testing
     let point = try #require(series.points.first { $0.provider == .claude })
 
     #expect(point.totalTokens == 550)
-    #expect(point.notionalCostUSD == 0)
-    #expect(point.unpricedTokens == 550)
     #expect(point.topModel == "claude-mystery-model-not-in-price-table")
 }
 
@@ -412,4 +410,37 @@ private final class LocalUsageFixture {
         try (lines.joined(separator: "\n") + "\n").write(to: url, atomically: true, encoding: .utf8)
         return url
     }
+}
+
+@Test func dedupeSurvivesAResumeSoAReplayedMessageIsNotCountedTwice() async throws {
+    // The shipped dedupe test only proved dedupe WITHIN one pass: it would
+    // pass even if the seen-id set were thrown away between scans. This is the
+    // case that actually happens — a resumed CLI session replays an assistant
+    // message it already wrote, and the file is scanned incrementally, so the
+    // ids must come back from the cache or every append re-admits duplicates.
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    let original = assistantLine(timestamp: now, messageID: "msg_a", requestID: "req_a", input: 1_000, output: 100)
+    let url = try fixture.writeClaudeSession(lines: [original])
+
+    let scanner = fixture.scanner()
+    let first = await scanner.scan(now: now)
+    #expect(first.points.first { $0.provider == .claude }?.totalTokens == 1_100)
+
+    // The same message again, plus a genuinely new one.
+    let fresh = assistantLine(timestamp: now, messageID: "msg_b", requestID: "req_b", input: 10, output: 1)
+    try fixture.appendRaw(original + "\n" + fresh + "\n", to: url)
+
+    let second = await scanner.scan(now: now)
+    // 1100 + 11, NOT 1100 + 1100 + 11: the replay is recognised across the
+    // resume boundary, where the offset means those bytes are seen fresh.
+    #expect(second.points.first { $0.provider == .claude }?.totalTokens == 1_111)
+
+    // And across a relaunch, where the ids can only come from the persisted
+    // cache rather than from memory.
+    let relaunched = fixture.scanner()
+    let third = await relaunched.scan(now: now)
+    #expect(third.points.first { $0.provider == .claude }?.totalTokens == 1_111)
 }

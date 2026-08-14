@@ -48,6 +48,9 @@ struct CodexUsageFetcher: UsageFetching {
             provider: .codex,
             account: payload.email,
             plan: payload.planType,
+            // `plan_type` is the subscription's name, so its presence is the
+            // signal. Without it we are talking to something billed per token.
+            billing: payload.planType.map(UsageBilling.plan) ?? .apiKey,
             windows: Self.windows(from: payload),
             capturedAt: now
         )
