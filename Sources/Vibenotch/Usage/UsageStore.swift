@@ -88,13 +88,26 @@ final class UsageStore {
         return result
     }
 
-    /// Called when the quota tab becomes visible. Cheap to call repeatedly.
-    func refreshIfStale(now: Date = .now) {
-        if let lastRefresh, now.timeIntervalSince(lastRefresh) < Self.staleAfter, inFlight == nil {
+    /// Called when the quota tab becomes visible, and on a slower cadence by
+    /// the remote bridge. Cheap to call repeatedly.
+    ///
+    /// `maxAge` is a parameter because the two callers want different things:
+    /// someone staring at the panel deserves a fresher number than a
+    /// background publish does, and the background one is the one that must
+    /// not become a poll against an undocumented endpoint.
+    func refreshIfStale(maxAge: TimeInterval = staleAfter, now: Date = .now) {
+        if let lastRefresh, now.timeIntervalSince(lastRefresh) < maxAge, inFlight == nil {
             return
         }
         refresh(now: now)
     }
+
+    /// How often the bridge refreshes so the PHONE has something to show. The
+    /// quota tab is not the only consumer any more, and it was the only
+    /// trigger: without this, nothing was ever fetched unless someone opened
+    /// the notch on the Mac — which is exactly the trip to the Mac the phone
+    /// exists to save.
+    static let backgroundMaxAge: TimeInterval = 300
 
     func refresh(now: Date = .now) {
         // One refresh at a time. Two overlapping passes would race to write

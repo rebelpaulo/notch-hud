@@ -80,6 +80,18 @@ protocol RemoteSessionStoring: AnyObject {
 
 extension SessionStore: RemoteSessionStoring {}
 
+/// The slice of `UsageStore` the publisher needs: what each provider last
+/// loaded, and the pace engine's read on it. Pace is computed here — on the
+/// Mac — and never in JavaScript, so this is the only door into that math.
+@MainActor
+protocol RemoteUsageStoring: AnyObject {
+    var entries: [UsageProviderKind: UsageStore.Entry] { get }
+    func pace(for snapshot: UsageSnapshot, now: Date) -> [String: UsagePace]
+    func refreshIfStale(maxAge: TimeInterval, now: Date)
+}
+
+extension UsageStore: RemoteUsageStoring {}
+
 @MainActor
 final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
@@ -92,6 +104,7 @@ final class RemoteBridge {
 
     private let engine: any RemoteKeepAwakeEngine
     private let sessionStore: any RemoteSessionStoring
+    private let usageStore: any RemoteUsageStoring
     private let commandRunner: any CommandRunning
     private let powerSourceProvider: any PowerSourceProviding
     private let pairingURL: URL
@@ -134,6 +147,7 @@ final class RemoteBridge {
     init(
         engine: any RemoteKeepAwakeEngine,
         sessionStore: any RemoteSessionStoring,
+        usageStore: any RemoteUsageStoring = UsageStore(),
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -147,6 +161,7 @@ final class RemoteBridge {
         self.remoteControlServer = remoteControlServer
         self.engine = engine
         self.sessionStore = sessionStore
+        self.usageStore = usageStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
         self.powerSourceProvider = powerSourceProvider
         self.userDefaults = userDefaults
@@ -265,6 +280,11 @@ final class RemoteBridge {
     private var lastPublishedSessions: [PublishedSession]?
     private var lastPublishedResumable: [PublishedConversation]?
 
+    /// The last rendered usage JSON, compared as text like the status strip —
+    /// quotas move slowly and /api/state is a write, so an unchanged reading
+    /// is not worth a POST.
+    private var lastPublishedUsage: String?
+
     /// The last request actually carried out. A clear that succeeds on the
     /// server but is not reflected in the next GET would otherwise run the
     /// same request twice.
@@ -340,6 +360,31 @@ final class RemoteBridge {
             startedAt = formatter.string(from: session.startedAt ?? session.updatedAt)
             subagents = session.subagents
         }
+    }
+
+    /// One provider's slice of the wire contract. Rendered by hand rather
+    /// than through `JSONEncoder`: on Darwin, `JSONEncoder`'s keyed
+    /// containers go through an unordered dictionary before serializing, so
+    /// the same value can come out with its keys in a different order on
+    /// every encode — exactly the "dictionary reorders itself" case that
+    /// would make `publishUsageIfChanged()`'s change-detection fire on an
+    /// unchanged snapshot.
+    fileprivate struct PublishedUsageProvider: Equatable {
+        let plan: String?
+        let account: String?
+        let windows: [PublishedUsageWindow]
+    }
+
+    /// One quota window. Field order here IS the wire order.
+    fileprivate struct PublishedUsageWindow: Equatable {
+        let kind: String
+        let percentUsed: Double
+        let resetsAt: String?
+        let scope: String?
+        let severity: String
+        let expectedPercent: Double?
+        let deltaPercent: Double?
+        let runsOutAt: String?
     }
 
     // nil until the first successful reconcile; then the on/off value both
@@ -440,6 +485,12 @@ final class RemoteBridge {
         await publishBatteryIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
+        // Ask before publishing, on a five-minute cadence rather than the
+        // bridge's ten-second one. Opening the quota tab was the only thing
+        // that ever fetched these, so the phone would have shown whatever was
+        // last looked at on the Mac — or nothing at all.
+        usageStore.refreshIfStale(maxAge: UsageStore.backgroundMaxAge, now: Date())
+        await publishUsageIfChanged()
         await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
         await updateStatusStrip(enabled: remote.statusNotification == true)
         await runPendingCommand(remote.command)
@@ -604,6 +655,81 @@ final class RemoteBridge {
         if await run(["--state-put"], stdin: body).exitCode == 0 {
             lastPublishedResumable = snapshot
         }
+    }
+
+    /// Publishes the Claude/Codex quota gauges so the phone can draw the same
+    /// bars the notch does. On change only, compared on the rendered JSON —
+    /// same rule as the status strip. Never triggers a refresh itself: this
+    /// publishes whatever `UsageStore` already holds, and a provider with
+    /// nothing loaded is left out of the object entirely rather than sent as
+    /// null.
+    private func publishUsageIfChanged() async {
+        guard let body = renderedUsagePayload() else { return }
+        guard body != lastPublishedUsage else { return }
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedUsage = body
+        }
+    }
+
+    private func renderedUsagePayload() -> String? {
+        let claude = publishedUsageProvider(for: .claude)
+        let codex = publishedUsageProvider(for: .codex)
+        // Nothing loaded on either side: no usage object at all, not an
+        // empty one.
+        guard claude != nil || codex != nil else { return nil }
+
+        // Provider order follows the enum's own declaration order (claude,
+        // codex) rather than a dictionary, and a provider with nothing
+        // loaded is left out of the join entirely — never `"codex":null`.
+        var providers: [String] = []
+        if let claude {
+            providers.append("\"claude\":\(renderedUsageProvider(claude))")
+        }
+        if let codex {
+            providers.append("\"codex\":\(renderedUsageProvider(codex))")
+        }
+        return "{\"usage\":{\(providers.joined(separator: ","))}}"
+    }
+
+    private func renderedUsageProvider(_ provider: PublishedUsageProvider) -> String {
+        let windows = provider.windows.map(renderedUsageWindow).joined(separator: ",")
+        return "{\"plan\":\(jsonStringOrNull(provider.plan))"
+            + ",\"account\":\(jsonStringOrNull(provider.account))"
+            + ",\"windows\":[\(windows)]}"
+    }
+
+    private func renderedUsageWindow(_ window: PublishedUsageWindow) -> String {
+        "{\"kind\":\(jsonString(window.kind))"
+            + ",\"percent_used\":\(jsonNumber(window.percentUsed))"
+            + ",\"resets_at\":\(jsonStringOrNull(window.resetsAt))"
+            + ",\"scope\":\(jsonStringOrNull(window.scope))"
+            + ",\"severity\":\(jsonString(window.severity))"
+            + ",\"expected_percent\":\(jsonNumberOrNull(window.expectedPercent))"
+            + ",\"delta_percent\":\(jsonNumberOrNull(window.deltaPercent))"
+            + ",\"runs_out_at\":\(jsonStringOrNull(window.runsOutAt))}"
+    }
+
+    private func publishedUsageProvider(for kind: UsageProviderKind) -> PublishedUsageProvider? {
+        guard case .loaded(let snapshot) = usageStore.entries[kind] else { return nil }
+
+        let pace = usageStore.pace(for: snapshot, now: Date())
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        let windows = snapshot.windows.map { window -> PublishedUsageWindow in
+            let windowPace = pace[window.id]
+            return PublishedUsageWindow(
+                kind: window.kind == .session ? "session" : "weekly",
+                percentUsed: window.percentUsed,
+                resetsAt: window.resetsAt.map { formatter.string(from: $0) },
+                scope: window.scopeLabel,
+                severity: window.severity.rawValue,
+                expectedPercent: windowPace?.expectedPercent,
+                deltaPercent: windowPace?.deltaPercent,
+                runsOutAt: windowPace?.runsOutAt.map { formatter.string(from: $0) }
+            )
+        }
+        return PublishedUsageProvider(plan: snapshot.plan, account: snapshot.account, windows: windows)
     }
 
     /// The phone can ask for exactly one thing, and it cannot say how.
@@ -939,6 +1065,42 @@ final class RemoteBridge {
         }
         return result
     }
+}
+
+/// Minimal hand-rolled JSON scalar rendering for the usage payload — see
+/// `RemoteBridge.PublishedUsageProvider` for why `JSONEncoder` is not used
+/// for this one value on this platform.
+private func jsonString(_ value: String) -> String {
+    var result = "\""
+    for scalar in value.unicodeScalars {
+        switch scalar {
+        case "\"": result += "\\\""
+        case "\\": result += "\\\\"
+        case "\n": result += "\\n"
+        case "\r": result += "\\r"
+        case "\t": result += "\\t"
+        default:
+            if scalar.value < 0x20 {
+                result += String(format: "\\u%04x", scalar.value)
+            } else {
+                result.unicodeScalars.append(scalar)
+            }
+        }
+    }
+    result += "\""
+    return result
+}
+
+private func jsonStringOrNull(_ value: String?) -> String {
+    value.map(jsonString) ?? "null"
+}
+
+private func jsonNumber(_ value: Double) -> String {
+    String(value)
+}
+
+private func jsonNumberOrNull(_ value: Double?) -> String {
+    value.map(jsonNumber) ?? "null"
 }
 
 /// The seven remote-managed fields of `KeepAwakeConfig`, mapped to the wire
