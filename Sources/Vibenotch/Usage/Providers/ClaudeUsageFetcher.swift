@@ -99,19 +99,20 @@ private extension UsageWindow {
     init?(claudeLimit limit: ClaudeUsageResponse.Limit) {
         // Missing percent must not become 0% — that would read as "fine".
         guard let percent = limit.percent else { return nil }
-        self.init(
+        guard let validated = UsageWindow.validated(
             kind: ClaudeUsageFetcher.kind(forGroup: limit.group),
             percentUsed: percent,
             resetsAt: ClaudeUsageFetcher.parseISO8601(limit.resetsAt),
             windowLength: nil,
             scopeLabel: limit.scope?.model?.displayName,
             severity: ClaudeUsageFetcher.severity(from: limit.severity)
-        )
+        ) else { return nil }
+        self = validated
     }
 
     init?(claudeFallback window: ClaudeUsageResponse.Window, kind: UsageWindowKind) {
         guard let percent = window.utilization else { return nil }
-        self.init(
+        guard let validated = UsageWindow.validated(
             kind: kind,
             percentUsed: percent,
             resetsAt: ClaudeUsageFetcher.parseISO8601(window.resetsAt),
@@ -119,7 +120,8 @@ private extension UsageWindow {
             scopeLabel: nil,
             // The fallback shape carries no severity of its own.
             severity: .derived(fromPercentUsed: percent)
-        )
+        ) else { return nil }
+        self = validated
     }
 }
 

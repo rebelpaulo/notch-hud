@@ -53,13 +53,31 @@ final class UsageStore {
         entries.isEmpty || entries.values.contains { $0 == .loading }
     }
 
-    func tokens(for provider: UsageProviderKind, today: Bool) -> Int {
+    /// Tokens for one provider, either today or across the trailing window the
+    /// card claims to show.
+    ///
+    /// The window is applied on purpose. The first version filtered by date
+    /// only in the `today` case and otherwise summed every point the scanner
+    /// returned — and the scanner keeps a few days more than the card labels,
+    /// so a long-lived transcript touched recently pulled older days into a
+    /// total captioned "Last 31 days". A number under a label that does not
+    /// describe it is worse than no number.
+    func tokens(for provider: UsageProviderKind, today: Bool, now: Date = .now) -> Int {
         guard let localSeries else { return 0 }
-        let days = today
-            ? localSeries.points.filter { $0.provider == provider && Calendar.current.isDateInToday($0.day) }
-            : localSeries.points.filter { $0.provider == provider }
+        let calendar = Calendar.current
+        let cutoff = calendar.date(byAdding: .day, value: -(Self.trailingDays - 1), to: calendar.startOfDay(for: now))
+
+        let days = localSeries.points.filter { point in
+            guard point.provider == provider else { return false }
+            if today { return calendar.isDate(point.day, inSameDayAs: now) }
+            guard let cutoff else { return true }
+            return point.day >= cutoff
+        }
         return days.reduce(0) { $0 + $1.totalTokens }
     }
+
+    /// Matches the caption on the card. Change one and the other is a lie.
+    static let trailingDays = 31
 
     /// Kicked off when the tab opens. The scan is the slow one, so it runs
     /// once per launch and then rides its own on-disk cache.

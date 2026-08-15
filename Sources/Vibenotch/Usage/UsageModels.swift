@@ -88,6 +88,34 @@ struct UsageWindow: Sendable, Equatable, Identifiable {
     var percentLeft: Double {
         max(0, 100 - percentUsed)
     }
+
+    /// The constructor for anything coming off the wire. Returns nil when the
+    /// percentage is not a percentage.
+    ///
+    /// A separate factory rather than a failable init so that constructing a
+    /// window from values already known to be good — a preview, a test — stays
+    /// a plain expression. The rule it enforces is the one the rest of this
+    /// layer already follows: a value we cannot believe produces an ABSENT
+    /// window, never a shown one. Without it a service answering `120` drew a
+    /// bar reading "120% used" and sent that number on to the phone.
+    static func validated(
+        kind: UsageWindowKind,
+        percentUsed: Double,
+        resetsAt: Date?,
+        windowLength: TimeInterval?,
+        scopeLabel: String?,
+        severity: UsageSeverity
+    ) -> UsageWindow? {
+        guard percentUsed.isFinite, (0...100).contains(percentUsed) else { return nil }
+        return UsageWindow(
+            kind: kind,
+            percentUsed: percentUsed,
+            resetsAt: resetsAt,
+            windowLength: windowLength,
+            scopeLabel: scopeLabel,
+            severity: severity
+        )
+    }
 }
 
 /// Where the user should be if they were spending evenly, and what that implies.

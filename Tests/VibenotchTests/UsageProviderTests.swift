@@ -209,3 +209,31 @@ private let codexFixture = Data("""
     #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: seconds * 1000) == nil)
     #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: Double?.none) == nil)
 }
+
+@Test func aPercentageThatIsNotAPercentageProducesNoWindow() {
+    // From the Codex review: the fetchers passed whatever arrived straight
+    // through, so a service answering 120 drew a bar reading "120% used" and
+    // published that number to the phone.
+    let good = UsageWindow.validated(
+        kind: .weekly, percentUsed: 84, resetsAt: nil,
+        windowLength: nil, scopeLabel: nil, severity: .warning
+    )
+    #expect(good != nil)
+
+    for bad in [120.0, -5.0, .infinity, .nan] {
+        #expect(UsageWindow.validated(
+            kind: .weekly, percentUsed: bad, resetsAt: nil,
+            windowLength: nil, scopeLabel: nil, severity: .normal
+        ) == nil)
+    }
+
+    // The edges are legitimate: an untouched quota and an exhausted one.
+    #expect(UsageWindow.validated(
+        kind: .session, percentUsed: 0, resetsAt: nil,
+        windowLength: nil, scopeLabel: nil, severity: .normal
+    ) != nil)
+    #expect(UsageWindow.validated(
+        kind: .session, percentUsed: 100, resetsAt: nil,
+        windowLength: nil, scopeLabel: nil, severity: .critical
+    ) != nil)
+}

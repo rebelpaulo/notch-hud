@@ -100,7 +100,7 @@ private extension UsageWindow {
     init?(codexWindow window: CodexUsageResponse.Window?, scopeLabel: String?) {
         // Missing percent must not become 0% — that would read as "fine".
         guard let window, let percent = window.usedPercent else { return nil }
-        self.init(
+        guard let validated = UsageWindow.validated(
             // THE important part: classify by the window's actual length, not
             // by which slot it arrived in. On a real account here the
             // *primary* window was the 604800-second (weekly) one with
@@ -113,7 +113,8 @@ private extension UsageWindow {
             scopeLabel: scopeLabel,
             // Codex reports no severity of its own.
             severity: .derived(fromPercentUsed: percent)
-        )
+        ) else { return nil }
+        self = validated
     }
 
 }
