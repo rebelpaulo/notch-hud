@@ -811,9 +811,15 @@ final class RemoteBridge {
     private func renderedUsageHistoryPayload() -> String? {
         let claude = publishedUsageHistoryProvider(for: .claude)
         let codex = publishedUsageHistoryProvider(for: .codex)
-        // Neither provider has any days: no usage_history key at all, not an
-        // empty one.
-        guard claude != nil || codex != nil else { return nil }
+
+        // Nothing at all to report, and nothing was ever reported: stay quiet.
+        // But once something HAS been published, silence stops being neutral —
+        // the payload replaces only the keys it carries, so an omitted
+        // provider keeps whatever the remote last saw. A provider whose last
+        // day ages out of the window would leave the phone drawing a chart
+        // that no longer exists anywhere else. So after the first publish we
+        // always say something, even if what we have to say is "nothing".
+        guard claude != nil || codex != nil || lastPublishedUsageHistory != nil else { return nil }
 
         var providers: [String] = []
         if let claude {

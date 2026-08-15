@@ -70,8 +70,20 @@ struct ClaudeUsageFetcher: UsageFetching {
         ].compactMap { $0 }
     }
 
-    fileprivate static func severity(from raw: String?) -> UsageSeverity {
-        guard let raw, let value = UsageSeverity(rawValue: raw) else { return .normal }
+    /// Prefers what the service says, and falls back to the percentage rather
+    /// than to the calmest possible answer.
+    ///
+    /// Defaulting an unrecognised word to `.normal` picked the one value that
+    /// can never look alarming. This endpoint is undocumented and renames
+    /// fields; the day it invents a new severity word, a window at 95% would
+    /// have reported "normal" into `worstSeverity` and the notch badge would
+    /// have under-stated the state — exactly when it matters. The derived
+    /// value is what Codex already uses, so both providers degrade the same
+    /// way instead of one of them degrading optimistically.
+    fileprivate static func severity(from raw: String?, percentUsed: Double) -> UsageSeverity {
+        guard let raw, let value = UsageSeverity(rawValue: raw) else {
+            return .derived(fromPercentUsed: percentUsed)
+        }
         return value
     }
 
@@ -123,7 +135,7 @@ private extension UsageWindow {
             resetsAt: ClaudeUsageFetcher.parseISO8601(limit.resetsAt),
             windowLength: nil,
             scopeLabel: ClaudeUsageFetcher.scopeLabel(from: limit.scope),
-            severity: ClaudeUsageFetcher.severity(from: limit.severity)
+            severity: ClaudeUsageFetcher.severity(from: limit.severity, percentUsed: percent)
         ) else { return nil }
         self = validated
     }

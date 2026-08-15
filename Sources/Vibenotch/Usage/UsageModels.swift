@@ -87,8 +87,17 @@ struct UsageWindow: Sendable, Equatable, Identifiable {
     let scopeLabel: String?
     let severity: UsageSeverity
 
+    /// Unique per window within one snapshot.
+    ///
+    /// Kind and scope alone were not enough: two account-wide windows of the
+    /// same kind — a primary and a secondary that both classify as weekly —
+    /// produced the SAME id. Pace is keyed by this in a dictionary, so one
+    /// window's pace was silently applied to the other, and `ForEach` over the
+    /// scoped rows would have collapsed them into one. The reset time is what
+    /// actually distinguishes two windows that otherwise look alike.
     var id: String {
-        "\(kind)-\(scopeLabel ?? "account")"
+        let reset = resetsAt.map { String(Int($0.timeIntervalSince1970)) } ?? "none"
+        return "\(kind)-\(scopeLabel ?? "account")-\(reset)"
     }
 
     /// Stands in for a scope name the API didn't provide, on a window that IS

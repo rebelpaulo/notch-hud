@@ -64,12 +64,26 @@ enum UsageFormatting {
         return t("updated %dd ago", Int(seconds / 86_400))
     }
 
+    /// Points of pace drift treated as noise rather than a real lead or lag.
+    /// This is the ONE place that number lives: both `pacePhrase` (the
+    /// words) and `UsageGauge`'s marker color are the same "ahead of pace?"
+    /// judgement rendered twice — through this one threshold — so the two
+    /// can never disagree on the same row again.
+    static let paceNoiseFloor: Double = 5
+
+    /// Whether a delta is far enough past the noise floor to read as ahead
+    /// of pace — the same judgement `pacePhrase` turns into words, exposed
+    /// as a plain yes/no for `UsageGauge`'s marker color to key off of.
+    static func isAheadOfPace(_ pace: UsagePace) -> Bool {
+        pace.deltaPercent > paceNoiseFloor
+    }
+
     /// "On pace" / "Ahead of pace" / "Behind pace". The ±5 point band is a
     /// noise floor — a delta of 1 or 2 is measurement jitter, not a trend
     /// worth alarming the user about.
     static func pacePhrase(_ pace: UsagePace) -> String {
-        if pace.deltaPercent > 5 { return t("Ahead of pace") }
-        if pace.deltaPercent < -5 { return t("Behind pace") }
+        if isAheadOfPace(pace) { return t("Ahead of pace") }
+        if pace.deltaPercent < -paceNoiseFloor { return t("Behind pace") }
         return t("On pace")
     }
 
@@ -87,16 +101,19 @@ extension UsageFormatting {
     /// 9.8B stay distinguishable; none above, where the extra digit is noise.
     static func tokenCount(_ tokens: Int) -> String {
         let value = Double(tokens)
-        switch value {
-        case 1e9...:
-            return compact(value / 1e9, suffix: "B")
-        case 1e6...:
-            return compact(value / 1e6, suffix: "M")
-        case 1e3...:
-            return compact(value / 1e3, suffix: "K")
-        default:
-            return "\(tokens)"
+        // Ordered largest-first so the first divisor the raw value clears
+        // wins, same as the old switch — but the suffix isn't final until
+        // we check what it will actually *print*: rounding a value like
+        // 999_999 up at the K tier prints "1000K", which is really 1M's
+        // territory, so a "1000" print bumps to the next suffix up.
+        let tiers: [(divisor: Double, suffix: String)] = [(1e9, "B"), (1e6, "M"), (1e3, "K")]
+        for (index, tier) in tiers.enumerated() where value >= tier.divisor {
+            let printed = compact(value / tier.divisor, suffix: tier.suffix)
+            guard printed.hasPrefix("1000"), index > 0 else { return printed }
+            let next = tiers[index - 1]
+            return compact(value / next.divisor, suffix: next.suffix)
         }
+        return "\(tokens)"
     }
 
     private static func compact(_ value: Double, suffix: String) -> String {

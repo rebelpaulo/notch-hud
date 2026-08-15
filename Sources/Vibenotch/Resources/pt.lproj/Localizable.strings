@@ -135,9 +135,9 @@
 "Resets in %@" = "Reinicia em %@";
 "Runs out in %@" = "Esgota em %@";
 "<1% used" = "<1% usado";
-"%d%% used" = "%d%% usado";
+"%d%% used" = "%d%% usados";
 "<1% left" = "<1% restante";
-"%d%% left" = "%d%% restante";
+"%d%% left" = "%d%% restantes";
 "updated just now" = "atualizado agora mesmo";
 "updated %dm ago" = "atualizado há %dm";
 "updated %dh ago" = "atualizado há %dh";

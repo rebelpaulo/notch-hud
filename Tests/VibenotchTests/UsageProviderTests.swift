@@ -351,3 +351,21 @@ private let codexFixture = Data("""
     #expect(scoped.contains { $0.kind == .session && $0.percentUsed == 10 })
     #expect(scoped.contains { $0.kind == .weekly && $0.percentUsed == 40 })
 }
+
+@Test func anUnknownSeverityWordFallsBackToThePercentNotToNormal() async throws {
+    // `.normal` is the one value that can never look alarming, which makes it
+    // the worst possible default for an endpoint that renames things.
+    let body = """
+    {"limits":[{"kind":"weekly_all","group":"weekly","percent":95,"severity":"chartreuse",
+                "resets_at":"2026-08-16T17:00:00Z","scope":null,"is_active":true}]}
+    """
+    let fetcher = ClaudeUsageFetcher(
+        credentials: FakeClaudeCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: Data(body.utf8))
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+    let weekly = try #require(snapshot.window(.weekly))
+    #expect(weekly.severity == .critical)
+    #expect(snapshot.worstSeverity == .critical)
+}

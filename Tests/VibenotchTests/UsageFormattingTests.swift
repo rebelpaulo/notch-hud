@@ -119,3 +119,38 @@ struct UsageFormattingTests {
     // A whole number keeps no pointless decimal.
     #expect(UsageFormatting.tokenCount(2_000_000) == "2M")
 }
+
+// DEFECT 1: the suffix must be chosen against the value as it will actually
+// be printed, not the raw value — otherwise rounding pushes a number like
+// 999_999 into "1000K" instead of bumping it to the next suffix.
+@Test func tokenCountNeverPrintsAThousandOfTheCurrentSuffix() {
+    #expect(UsageFormatting.tokenCount(999_999) == "1M")
+    #expect(UsageFormatting.tokenCount(1_000_000) == "1M")
+    #expect(UsageFormatting.tokenCount(999_999_999) == "1B")
+    #expect(UsageFormatting.tokenCount(1_000_000_000) == "1B")
+}
+
+// DEFECT 2: the gauge marker's color and `pacePhrase`'s words must be driven
+// by the same judgement so they can never disagree on the same row.
+@Test func paceJudgementUsedByTheGaugeMarkerAgreesWithThePhraseBoundary() {
+    let justOverOnPace = UsagePace(expectedPercent: 50, deltaPercent: 1, runsOutAt: nil)
+    let clearlyAhead = UsagePace(expectedPercent: 50, deltaPercent: 6, runsOutAt: nil)
+    #expect(UsageFormatting.pacePhrase(justOverOnPace) == "On pace")
+    #expect(!UsageFormatting.isAheadOfPace(justOverOnPace))
+    #expect(UsageFormatting.pacePhrase(clearlyAhead) == "Ahead of pace")
+    #expect(UsageFormatting.isAheadOfPace(clearlyAhead))
+}
+
+// DEFECT 3: "%d%% left"/"%d%% used" print for values above one, so the PT
+// adjective needs plural agreement — "restante"/"usado" read as singular.
+@Test func portugueseQuotaPercentStringsAgreeInNumber() throws {
+    let url = try #require(
+        Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "pt.lproj")
+    )
+    let contents = try Data(contentsOf: url)
+    let table = try #require(
+        PropertyListSerialization.propertyList(from: contents, format: nil) as? [String: String]
+    )
+    #expect(table["%d%% left"] == "%d%% restantes")
+    #expect(table["%d%% used"] == "%d%% usados")
+}

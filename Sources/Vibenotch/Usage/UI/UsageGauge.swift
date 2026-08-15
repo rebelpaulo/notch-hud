@@ -58,7 +58,10 @@ struct UsageGauge: View {
             // faster than the window allows, green = at or under pace.
             if let pace {
                 let markerX = size.width * CGFloat(min(max(pace.expectedPercent, 0), 100)) / 100
-                let markerColor: Color = pace.deltaPercent > 0
+                // Same judgement as `UsageFormatting.pacePhrase` — routed
+                // through `isAheadOfPace` instead of re-deriving its own
+                // threshold, so the marker color can't drift from the words.
+                let markerColor: Color = UsageFormatting.isAheadOfPace(pace)
                     ? Color(nsColor: .systemRed)
                     : Color(nsColor: .systemGreen)
 
