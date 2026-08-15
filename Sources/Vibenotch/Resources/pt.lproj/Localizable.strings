@@ -73,6 +73,12 @@
 
 /* Notifications (Mac and phone) */
 "Gotta go!: battery low, going to sleep" = "Gotta go!: bateria baixa, a dormir";
+"Gotta go!: Mac too hot, going to sleep" = "Gotta go!: Mac demasiado quente, a dormir";
+"The Mac is running hot" = "O Mac está a aquecer";
+"The Mac is overheating — Gotta go! is turning off" = "O Mac está a sobreaquecer — o Gotta go! vai desligar-se";
+"The Mac is overheating" = "O Mac está a sobreaquecer";
+"hot" = "quente";
+"overheating" = "a sobreaquecer";
 "Gotta go! finished" = "Gotta go! terminou";
 "Gotta go! finished — all agents done" = "Gotta go! terminou — todos os agentes concluíram";
 "Gotta go! finished — apps closed" = "Gotta go! terminou — apps fechadas";
@@ -126,3 +132,4 @@
 "Deny" = "Negar";
 "Allow Once" = "Permitir uma vez";
 "Bypass" = "Ignorar";
+"Gotta go! could not start — the Mac is too hot" = "Gotta go! não arrancou — o Mac está demasiado quente";

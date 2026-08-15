@@ -47,6 +47,59 @@ import Testing
 }
 
 @MainActor
+@Test func criticalHeatForcesOffButSeriousDoesNot() {
+    // `serious` is a normal MacBook under a long build. Turning off there would
+    // end Gotta go! during exactly the work it exists to protect, so the line
+    // is drawn at `critical` — where macOS is already shedding performance.
+    let fixture = KeepAwakeFixture(thermalState: .serious)
+    fixture.engine.setMode(.manual)
+
+    fixture.engine.tick()
+    #expect(fixture.engine.mode == .manual)
+    #expect(fixture.engine.thermalState == .serious)
+    #expect(fixture.notifications.messages.isEmpty)
+
+    fixture.thermal.state = .critical
+    fixture.engine.tick()
+
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.assertions.activeIDs.isEmpty)
+    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
+}
+
+@MainActor
+@Test func criticalHeatReportsOncePerEpisodeAndRefusesToTurnBackOn() {
+    let fixture = KeepAwakeFixture(thermalState: .critical)
+    fixture.engine.setMode(.manual)
+
+    // Refused outright: turning on, then shutting down five seconds later, is
+    // the loop this prevents.
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.assertions.activeIDs.isEmpty)
+
+    // And SILENT. "Going to sleep" is a claim about something that was
+    // awake; refusing to start was never a shutdown, so announcing one
+    // describes an event the user did not have.
+    fixture.engine.tick()
+    fixture.engine.setMode(.manual)
+    fixture.engine.tick()
+    #expect(fixture.notifications.messages.isEmpty)
+
+    // Cooled down: it can be turned on again.
+    fixture.thermal.state = .nominal
+    fixture.engine.tick()
+    fixture.engine.setMode(.manual)
+    #expect(fixture.engine.mode == .manual)
+
+    // NOW there is something to report — a session that was running has been
+    // stopped by the heat, which is the only case the sentence describes.
+    fixture.thermal.state = .critical
+    fixture.engine.tick()
+    #expect(fixture.engine.mode == .off)
+    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
+}
+
+@MainActor
 @Test func timerExpiryTurnsEngineOffAndReportsNoRemainingTime() {
     let fixture = KeepAwakeFixture()
     let start = Date(timeIntervalSince1970: 2_000_000)
@@ -187,21 +240,30 @@ private final class KeepAwakeFixture {
     let assertions = FakeSleepAssertionProvider()
     let notifications = FakeNotificationPoster()
     let engine: KeepAwakeEngine
-    private let suiteName: String
+    let suiteName: String
     private let defaults: UserDefaults
+
+    let thermal: FakeThermalState
 
     init(
         percent: Int? = 100,
         isOnACPower: Bool = true,
-        applications: FakeRunningApplications = FakeRunningApplications()
+        thermalState: ProcessInfo.ThermalState = .nominal,
+        applications: FakeRunningApplications = FakeRunningApplications(),
+        /// Shared between two fixtures when a test needs a RELAUNCH: the
+        /// engine restores its mode from here, so a second engine over the
+        /// same defaults is what "the app started again" means.
+        reusing existingSuite: String? = nil
     ) {
-        suiteName = "KeepAwakeEngineTests.\(UUID().uuidString)"
+        suiteName = existingSuite ?? "KeepAwakeEngineTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
+        thermal = FakeThermalState(state: thermalState)
         engine = KeepAwakeEngine(
             sessionStore: store,
             assertionProvider: assertions,
             runningApplicationsProvider: applications,
             powerSourceProvider: FakePowerSource(percent: percent, isOnACPower: isOnACPower),
+            thermalStateProvider: thermal,
             notificationPoster: notifications,
             userDefaults: defaults
         )
@@ -244,6 +306,16 @@ private final class FakeRunningApplications: RunningApplicationsProviding, @unch
     }
 }
 
+private final class FakeThermalState: ThermalStateProviding, @unchecked Sendable {
+    var state: ProcessInfo.ThermalState
+
+    init(state: ProcessInfo.ThermalState = .nominal) {
+        self.state = state
+    }
+
+    var thermalState: ProcessInfo.ThermalState { state }
+}
+
 private final class FakePowerSource: PowerSourceProviding, @unchecked Sendable {
     var percent: Int?
     var isOnACPower: Bool
@@ -274,4 +346,20 @@ private func makeAwakeSession(status: SessionStatus) -> Session {
         ),
         updatedAt: Date(timeIntervalSince1970: 1_000_000)
     )
+}
+
+@MainActor
+@Test func launchingHotWithARestoredSessionDoesNotHoldTheAssertions() {
+    // A session restored from disk used to keep the Mac awake until the first
+    // tick — the app would start by holding assertions on a machine it is
+    // about to declare too hot to hold them on.
+    let warm = KeepAwakeFixture(thermalState: .nominal)
+    warm.engine.setMode(.manual)
+    #expect(warm.engine.mode == .manual)
+    #expect(!warm.assertions.activeIDs.isEmpty)
+
+    // Same persisted state, relaunched into a critically hot Mac.
+    let hot = KeepAwakeFixture(thermalState: .critical, reusing: warm.suiteName)
+    #expect(hot.engine.mode == .off)
+    #expect(hot.assertions.activeIDs.isEmpty)
 }

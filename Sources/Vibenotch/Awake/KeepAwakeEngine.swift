@@ -24,6 +24,7 @@ final class KeepAwakeEngine {
     private let assertionProvider: any SleepAssertionProviding
     private let runningApplicationsProvider: any RunningApplicationsProviding
     private let powerSourceProvider: any PowerSourceProviding
+    private let thermalStateProvider: any ThermalStateProviding
     private let notificationPoster: any NotificationPosting
     private let userDefaults: UserDefaults
 
@@ -33,11 +34,17 @@ final class KeepAwakeEngine {
     private var graceDeadline: Date?
     private var noAgentSince: Date?
     private var didPostIdleReminder = false
+    /// Re-armed when the Mac leaves `critical`, so a second episode is reported
+    /// but a single one is not reported sixty times a minute.
+    private var didReportCriticalHeat = false
 
     private(set) var mode: KeepAwakeMode = .off
     private(set) var lastOffReason: KeepAwakeOffReason?
     private(set) var activeSince: Date?
     private(set) var isOnACPower: Bool
+    /// Refreshed on the tick rather than read live, so the notch and the phone
+    /// always show the same reading the auto-off decision was made from.
+    private(set) var thermalState: ProcessInfo.ThermalState = .nominal
     private(set) var remainingTime: TimeInterval?
     var config: KeepAwakeConfig {
         didSet {
@@ -61,6 +68,7 @@ final class KeepAwakeEngine {
         assertionProvider: any SleepAssertionProviding = SystemSleepAssertionProvider(),
         runningApplicationsProvider: any RunningApplicationsProviding = SystemRunningApplicationsProvider(),
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
+        thermalStateProvider: any ThermalStateProviding = SystemThermalStateProvider(),
         notificationPoster: any NotificationPosting = SystemNotificationPoster(),
         userDefaults: UserDefaults = .standard
     ) {
@@ -68,10 +76,12 @@ final class KeepAwakeEngine {
         self.assertionProvider = assertionProvider
         self.runningApplicationsProvider = runningApplicationsProvider
         self.powerSourceProvider = powerSourceProvider
+        self.thermalStateProvider = thermalStateProvider
         self.notificationPoster = notificationPoster
         self.userDefaults = userDefaults
         self.assertionLease = KeepAwakeAssertionLease(provider: assertionProvider)
         self.isOnACPower = powerSourceProvider.snapshot().isOnACPower
+        self.thermalState = thermalStateProvider.thermalState
         let restoreTime = Date()
 
         if let data = userDefaults.data(forKey: Self.configKey),
@@ -92,6 +102,16 @@ final class KeepAwakeEngine {
         }
         remainingTime = timerRemainingTime(at: restoreTime)
         persistConfig()
+
+        // Launching into a Mac that is ALREADY critical, with a session
+        // restored from disk, would otherwise hold the assertions until the
+        // first tick — the app would start by keeping a machine awake that it
+        // is about to declare too hot to keep awake. Decide before creating
+        // them, not after.
+        if isActive, thermalState == .critical {
+            reportCriticalHeat(now: restoreTime)
+        }
+
         reconcileAssertions()
     }
 
@@ -117,6 +137,16 @@ final class KeepAwakeEngine {
     }
 
     func setMode(_ newMode: KeepAwakeMode, now: Date = Date()) {
+        // Refused here rather than left for the next tick to undo. Turning on
+        // into a critical Mac would light the bolt, post a shutdown notice five
+        // seconds later, and do the same again on the next attempt — from the
+        // notch, from the phone, and from the remote reconciler, each one
+        // costing a notification.
+        thermalState = thermalStateProvider.thermalState
+        if newMode != .off, thermalState == .critical {
+            reportCriticalHeat(now: now)
+            return
+        }
         applyMode(newMode, now: now, offReason: nil)
     }
 
@@ -149,6 +179,8 @@ final class KeepAwakeEngine {
     func tick(now: Date = Date()) {
         let powerSource = powerSourceProvider.snapshot()
         isOnACPower = powerSource.isOnACPower
+        thermalState = thermalStateProvider.thermalState
+        if thermalState != .critical { didReportCriticalHeat = false }
         guard isActive else {
             releaseAssertions()
             return
@@ -158,6 +190,17 @@ final class KeepAwakeEngine {
            let percent = powerSource.percent,
            percent <= max(10, config.batteryFloorPercent) {
             turnOff(notification: t("Gotta go!: battery low, going to sleep"), now: now)
+            return
+        }
+
+        // Critical only. macOS reports `serious` for any sustained load — a long
+        // build hits it on a healthy machine — so acting there would turn Gotta
+        // go! off during exactly the work it exists to protect. `critical` means
+        // the system is already shedding performance to survive, and holding the
+        // Mac awake past that point buys nothing: the agents are being throttled
+        // anyway, and the heat has nowhere to go with the lid shut.
+        if thermalState == .critical {
+            reportCriticalHeat(now: now)
             return
         }
 
@@ -238,6 +281,30 @@ final class KeepAwakeEngine {
         let activeHours = max(1, Int(now.timeIntervalSince(activeSince ?? now) / 3_600))
         notificationPoster.post(t("Gotta go! on for %dh with no agents working", activeHours))
         didPostIdleReminder = true
+    }
+
+    /// Shuts down for heat, and says so ONCE per critical episode.
+    ///
+    /// The latch is the point. Without it a Mac sitting at critical posts a
+    /// notification every five seconds, and every rejected attempt to turn
+    /// Gotta go! back on posts another — which is how a safety feature turns
+    /// into the reason someone mutes the app's notifications entirely.
+    private func reportCriticalHeat(now: Date) {
+        // "Going to sleep" is a claim about something that was awake. Refusing
+        // to START while the Mac is already too hot goes through here too, and
+        // announcing a shutdown that never happened describes an event the
+        // user did not have. Still marked as reported, so the message is not
+        // saved up to fire later out of context.
+        guard isActive else {
+            didReportCriticalHeat = true
+            return
+        }
+
+        turnOff(
+            notification: didReportCriticalHeat ? nil : t("Gotta go!: Mac too hot, going to sleep"),
+            now: now
+        )
+        didReportCriticalHeat = true
     }
 
     private func turnOff(

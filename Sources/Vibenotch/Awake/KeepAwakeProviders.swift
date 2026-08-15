@@ -102,6 +102,37 @@ struct SystemPowerSourceProvider: PowerSourceProviding {
     }
 }
 
+/// How hard the Mac is struggling to stay cool, as macOS itself judges it.
+///
+/// Worth having because Gotta go! exists to run the machine hard with the lid
+/// shut — the one posture where a MacBook dissipates worst, since the exhaust
+/// behind the hinge vents into a closed clamshell. Nothing here controls the
+/// fans (that is firmware, and no API can reach it); this only reads the
+/// verdict so the app can stop asking for more than the Mac can give.
+protocol ThermalStateProviding: Sendable {
+    var thermalState: ProcessInfo.ThermalState { get }
+}
+
+struct SystemThermalStateProvider: ThermalStateProviding {
+    var thermalState: ProcessInfo.ThermalState {
+        ProcessInfo.processInfo.thermalState
+    }
+}
+
+extension ProcessInfo.ThermalState {
+    /// The wire name. Spelled out rather than sent as the raw Int so the phone
+    /// keeps working if Apple ever renumbers the enum.
+    var wireName: String {
+        switch self {
+        case .nominal: "nominal"
+        case .fair: "fair"
+        case .serious: "serious"
+        case .critical: "critical"
+        @unknown default: "nominal"
+        }
+    }
+}
+
 protocol NotificationPosting: Sendable {
     func post(_ message: String)
 }
