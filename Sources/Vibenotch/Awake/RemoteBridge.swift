@@ -102,6 +102,8 @@ final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
     private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
     private static let sessionIDKeyKey = "remoteBridge.sessionIDKey"
+    private static let lastPublishedUsageDigestKey = "remoteBridge.lastPublishedUsageDigest"
+    private static let lastPublishedUsageHistoryDigestKey = "remoteBridge.lastPublishedUsageHistoryDigest"
     /// Read by the Settings window, which runs the same script from a
     /// different place and would otherwise have no way to know.
     static let scriptMismatchKey = "remoteBridge.scriptMismatch"
@@ -173,6 +175,8 @@ final class RemoteBridge {
         pairingURL = homeURL.appendingPathComponent(".vibenotch/remote.json", isDirectory: false)
         previousMode = engine.mode
         lastSyncedSettingsSnapshot = RemoteSettingsSnapshot(engine.config)
+        lastPublishedUsageDigest = userDefaults.string(forKey: Self.lastPublishedUsageDigestKey)
+        lastPublishedUsageHistoryDigest = userDefaults.string(forKey: Self.lastPublishedUsageHistoryDigestKey)
     }
 
     func start() {
@@ -285,13 +289,13 @@ final class RemoteBridge {
     private var lastPublishedSessions: [PublishedSession]?
     private var lastPublishedResumable: [PublishedConversation]?
 
-    /// The last rendered usage JSON, compared as text like the status strip —
-    /// quotas move slowly and /api/state is a write, so an unchanged reading
-    /// is not worth a POST.
-    private var lastPublishedUsage: String?
+    /// A digest survives restarts without retaining account or quota data in
+    /// preferences. That survival matters when the new reading is empty: nil
+    /// must mean "never published", not merely "this process just launched".
+    private var lastPublishedUsageDigest: String?
 
-    /// Same rule as `lastPublishedUsage`, for the local token-history series.
-    private var lastPublishedUsageHistory: String?
+    /// Same rule as `lastPublishedUsageDigest`, for local token history.
+    private var lastPublishedUsageHistoryDigest: String?
 
     /// The last request actually carried out. A clear that succeeds on the
     /// server but is not reflected in the next GET would otherwise run the
@@ -705,22 +709,32 @@ final class RemoteBridge {
     private func publishUsageIfChanged() async {
         guard !isPublishingUsage else { return }
         guard let body = renderedUsagePayload() else { return }
-        guard body != lastPublishedUsage else { return }
+        let digest = Self.payloadDigest(body)
+        guard digest != lastPublishedUsageDigest else { return }
 
         isPublishingUsage = true
         defer { isPublishingUsage = false }
 
         if await run(["--state-put"], stdin: body).exitCode == 0 {
-            lastPublishedUsage = body
+            lastPublishedUsageDigest = digest
+            userDefaults.set(digest, forKey: Self.lastPublishedUsageDigestKey)
         }
     }
 
     private func renderedUsagePayload() -> String? {
         let claude = publishedUsageProvider(for: .claude)
         let codex = publishedUsageProvider(for: .codex)
-        // Nothing loaded on either side: no usage object at all, not an
-        // empty one.
-        guard claude != nil || codex != nil else { return nil }
+        if claude == nil, codex == nil {
+            // Loading is ignorance, not an empty result. Once every attempted
+            // fetch has settled, however, a prior successful publish must be
+            // cleared or the phone keeps quotas that no provider can supply.
+            let entries = usageStore.entries.values
+            let hasFinishedFetch = !entries.isEmpty && !entries.contains { entry in
+                if case .loading = entry { return true }
+                return false
+            }
+            guard hasFinishedFetch, lastPublishedUsageDigest != nil else { return nil }
+        }
 
         // Provider order follows the enum's own declaration order (claude,
         // codex) rather than a dictionary, and a provider with nothing
@@ -798,19 +812,26 @@ final class RemoteBridge {
     private func publishUsageHistoryIfChanged() async {
         guard !isPublishingUsageHistory else { return }
         guard let body = renderedUsageHistoryPayload() else { return }
-        guard body != lastPublishedUsageHistory else { return }
+        let digest = Self.payloadDigest(body)
+        guard digest != lastPublishedUsageHistoryDigest else { return }
 
         isPublishingUsageHistory = true
         defer { isPublishingUsageHistory = false }
 
         if await run(["--state-put"], stdin: body).exitCode == 0 {
-            lastPublishedUsageHistory = body
+            lastPublishedUsageHistoryDigest = digest
+            userDefaults.set(digest, forKey: Self.lastPublishedUsageHistoryDigestKey)
         }
     }
 
     private func renderedUsageHistoryPayload() -> String? {
         let claude = publishedUsageHistoryProvider(for: .claude)
         let codex = publishedUsageHistoryProvider(for: .codex)
+
+        // A nil series means the restart scan has not answered yet. Clearing
+        // during that gap would make valid history flicker away on every app
+        // launch and would turn each launch into two unnecessary writes.
+        guard usageStore.localSeries != nil else { return nil }
 
         // Nothing at all to report, and nothing was ever reported: stay quiet.
         // But once something HAS been published, silence stops being neutral —
@@ -819,7 +840,7 @@ final class RemoteBridge {
         // day ages out of the window would leave the phone drawing a chart
         // that no longer exists anywhere else. So after the first publish we
         // always say something, even if what we have to say is "nothing".
-        guard claude != nil || codex != nil || lastPublishedUsageHistory != nil else { return nil }
+        guard claude != nil || codex != nil || lastPublishedUsageHistoryDigest != nil else { return nil }
 
         var providers: [String] = []
         if let claude {
@@ -1138,10 +1159,20 @@ final class RemoteBridge {
         lastPublishedBattery = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
-        lastPublishedUsage = nil
-        lastPublishedUsageHistory = nil
+        lastPublishedUsageDigest = nil
+        lastPublishedUsageHistoryDigest = nil
+        userDefaults.removeObject(forKey: Self.lastPublishedUsageDigestKey)
+        userDefaults.removeObject(forKey: Self.lastPublishedUsageHistoryDigestKey)
         lastStatusLine = nil
         lastSyncedActive = nil
+    }
+
+    private static func payloadDigest(_ body: String) -> String {
+        // 128 bits is ample for change detection while keeping preferences to
+        // a short, non-reversible marker rather than the user-facing payload.
+        SHA256.hash(data: Data(body.utf8)).prefix(16)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     private func reconcileSettings(_ remote: RemoteStateWithSettings) async {

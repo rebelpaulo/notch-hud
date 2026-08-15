@@ -54,6 +54,7 @@ struct UsageFormattingTests {
     @Test func percentUsedIsAnIntegerWithAWordBelowOnePoint() {
         #expect(UsageFormatting.percentUsed(84) == "84% used")
         #expect(UsageFormatting.percentUsed(84.6) == "85% used")
+        #expect(UsageFormatting.percentUsed(1) == "1% used")
         #expect(UsageFormatting.percentUsed(0) == "0% used")
         #expect(UsageFormatting.percentUsed(100) == "100% used")
         #expect(UsageFormatting.percentUsed(0.4) == "<1% used")
@@ -61,6 +62,7 @@ struct UsageFormattingTests {
 
     @Test func percentLeftIsAnIntegerWithAWordBelowOnePoint() {
         #expect(UsageFormatting.percentLeft(16) == "16% left")
+        #expect(UsageFormatting.percentLeft(1) == "1% left")
         #expect(UsageFormatting.percentLeft(0) == "0% left")
         #expect(UsageFormatting.percentLeft(100) == "100% left")
         #expect(UsageFormatting.percentLeft(0.9) == "<1% left")
@@ -141,8 +143,8 @@ struct UsageFormattingTests {
     #expect(UsageFormatting.isAheadOfPace(clearlyAhead))
 }
 
-// DEFECT 3: "%d%% left"/"%d%% used" print for values above one, so the PT
-// adjective needs plural agreement — "restante"/"usado" read as singular.
+// A flat strings table cannot choose grammatical number on its own, so both
+// forms have to remain present for the formatter's rounded-value branch.
 @Test func portugueseQuotaPercentStringsAgreeInNumber() throws {
     let url = try #require(
         Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "pt.lproj")
@@ -151,6 +153,8 @@ struct UsageFormattingTests {
     let table = try #require(
         PropertyListSerialization.propertyList(from: contents, format: nil) as? [String: String]
     )
+    #expect(table["1% left"] == "1% restante")
     #expect(table["%d%% left"] == "%d%% restantes")
+    #expect(table["1% used"] == "1% usado")
     #expect(table["%d%% used"] == "%d%% usados")
 }

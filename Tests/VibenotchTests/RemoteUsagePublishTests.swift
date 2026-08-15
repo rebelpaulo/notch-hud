@@ -90,6 +90,24 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeClearsPublishedUsageAfterARestartWhenFetchesSettleEmpty() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.entries[.claude] = .loaded(claudeSnapshot(percentUsed: 50))
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.usagePutBodies().count == 1)
+
+    // The in-memory cache disappears here. Only persisted evidence of the
+    // successful write can tell the new bridge that empty is a real change.
+    fixture.usage.entries[.claude] = .failed(.notLoggedIn)
+    fixture.relaunchBridge()
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usagePutBodies().last == #"{"usage":{}}"#)
+}
+
+@MainActor
 @Test func remoteBridgeOmitsAProviderWithNoLoadedSnapshotInsteadOfSendingNull() async throws {
     let fixture = try UsageBridgeFixture()
     defer { fixture.remove() }
@@ -253,6 +271,33 @@ import Testing
 }
 
 @MainActor
+@Test func remoteBridgeClearsPublishedUsageHistoryAfterAnEmptyRestartScan() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.localSeries = LocalUsageSeries(
+        points: [
+            LocalUsageDayPoint(
+                day: startOfToday(),
+                provider: .claude,
+                totalTokens: 100,
+                topModel: "claude-fable-5"
+            ),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.usageHistoryPutBodies().count == 1)
+
+    fixture.usage.localSeries = LocalUsageSeries(points: [], today: .zero, trailingThirtyOneDays: .zero)
+    fixture.relaunchBridge()
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usageHistoryPutBodies().last == #"{"usage_history":{}}"#)
+}
+
+@MainActor
 @Test func remoteBridgeAsksForALocalScanEveryTick() async throws {
     // Without this the phone never gets history unless someone opens the
     // notch on the Mac — `scanLocalIfNeeded()` is cheap to call repeatedly.
@@ -310,7 +355,7 @@ final class UsageBridgeFixture {
     let store = UsageFakeSessionStore()
     let usage = FakeUsageStore()
     let runner: UsageFakeCommandRunner
-    let bridge: RemoteBridge
+    private(set) var bridge: RemoteBridge
 
     private let suiteName: String
     private let defaults: UserDefaults
@@ -322,6 +367,20 @@ final class UsageBridgeFixture {
             to: scratch.appendingPathComponent(".vibenotch/remote.json"),
             atomically: true,
             encoding: .utf8
+        )
+    }
+
+    func relaunchBridge() {
+        bridge = RemoteBridge(
+            engine: engine,
+            sessionStore: store,
+            usageStore: usage,
+            commandRunner: runner,
+            powerSourceProvider: UsageFakePowerSource(),
+            homeURL: scratch,
+            userDefaults: defaults,
+            // Never spawn a real pgrep from a test.
+            remoteControlServer: RemoteControlServer(runProcess: { _, _ in 1 })
         )
     }
 

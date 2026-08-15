@@ -38,17 +38,33 @@ enum UsageFormatting {
     /// because those are different facts — one is "nothing spent yet", the
     /// other is "a sliver was".
     static func percentUsed(_ percent: Double) -> String {
-        percentString(percent, wordKey: "%d%% used", underOneKey: "<1% used")
+        percentString(
+            percent,
+            singularKey: "1% used",
+            pluralKey: "%d%% used",
+            underOneKey: "<1% used"
+        )
     }
 
     /// "16% left" — same rounding rule as `percentUsed`, mirrored.
     static func percentLeft(_ percent: Double) -> String {
-        percentString(percent, wordKey: "%d%% left", underOneKey: "<1% left")
+        percentString(
+            percent,
+            singularKey: "1% left",
+            pluralKey: "%d%% left",
+            underOneKey: "<1% left"
+        )
     }
 
-    private static func percentString(_ percent: Double, wordKey: String, underOneKey: String) -> String {
+    private static func percentString(
+        _ percent: Double,
+        singularKey: String,
+        pluralKey: String,
+        underOneKey: String
+    ) -> String {
         if percent > 0, percent < 1 { return t(underOneKey) }
-        return t(wordKey, Int(percent.rounded()))
+        let rounded = Int(percent.rounded())
+        return rounded == 1 ? t(singularKey) : t(pluralKey, rounded)
     }
 
     /// "updated just now" / "updated 3m ago". Single largest unit only —

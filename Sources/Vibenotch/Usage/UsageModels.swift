@@ -86,18 +86,53 @@ struct UsageWindow: Sendable, Equatable, Identifiable {
     /// e.g. a weekly cap scoped to a single model. nil means account-wide.
     let scopeLabel: String?
     let severity: UsageSeverity
+    private let identityOrdinal: Int
 
-    /// Unique per window within one snapshot.
-    ///
-    /// Kind and scope alone were not enough: two account-wide windows of the
-    /// same kind — a primary and a secondary that both classify as weekly —
-    /// produced the SAME id. Pace is keyed by this in a dictionary, so one
-    /// window's pace was silently applied to the other, and `ForEach` over the
-    /// scoped rows would have collapsed them into one. The reset time is what
-    /// actually distinguishes two windows that otherwise look alike.
+    /// Reset metadata is deliberately absent: APIs can add, remove, or adjust
+    /// it between polls without changing which quota row the user is looking
+    /// at. Snapshot assembly adds an ordinal only when kind and scope are not
+    /// enough to distinguish multiple rows.
     var id: String {
-        let reset = resetsAt.map { String(Int($0.timeIntervalSince1970)) } ?? "none"
-        return "\(kind)-\(scopeLabel ?? "account")-\(reset)"
+        identityOrdinal == 0 ? identityBase : "\(identityBase)#\(identityOrdinal + 1)"
+    }
+
+    fileprivate var identityBase: String {
+        let kindID = kind == .session ? "session" : "weekly"
+        guard let scopeLabel else { return "\(kindID)-account" }
+        // The byte count keeps a real scope named "account" and labels that
+        // contain our separators from ever aliasing another derived base.
+        return "\(kindID)-scope-\(scopeLabel.utf8.count):\(scopeLabel)"
+    }
+
+    init(
+        kind: UsageWindowKind,
+        percentUsed: Double,
+        resetsAt: Date?,
+        windowLength: TimeInterval?,
+        scopeLabel: String?,
+        severity: UsageSeverity
+    ) {
+        self.kind = kind
+        self.percentUsed = percentUsed
+        self.resetsAt = resetsAt
+        self.windowLength = windowLength
+        self.scopeLabel = scopeLabel
+        self.severity = severity
+        identityOrdinal = 0
+    }
+
+    private init(copying window: UsageWindow, identityOrdinal: Int) {
+        kind = window.kind
+        percentUsed = window.percentUsed
+        resetsAt = window.resetsAt
+        windowLength = window.windowLength
+        scopeLabel = window.scopeLabel
+        severity = window.severity
+        self.identityOrdinal = identityOrdinal
+    }
+
+    fileprivate func assigningIdentityOrdinal(_ ordinal: Int) -> UsageWindow {
+        UsageWindow(copying: self, identityOrdinal: ordinal)
     }
 
     /// Stands in for a scope name the API didn't provide, on a window that IS
@@ -190,6 +225,31 @@ struct UsageSnapshot: Sendable, Equatable {
     let billing: UsageBilling
     let windows: [UsageWindow]
     let capturedAt: Date
+
+    init(
+        provider: UsageProviderKind,
+        account: String?,
+        plan: String?,
+        billing: UsageBilling,
+        windows: [UsageWindow],
+        capturedAt: Date
+    ) {
+        self.provider = provider
+        self.account = account
+        self.plan = plan
+        self.billing = billing
+        self.capturedAt = capturedAt
+
+        // The APIs already give us a meaningful order. Reusing it is the only
+        // derived way to distinguish genuinely duplicate kind/scope pairs
+        // without making volatile percentages or reset metadata into identity.
+        var occurrences: [String: Int] = [:]
+        self.windows = windows.map { window in
+            let ordinal = occurrences[window.identityBase, default: 0]
+            occurrences[window.identityBase] = ordinal + 1
+            return window.assigningIdentityOrdinal(ordinal)
+        }
+    }
 
     /// The single worst thing happening, for the notch badge.
     var worstSeverity: UsageSeverity {

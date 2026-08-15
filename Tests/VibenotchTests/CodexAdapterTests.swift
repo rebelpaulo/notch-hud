@@ -315,6 +315,11 @@ private func cleanCodexEnvironment(home: URL) -> [String: String] {
     var environment = ProcessInfo.processInfo.environment
     environment["HOME"] = home.path
     environment["VIBENOTCH_HOME"] = home.path
+    // These tests often run from inside the Codex shim itself. Inheriting its
+    // session makes desktop notifications take the CLI update-only branch and
+    // makes otherwise isolated fixtures depend on the parent process's id.
+    environment["NOTCH_CODEX_SESSION_ID"] = nil
+    environment["VIBENOTCH_SHIM_DEPTH"] = nil
     environment["VIBENOTCH_TTY"] = ""
     environment["TERM_PROGRAM"] = nil
     environment["ITERM_SESSION_ID"] = nil
