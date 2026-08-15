@@ -149,6 +149,9 @@ actor LocalUsageScanner {
     private let codexRootURLs: [URL]
     private let cacheFileURL: URL
     private var cache: [String: CachedFile] = [:]
+    /// Set once `loadCacheIfNeeded()` has run, successfully or not, so a
+    /// missing/corrupt cache isn't retried on every scan.
+    private var hasLoadedCache = false
     private(set) var lastScanStats = LocalUsageScanStats(filesParsed: 0, filesCached: 0, bytesRead: 0, oversizedLinesSkipped: 0, filesPruned: 0)
 
     /// Everything needed to resume an append-only log without re-reading the
@@ -188,13 +191,14 @@ actor LocalUsageScanner {
     /// environment variable when set, matching the Codex CLI's own
     /// resolution.
     ///
-    /// The on-disk cache is loaded synchronously here: it is one small JSON
-    /// read (metadata and tallies, never conversation text), the same kind of
-    /// blocking file call `ClaudeConversationIndex` makes, and every scan
-    /// after this one depends on it being in memory already. A missing,
-    /// corrupt, or unreadable file is not an error — `cache` just stays
-    /// empty and the first `scan()` does a full rescan, exactly as if
-    /// Vibenotch had never run before.
+    /// Deliberately does no file I/O: this initialiser runs on whatever
+    /// actor constructs a `LocalUsageScanner`, and that is the main actor in
+    /// this app (`NotchWindowManager` holds one; `RemoteBridge`'s default
+    /// argument makes another). A synchronous read-and-decode of a cache
+    /// that can reach several megabytes here would hang the UI before
+    /// anything is drawn. The cache is loaded lazily instead, inside the
+    /// actor's own executor, the first time `scan()` needs it — see
+    /// `loadCacheIfNeeded()`.
     init(
         claudeHomeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         codexHomeURL: URL = LocalUsageScanner.defaultCodexHomeURL(),
@@ -207,11 +211,22 @@ actor LocalUsageScanner {
         ]
         cacheFileURL = cacheDirectoryURL
             .appendingPathComponent("local-usage-scan-cache.v\(Self.cacheSchemaVersion).json", isDirectory: false)
+    }
 
-        if let data = try? Data(contentsOf: cacheFileURL),
-           let loaded = try? JSONDecoder().decode([String: CachedFile].self, from: data) {
-            cache = loaded
-        }
+    /// Reads and decodes the on-disk cache the first time it's needed —
+    /// called at the top of `scan()`, on the actor's own executor, never
+    /// from `init`. A missing, corrupt, or unreadable file is not an error —
+    /// `cache` just stays empty and this scan does a full rescan, exactly as
+    /// if Vibenotch had never run before. Runs at most once per instance:
+    /// later scans reuse the in-memory `cache` they themselves keep current.
+    private func loadCacheIfNeeded() {
+        guard !hasLoadedCache else { return }
+        hasLoadedCache = true
+
+        guard let data = try? Data(contentsOf: cacheFileURL),
+              let loaded = try? JSONDecoder().decode([String: CachedFile].self, from: data)
+        else { return }
+        cache = loaded
     }
 
     static func defaultCodexHomeURL() -> URL {
@@ -236,6 +251,8 @@ actor LocalUsageScanner {
     private var fileManager: FileManager { .default }
 
     func scan(now: Date = Date()) -> LocalUsageSeries {
+        loadCacheIfNeeded()
+
         var parsed = 0
         var cached = 0
         var bytesRead = 0
@@ -545,7 +562,7 @@ actor LocalUsageScanner {
                   let message = object["message"] as? [String: Any],
                   let usage = message["usage"] as? [String: Any],
                   let timestampString = object["timestamp"] as? String,
-                  let timestamp = Self.parseTimestamp(timestampString)
+                  let timestamp = parseTimestamp(timestampString)
             else { return }
 
             // Dedupe only when both ids are present, per the ticket: a resumed
@@ -627,7 +644,7 @@ actor LocalUsageScanner {
                   let info = payload["info"] as? [String: Any],
                   let last = info["last_token_usage"] as? [String: Any],
                   let timestampString = object["timestamp"] as? String,
-                  let timestamp = Self.parseTimestamp(timestampString)
+                  let timestamp = parseTimestamp(timestampString)
             else { return }
 
             let input = (last["input_tokens"] as? Int) ?? 0
@@ -646,23 +663,27 @@ actor LocalUsageScanner {
         return ParseResult(perDay: perDay, offset: endOffset, lastKnownModel: currentModel, skippedOversizedLineCount: skippedOversized)
     }
 
-    // `nonisolated(unsafe)`: these are only ever touched from this actor's
-    // own serial executor (one caller at a time), so the formatters — which
-    // are not Sendable but are safe under single-threaded access — never see
-    // concurrent use in practice.
-    nonisolated(unsafe) private static let isoFormatterWithFraction: ISO8601DateFormatter = {
+    // Instance properties, not `static`: a `static` would be shared by every
+    // `LocalUsageScanner` — including two Swift Testing cases running in
+    // parallel, which this suite does — and `ISO8601DateFormatter` is not
+    // Sendable, so concurrent callers could race on it. That's what the
+    // `nonisolated(unsafe)` this replaced was actually promising away rather
+    // than proving. As actor-isolated instance state, real isolation checking
+    // covers them instead: only this actor's own executor ever touches them,
+    // enforced by the compiler, not by a comment.
+    private let isoFormatterWithFraction: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    nonisolated(unsafe) private static let isoFormatter: ISO8601DateFormatter = {
+    private let isoFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
 
-    private static func parseTimestamp(_ string: String) -> Date? {
+    private func parseTimestamp(_ string: String) -> Date? {
         isoFormatterWithFraction.date(from: string) ?? isoFormatter.date(from: string)
     }
 

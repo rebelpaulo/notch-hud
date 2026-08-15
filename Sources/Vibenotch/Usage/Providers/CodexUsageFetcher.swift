@@ -104,13 +104,16 @@ private extension UsageWindow {
     init?(codexWindow window: CodexUsageResponse.Window?, scopeLabel: String?) {
         // Missing percent must not become 0% — that would read as "fine".
         guard let window, let percent = window.usedPercent else { return nil }
+        // THE important part: classify by the window's actual length, not by
+        // which slot it arrived in. On a real account here the *primary*
+        // window was the 604800-second (weekly) one with `secondary_window`
+        // null — trusting the slot name would have printed "Session" over a
+        // weekly quota. And if `limit_window_seconds` itself is missing or
+        // renamed, there is no length to classify by at all — that must drop
+        // the window, not default to `.session`.
+        guard let kind = UsageWindowKind.classify(lengthSeconds: window.limitWindowSeconds) else { return nil }
         guard let validated = UsageWindow.validated(
-            // THE important part: classify by the window's actual length, not
-            // by which slot it arrived in. On a real account here the
-            // *primary* window was the 604800-second (weekly) one with
-            // `secondary_window` null — trusting the slot name would have
-            // printed "Session" over a weekly quota.
-            kind: .classify(lengthSeconds: window.limitWindowSeconds),
+            kind: kind,
             percentUsed: percent,
             resetsAt: CodexUsageFetcher.resetDate(fromEpochSeconds: window.resetAt),
             windowLength: window.limitWindowSeconds,

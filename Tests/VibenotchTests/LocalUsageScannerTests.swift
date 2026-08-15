@@ -412,6 +412,58 @@ private final class LocalUsageFixture {
     }
 }
 
+// MARK: - Init defers I/O off the main actor
+
+@Test func initDoesNoFileIOAndTheFirstScanStillPicksUpAnEnormousCache() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    try fixture.writeClaudeSession(lines: [
+        assistantLine(timestamp: now, messageID: "msg_enormous", requestID: "req_enormous", input: 30, output: 3)
+    ])
+
+    // Scan once for real so a genuine, valid cache file exists on disk in
+    // exactly the shape LocalUsageScanner persists.
+    let seeder = fixture.scanner()
+    let seeded = await seeder.scan(now: now)
+
+    // Inflate that real cache file to tens of megabytes by padding the
+    // `lastKnownModel` field's string value — a field that plays no role in
+    // cache-hit matching (it's only read back to seed Codex's
+    // `turn_context` model, and this is a Claude-only fixture) — so the
+    // file stays valid JSON but decoding it synchronously would now be
+    // trivially measurable, not free.
+    let cacheFile = fixture.cacheDirectoryURL
+        .appendingPathComponent("local-usage-scan-cache.v\(LocalUsageScanner.cacheSchemaVersion).json")
+    let original = try String(contentsOf: cacheFile, encoding: .utf8)
+    let needle = "\"lastKnownModel\":\""
+    let insertionPoint = try #require(original.range(of: needle))
+    let padding = String(repeating: "a", count: 50_000_000) // ~50 MB
+    let inflated = original.replacingCharacters(in: insertionPoint, with: needle + padding)
+    try inflated.write(to: cacheFile, atomically: true, encoding: .utf8)
+    #expect(try fixture.fileSize(cacheFile) > 40_000_000) // sanity: genuinely enormous
+
+    // Construction itself must be immediate — no read, no decode — even
+    // though the cache file it's pointed at is now tens of megabytes. A
+    // scanner assembles three URLs and nothing else; if this regressed back
+    // to reading and JSON-decoding the file synchronously it would blow far
+    // past this budget.
+    let constructionStart = Date()
+    let scanner = fixture.scanner()
+    let constructionElapsed = Date().timeIntervalSince(constructionStart)
+    #expect(constructionElapsed < 0.05)
+
+    // ...and yet the first scan still finds and uses that same cache: a
+    // full hit on the one file already scanned, not a rescan from zero.
+    let series = await scanner.scan(now: now)
+    let stats = await scanner.lastScanStats
+    #expect(stats.filesParsed == 0)
+    #expect(stats.filesCached == 1)
+    #expect(stats.bytesRead == 0)
+    #expect(series == seeded)
+}
+
 // MARK: - Adversarial-review defects
 
 @Test func aFileCappedAtTheLinesPerScanLimitIsResumedNotCachedAsComplete() async throws {
