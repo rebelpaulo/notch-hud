@@ -210,6 +210,98 @@ private let codexFixture = Data("""
     #expect(CodexUsageFetcher.resetDate(fromEpochSeconds: Double?.none) == nil)
 }
 
+// MARK: - Defect 1: an unclassifiable window must not become `.session`
+
+@Test func codexMissingWindowLengthProducesNoWindow() async throws {
+    // `limit_window_seconds` renamed/dropped: before the fix this silently
+    // classified as `.session` (5h nominal) even though the real window was
+    // the 604800s weekly one — a wrong pace projection on a weekly quota.
+    let fixture = Data("""
+    {"account_id":"acct-123","email":"someone@example.com","plan_type":"prolite",
+     "rate_limit":{"allowed":true,"limit_reached":false,
+       "primary_window":{"used_percent":7,"reset_at":1787211467},
+       "secondary_window":null},
+     "additional_rate_limits":[{"limit_name":"GPT-5.3-Codex-Spark","metered_feature":"codex_bengalfox",
+       "rate_limit":{"primary_window":{"used_percent":0,"limit_window_seconds":604800,"reset_at":1787336160},"secondary_window":null}}],
+     "credits":{"has_credits":false,"balance":"0"}}
+    """.utf8)
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: fixture)
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    #expect(snapshot.windows.contains { $0.percentUsed == 7 } == false)
+    #expect(snapshot.windows.count == 1)
+}
+
+@Test func claudeUnrecognizedOrMissingGroupProducesNoWindow() async throws {
+    // `group` renamed/dropped or holding a value we've never seen: before the
+    // fix this silently classified as `.session`.
+    let fixture = Data("""
+    {"limits":[
+      {"percent":50,"severity":"normal","resets_at":"2026-08-16T17:00:00.000000+00:00","scope":null},
+      {"group":"monthly","percent":60,"severity":"normal","resets_at":"2026-08-16T17:00:00.000000+00:00","scope":null}
+    ]}
+    """.utf8)
+    let fetcher = ClaudeUsageFetcher(
+        credentials: FakeClaudeCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: fixture)
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    #expect(snapshot.windows.isEmpty)
+}
+
+// MARK: - Defect 2: a scoped window whose scope can't be named must not claim account-wide
+
+@Test func claudeScopedLimitWithoutModelNameDoesNotBecomeAccountWide() async throws {
+    // The unnamed-scope entry arrives BEFORE the real account-wide one, so a
+    // buggy nil scopeLabel here would win `window(.weekly)` and hide the real
+    // account-wide quota.
+    let fixture = Data("""
+    {"limits":[
+      {"group":"weekly","percent":70,"severity":"normal","resets_at":"2026-08-16T17:00:00.000000+00:00","scope":{"model":{"id":"m1","display_name":null},"surface":null}},
+      {"group":"weekly","percent":84,"severity":"warning","resets_at":"2026-08-16T18:00:00.000000+00:00","scope":null}
+    ]}
+    """.utf8)
+    let fetcher = ClaudeUsageFetcher(
+        credentials: FakeClaudeCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: fixture)
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    let accountWide = try #require(snapshot.window(.weekly))
+    #expect(accountWide.percentUsed == 84)
+    #expect(snapshot.windows.contains { $0.percentUsed == 70 && $0.scopeLabel != nil })
+}
+
+@Test func codexAdditionalLimitWithoutNameDoesNotBecomeAccountWide() async throws {
+    // `limit_name` missing on an `additional_rate_limits` entry: it is still
+    // a model-scoped limit by construction (it did not arrive in the
+    // account-wide `rate_limit` slot), so it must not carry scopeLabel == nil.
+    let fixture = Data("""
+    {"account_id":"acct-123","email":"someone@example.com","plan_type":"prolite",
+     "rate_limit":{"allowed":true,"limit_reached":false,
+       "primary_window":{"used_percent":7,"limit_window_seconds":604800,"reset_at":1787211467},
+       "secondary_window":null},
+     "additional_rate_limits":[{"metered_feature":"codex_bengalfox",
+       "rate_limit":{"primary_window":{"used_percent":40,"limit_window_seconds":604800,"reset_at":1787336160},"secondary_window":null}}]}
+    """.utf8)
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: fixture)
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    let additional = try #require(snapshot.windows.first { $0.percentUsed == 40 })
+    #expect(additional.scopeLabel != nil)
+}
+
 @Test func aPercentageThatIsNotAPercentageProducesNoWindow() {
     // From the Codex review: the fetchers passed whatever arrived straight
     // through, so a service answering 120 drew a bar reading "120% used" and

@@ -78,8 +78,24 @@ struct ClaudeUsageFetcher: UsageFetching {
     /// This response never states a window length, only `group` — Claude is
     /// the one exception to UsageWindowKind's "classify by duration" rule
     /// because there is no duration here to classify by.
-    fileprivate static func kind(forGroup group: String?) -> UsageWindowKind {
-        group == "weekly" ? .weekly : .session
+    ///
+    /// Returns nil for anything but the two known values, missing included —
+    /// a renamed or unrecognised `group` must not default to `.session`.
+    fileprivate static func kind(forGroup group: String?) -> UsageWindowKind? {
+        switch group {
+        case "session": return .session
+        case "weekly": return .weekly
+        default: return nil
+        }
+    }
+
+    /// `scope` being present at all means the limit is narrower than the
+    /// whole account; `nil` scope means account-wide. When scope is present
+    /// but the model name inside it didn't decode, this must still not be
+    /// `nil` — see `UsageWindow.unspecifiedScopeLabel`.
+    fileprivate static func scopeLabel(from scope: ClaudeUsageResponse.Scope?) -> String? {
+        guard let scope else { return nil }
+        return scope.model?.displayName ?? UsageWindow.unspecifiedScopeLabel
     }
 
     /// Two formatters because `resets_at` is not guaranteed to carry
@@ -99,12 +115,14 @@ private extension UsageWindow {
     init?(claudeLimit limit: ClaudeUsageResponse.Limit) {
         // Missing percent must not become 0% — that would read as "fine".
         guard let percent = limit.percent else { return nil }
+        // An unrecognised or missing `group` must not become `.session`.
+        guard let kind = ClaudeUsageFetcher.kind(forGroup: limit.group) else { return nil }
         guard let validated = UsageWindow.validated(
-            kind: ClaudeUsageFetcher.kind(forGroup: limit.group),
+            kind: kind,
             percentUsed: percent,
             resetsAt: ClaudeUsageFetcher.parseISO8601(limit.resetsAt),
             windowLength: nil,
-            scopeLabel: limit.scope?.model?.displayName,
+            scopeLabel: ClaudeUsageFetcher.scopeLabel(from: limit.scope),
             severity: ClaudeUsageFetcher.severity(from: limit.severity)
         ) else { return nil }
         self = validated

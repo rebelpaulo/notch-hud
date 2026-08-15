@@ -691,9 +691,25 @@ final class RemoteBridge {
     /// publishes whatever `UsageStore` already holds, and a provider with
     /// nothing loaded is left out of the object entirely rather than sent as
     /// null.
+    /// Serialised, for the same reason `publishSessionsIfChanged` is.
+    ///
+    /// The check against the last published body and the write that follows it
+    /// are separated by an await, and the actor is free to run another tick in
+    /// that gap — the ten-second timer and an observation-driven `checkNow()`
+    /// overlap routinely. Two passes could then post the same body twice, and
+    /// if two different bodies finished out of order the older one would win
+    /// both the remote row and the cache, freezing the phone on stale numbers
+    /// until something else changed.
+    private var isPublishingUsage = false
+
     private func publishUsageIfChanged() async {
+        guard !isPublishingUsage else { return }
         guard let body = renderedUsagePayload() else { return }
         guard body != lastPublishedUsage else { return }
+
+        isPublishingUsage = true
+        defer { isPublishingUsage = false }
+
         if await run(["--state-put"], stdin: body).exitCode == 0 {
             lastPublishedUsage = body
         }
@@ -766,9 +782,17 @@ final class RemoteBridge {
     /// JSON — same rule as `publishUsageIfChanged()`. Never triggers the scan
     /// itself: `reconcileRemote()` asks for that separately, and this
     /// publishes whatever `UsageStore` already holds.
+    /// Same reentrancy rule as the quota publisher above.
+    private var isPublishingUsageHistory = false
+
     private func publishUsageHistoryIfChanged() async {
+        guard !isPublishingUsageHistory else { return }
         guard let body = renderedUsageHistoryPayload() else { return }
         guard body != lastPublishedUsageHistory else { return }
+
+        isPublishingUsageHistory = true
+        defer { isPublishingUsageHistory = false }
+
         if await run(["--state-put"], stdin: body).exitCode == 0 {
             lastPublishedUsageHistory = body
         }

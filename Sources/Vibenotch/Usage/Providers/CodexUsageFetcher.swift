@@ -63,9 +63,13 @@ struct CodexUsageFetcher: UsageFetching {
                 .compactMap { UsageWindow(codexWindow: $0, scopeLabel: nil) })
         }
         for additional in payload.additionalRateLimits ?? [] {
+            // Everything in `additional_rate_limits` is scoped by construction
+            // (that's what distinguishes it from the account-wide `rate_limit`
+            // above) — a missing `limit_name` must not fall back to nil, which
+            // would read as account-wide. See `UsageWindow.unspecifiedScopeLabel`.
             if let window = UsageWindow(
                 codexWindow: additional.rateLimit?.primaryWindow,
-                scopeLabel: additional.limitName
+                scopeLabel: additional.limitName ?? UsageWindow.unspecifiedScopeLabel
             ) {
                 windows.append(window)
             }

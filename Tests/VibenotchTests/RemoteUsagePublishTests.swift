@@ -430,9 +430,20 @@ actor UsageFakeCommandRunner: CommandRunning {
         failStatePuts = value
     }
 
+    /// Makes a --state-put take long enough that a second tick can start while
+    /// the first is still awaiting, which is the race the publishers guard.
+    private var statePutDelay: Duration = .zero
+
+    func setStatePutDelay(_ value: Duration) {
+        statePutDelay = value
+    }
+
     func run(arguments: [String], stdin: String?) async -> CommandRunResult {
         calls.append(arguments)
         stdins.append(stdin)
+        if arguments == ["--state-put"], statePutDelay > .zero {
+            try? await Task.sleep(for: statePutDelay)
+        }
         if arguments == ["--state-put"], failStatePuts {
             return CommandRunResult(stdout: "", exitCode: 1)
         }
@@ -513,4 +524,39 @@ actor UsageFakeCommandRunner: CommandRunning {
     try fixture.repair(to: "https://elsewhere.example")
     await fixture.bridge.checkNow(pollRemoteState: true)
     #expect(await fixture.runner.usagePutBodies().count > firstCount)
+}
+
+@MainActor
+@Test func overlappingTicksPublishTheSameQuotaBodyOnlyOnce() async throws {
+    // The check against the last published body and the write are separated by
+    // an await, and the timer and an observation-driven checkNow() overlap
+    // routinely. Without a guard both passes see "not published yet".
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.entries[.claude] = .loaded(
+        UsageSnapshot(
+            provider: .claude,
+            account: nil,
+            plan: nil,
+            billing: .plan(nil),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 84,
+                    resetsAt: isoDate("2026-08-16T17:00:00Z"),
+                    windowLength: nil,
+                    scopeLabel: nil,
+                    severity: .warning
+                )
+            ],
+            capturedAt: isoDate("2026-08-14T20:00:00Z")
+        )
+    )
+    await fixture.runner.setStatePutDelay(.milliseconds(120))
+
+    async let first: Void = fixture.bridge.checkNow(pollRemoteState: true)
+    async let second: Void = fixture.bridge.checkNow(pollRemoteState: true)
+    _ = await (first, second)
+
+    #expect(await fixture.runner.usagePutBodies().count == 1)
 }

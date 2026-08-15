@@ -29,8 +29,14 @@ enum UsageWindowKind: Sendable, Equatable {
     /// Twelve hours splits the two cleanly: session windows observed so far are
     /// five hours, weekly ones are 604800 seconds. Anything long is treated as
     /// weekly rather than guessed at.
-    static func classify(lengthSeconds: TimeInterval?) -> UsageWindowKind {
-        guard let lengthSeconds, lengthSeconds > 0 else { return .session }
+    ///
+    /// Returns nil when there is nothing to classify from — a missing or
+    /// non-positive length must not become a guess. `limit_window_seconds` is
+    /// the only signal Codex windows carry; losing it must lose the window,
+    /// not silently relabel a weekly quota as a five-hour session (which then
+    /// feeds a wrong projection into the pace engine).
+    static func classify(lengthSeconds: TimeInterval?) -> UsageWindowKind? {
+        guard let lengthSeconds, lengthSeconds > 0 else { return nil }
         return lengthSeconds <= 12 * 3600 ? .session : .weekly
     }
 }
@@ -84,6 +90,20 @@ struct UsageWindow: Sendable, Equatable, Identifiable {
     var id: String {
         "\(kind)-\(scopeLabel ?? "account")"
     }
+
+    /// Stands in for a scope name the API didn't provide, on a window that IS
+    /// scoped (not account-wide).
+    ///
+    /// `scopeLabel == nil` already means "account-wide" — see
+    /// `UsageSnapshot.window(_:)`, which prefers it. If a window we know is
+    /// model-scoped (Claude sent a `scope` object; Codex put it in
+    /// `additional_rate_limits`) fell back to `nil` just because the name
+    /// field was missing, it would either become the account-wide headline
+    /// itself or collide with and hide the real one. Dropping the window
+    /// instead would throw away a percentage we DO trust — the value that
+    /// failed to decode is only the label, not `percentUsed` — so this
+    /// placeholder is preferred over `nil` and over discarding the window.
+    static let unspecifiedScopeLabel = "Unknown"
 
     var percentLeft: Double {
         max(0, 100 - percentUsed)
