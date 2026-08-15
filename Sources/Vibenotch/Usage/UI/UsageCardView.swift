@@ -43,11 +43,18 @@ struct UsageCardView: View {
 
                 let scoped = snapshot.windows.filter { $0.scopeLabel != nil }
                 if !scoped.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
+                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                         ForEach(scoped) { window in
                             compactRow(window)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let credits = UsageFormatting.limitResetCredits(snapshot.limitResetCredits) {
+                    Text(credits)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.55))
                 }
             } else {
                 unavailableRow
@@ -153,12 +160,17 @@ struct UsageCardView: View {
     private func compactRow(_ window: UsageWindow) -> some View {
         let pace = paceByWindowID[window.id]
 
-        return HStack(spacing: 8) {
+        return GridRow(alignment: .center) {
             Text(window.scopeLabel ?? t("Model"))
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.55))
                 .lineLimit(1)
-                .frame(width: 76, alignment: .leading)
+                .truncationMode(.tail)
+                // Scoped names should size their shared Grid column naturally
+                // now that the card is wide. The cap is what keeps an absurdly
+                // long server-provided name from consuming the gauge or the
+                // fixed percentage column at the far edge.
+                .frame(maxWidth: 220, alignment: .leading)
 
             UsageGauge(
                 percentUsed: window.percentUsed,
@@ -167,6 +179,7 @@ struct UsageCardView: View {
                 accessibilityLabel: window.scopeLabel ?? t("Model"),
                 accessibilityValue: gaugeAccessibilityValue(window, pace)
             )
+            .frame(minWidth: 120, maxWidth: .infinity)
 
             Text(UsageFormatting.percentLeft(window.percentLeft))
                 .font(.system(size: 9, design: .monospaced))

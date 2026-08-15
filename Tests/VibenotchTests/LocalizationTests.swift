@@ -109,8 +109,16 @@ private func looksPortuguese(_ line: some StringProtocol) -> Bool {
 /// The pt table as a dictionary, so "is this key present" is answerable
 /// without going through an API that substitutes a fallback.
 private func portugueseTable() throws -> [String: String] {
+    try localizedTable(language: "pt")
+}
+
+private func localizedTable(language: String) throws -> [String: String] {
     let url = try #require(
-        Bundle.module.url(forResource: "Localizable", withExtension: "strings", subdirectory: "pt.lproj")
+        Bundle.module.url(
+            forResource: "Localizable",
+            withExtension: "strings",
+            subdirectory: "\(language).lproj"
+        )
     )
     let contents = try Data(contentsOf: url)
     let parsed = try PropertyListSerialization.propertyList(from: contents, format: nil)

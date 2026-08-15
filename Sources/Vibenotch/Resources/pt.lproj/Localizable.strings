@@ -137,6 +137,9 @@
 "Session" = "Sessão";
 "Weekly" = "Semanal";
 "Model" = "Modelo";
+"Code review" = "Revisão de código";
+"1 limit reset available" = "1 reposição de limite disponível";
+"%d limit resets available" = "%d reposições de limite disponíveis";
 "Resetting…" = "A reiniciar…";
 "Resets in %@" = "Reinicia em %@";
 "Runs out in %@" = "Esgota em %@";
