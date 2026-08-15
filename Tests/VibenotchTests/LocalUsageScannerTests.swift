@@ -412,6 +412,117 @@ private final class LocalUsageFixture {
     }
 }
 
+// MARK: - Adversarial-review defects
+
+@Test func aFileCappedAtTheLinesPerScanLimitIsResumedNotCachedAsComplete() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    // More filler lines than `maxLinesPerFile`, so the first pass stops
+    // short of EOF, plus one real line past the cap that the first pass
+    // never reaches.
+    var lines = (0..<LocalUsageScanner.maxLinesPerFile).map { _ in "filler" }
+    lines.append(assistantLine(timestamp: now, messageID: "msg_tail", requestID: "req_tail", input: 40, output: 4))
+    let url = try fixture.writeClaudeSession(lines: lines)
+
+    let scanner = fixture.scanner()
+    let first = await scanner.scan(now: now)
+    let firstStats = await scanner.lastScanStats
+    #expect(try firstStats.bytesRead < fixture.fileSize(url)) // sanity: the cap really did stop us short
+    #expect((first.points.first { $0.provider == .claude }?.totalTokens ?? 0) == 0)
+
+    // The file is never touched again — same size, same mtime — but its
+    // tail was never read on pass one.
+    let second = await scanner.scan(now: now)
+    let secondStats = await scanner.lastScanStats
+
+    #expect(secondStats.filesCached == 0) // must resume, not treat as a completed cache hit
+    #expect(secondStats.bytesRead > 0)
+    #expect(second.points.first { $0.provider == .claude }?.totalTokens == 44)
+}
+
+@Test func aReplacedFileOfTheSameSizeForcesAFullRescanInsteadOfMergingStaleTallies() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    let originalLine = assistantLine(timestamp: now, messageID: "msg_orig", requestID: "req_orig", input: 900, output: 90)
+    let url = try fixture.writeClaudeSession(lines: [originalLine])
+
+    let scanner = fixture.scanner()
+    let first = await scanner.scan(now: now)
+    #expect(first.points.first { $0.provider == .claude }?.totalTokens == 990)
+
+    // Replace at the same path with different content that happens to be
+    // the exact same byte size (same-length ids, same digit counts) — size
+    // alone can't tell this apart from an append.
+    let replacementLine = assistantLine(timestamp: now, messageID: "msg_repl", requestID: "req_repl", input: 100, output: 10)
+    #expect(replacementLine.utf8.count == originalLine.utf8.count) // sanity: genuinely same size
+    try (replacementLine + "\n").write(to: url, atomically: true, encoding: .utf8)
+
+    let second = await scanner.scan(now: now)
+    // Only the replacement's tokens should count — the old tally must not
+    // survive as a stale merge.
+    #expect(second.points.first { $0.provider == .claude }?.totalTokens == 110)
+}
+
+@Test func anOversizedLineIsSkippedNotBufferedAndIsCountedInStats() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    // A single record far past the per-line cap — the "giant prompt/tool
+    // result" case — ahead of a normal line, so a correct implementation
+    // must recover and still read what follows.
+    let hugeLine = "{\"type\":\"assistant\",\"pad\":\"" + String(repeating: "z", count: 6_000_000) + "\"}"
+    let goodLine = assistantLine(timestamp: now, messageID: "msg_after_huge", requestID: "req_after_huge", input: 40, output: 4)
+    let url = try fixture.writeClaudeSession(lines: [hugeLine, goodLine])
+    #expect(try fixture.fileSize(url) > 6_000_000) // sanity: genuinely oversized
+
+    let scanner = fixture.scanner()
+    let series = await scanner.scan(now: now)
+    let stats = await scanner.lastScanStats
+
+    // The line after the giant one must still be read correctly...
+    #expect(series.points.first { $0.provider == .claude }?.totalTokens == 44)
+    // ...and the skip must be observable, not silent.
+    #expect(stats.oversizedLinesSkipped == 1)
+}
+
+@Test func deletedAndAgedOutFilesArePrunedFromThePersistedCache() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    let deletedURL = try fixture.writeClaudeSession(lines: [
+        assistantLine(timestamp: now, messageID: "msg_deleted", requestID: "req_deleted", input: 10, output: 1)
+    ])
+    let keptURL = try fixture.writeClaudeSession(lines: [
+        assistantLine(timestamp: now, messageID: "msg_kept", requestID: "req_kept", input: 20, output: 2)
+    ])
+
+    let scanner = fixture.scanner()
+    _ = await scanner.scan(now: now)
+    try FileManager.default.removeItem(at: deletedURL)
+
+    let series = await scanner.scan(now: now)
+    let stats = await scanner.lastScanStats
+
+    #expect(stats.filesPruned >= 1)
+    // The deleted file's tally must not linger in the output either.
+    #expect(series.points.first { $0.provider == .claude }?.totalTokens == 22)
+
+    // And it must not come back from a relaunch (persisted, not just
+    // in-memory).
+    let relaunched = fixture.scanner()
+    let afterRelaunch = await relaunched.scan(now: now)
+    let relaunchStats = await relaunched.lastScanStats
+    #expect(relaunchStats.filesCached == 1) // only the surviving file
+    #expect(afterRelaunch.points.first { $0.provider == .claude }?.totalTokens == 22)
+    _ = keptURL
+}
+
 @Test func dedupeSurvivesAResumeSoAReplayedMessageIsNotCountedTwice() async throws {
     // The shipped dedupe test only proved dedupe WITHIN one pass: it would
     // pass even if the seen-id set were thrown away between scans. This is the

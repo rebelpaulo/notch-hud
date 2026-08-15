@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 /// Tokens for one model on one day, broken down by how they are priced.
@@ -73,6 +74,14 @@ struct LocalUsageScanStats: Sendable, Equatable {
     let filesParsed: Int
     let filesCached: Int
     let bytesRead: Int
+    /// Lines longer than `LocalUsageScanner.maxLineBytes`, skipped rather
+    /// than buffered whole. Zero on a normal machine; a nonzero count means
+    /// some record's tokens were never counted, which is why this is a
+    /// visible stat rather than a silent drop.
+    let oversizedLinesSkipped: Int
+    /// Cache entries dropped this scan because their path was neither seen
+    /// on disk nor still inside the lookback window (see `pruneCache`).
+    let filesPruned: Int
 }
 
 /// Reads the session logs Claude Code and Codex already write to disk and
@@ -112,18 +121,35 @@ actor LocalUsageScanner {
     /// much a single busy session appends between two polls.
     static let maxLinesPerFile = 100_000
 
+    /// Hard ceiling on how large a single JSONL line may grow before it is
+    /// abandoned instead of buffered to the end. Every legitimate
+    /// usage-bearing line is a few KB at most (it is metadata, not
+    /// conversation content); this exists only to stop a single giant
+    /// prompt or tool-result line — real rollouts on this machine reach
+    /// 664 MB and a lone record can be a sizeable fraction of that — from
+    /// being retained in full (the raw buffer, then the decoded `String`,
+    /// then the parsed JSON object, all alive at once).
+    static let maxLineBytes = 4 * 1024 * 1024
+
+    /// Bytes at the start of a file hashed to confirm a cached resume point
+    /// still refers to the same file lineage, not a same-path replacement.
+    /// Deliberately not the modification date: a replacement file can carry
+    /// any mtime a rename or `cp -p` gives it, so mtime alone proves nothing
+    /// about content.
+    static let fingerprintByteCount = 512
+
     /// Bumped whenever `CachedFile`'s or `TokenTally`'s shape changes. Baked
     /// into the cache file's name rather than checked as a field inside it:
     /// a version bump just makes old cache files invisible (a fresh name
     /// `FileManager` has never seen), so there is no decode-then-compare path
     /// that could misread an old shape instead of just skipping it.
-    static let cacheSchemaVersion = 1
+    static let cacheSchemaVersion = 2
 
     private let claudeProjectsURL: URL
     private let codexRootURLs: [URL]
     private let cacheFileURL: URL
     private var cache: [String: CachedFile] = [:]
-    private(set) var lastScanStats = LocalUsageScanStats(filesParsed: 0, filesCached: 0, bytesRead: 0)
+    private(set) var lastScanStats = LocalUsageScanStats(filesParsed: 0, filesCached: 0, bytesRead: 0, oversizedLinesSkipped: 0, filesPruned: 0)
 
     /// Everything needed to resume an append-only log without re-reading the
     /// bytes already accounted for. `Codable` so the whole cache can be
@@ -148,6 +174,12 @@ actor LocalUsageScanner {
         /// carried across resumes because a resume can start reading well
         /// past the `turn_context` line that introduced it.
         let lastKnownModel: String
+        /// SHA-256 of the file's first `fingerprintByteCount` bytes at the
+        /// time this entry was written. A same-path replacement that is the
+        /// same size or larger looks identical to an append by every other
+        /// signal here (size didn't shrink); this is what actually tells
+        /// the two apart before any bytes get merged.
+        let headFingerprint: Data
     }
 
     /// `claudeHomeURL`, `codexHomeURL`, and `cacheDirectoryURL` are injectable
@@ -207,17 +239,34 @@ actor LocalUsageScanner {
         var parsed = 0
         var cached = 0
         var bytesRead = 0
+        var oversizedLinesSkipped = 0
+        var seenPaths: Set<String> = []
 
-        let claudeDays = scanProvider(.claude, roots: [claudeProjectsURL], now: now, parsed: &parsed, cached: &cached, bytesRead: &bytesRead)
-        let codexDays = scanProvider(.codex, roots: codexRootURLs, now: now, parsed: &parsed, cached: &cached, bytesRead: &bytesRead)
+        let claudeDays = scanProvider(
+            .claude, roots: [claudeProjectsURL], now: now,
+            parsed: &parsed, cached: &cached, bytesRead: &bytesRead,
+            oversizedLinesSkipped: &oversizedLinesSkipped, seenPaths: &seenPaths
+        )
+        let codexDays = scanProvider(
+            .codex, roots: codexRootURLs, now: now,
+            parsed: &parsed, cached: &cached, bytesRead: &bytesRead,
+            oversizedLinesSkipped: &oversizedLinesSkipped, seenPaths: &seenPaths
+        )
 
-        lastScanStats = LocalUsageScanStats(filesParsed: parsed, filesCached: cached, bytesRead: bytesRead)
+        let pruned = pruneCache(keeping: seenPaths)
+
+        lastScanStats = LocalUsageScanStats(
+            filesParsed: parsed, filesCached: cached, bytesRead: bytesRead,
+            oversizedLinesSkipped: oversizedLinesSkipped, filesPruned: pruned
+        )
         // Only write when something actually changed `cache` — most polls on
         // a quiet machine are all cache hits, and re-writing an unchanged
         // multi-hundred-file cache to disk on every poll would just trade
         // the I/O this whole cache exists to avoid for a different flavor
-        // of it.
-        if parsed > 0 { persistCache() }
+        // of it. Pruning counts as a change too, or a deleted/aged-out
+        // file's entry would survive on disk forever even though it is
+        // gone from the in-memory cache the moment this scan returns.
+        if parsed > 0 || pruned > 0 { persistCache() }
 
         var points: [LocalUsageDayPoint] = []
         points.append(contentsOf: claudeDays.map { day, models in Self.point(day: day, provider: .claude, models: models) })
@@ -270,6 +319,33 @@ actor LocalUsageScanner {
         try? data.write(to: cacheFileURL, options: .atomic)
     }
 
+    /// Drops cache entries for paths not in `seenPaths` and returns how many
+    /// were removed.
+    ///
+    /// `seenPaths` is deliberately built from every `.jsonl` file that
+    /// exists and is still inside `lookbackDays` — *before*
+    /// `maxFilesPerProvider` truncates that list down to what actually gets
+    /// parsed (see `scanProvider`) — not from "the files this particular
+    /// scan happened to touch." A file only drops out of `seenPaths` by
+    /// being deleted or by aging past the lookback window, both one-way:
+    /// deleted files don't come back, and files only get older, never
+    /// younger. If pruning instead followed the capped, parsed-this-scan
+    /// list, a file merely bumped below the top-`maxFilesPerProvider` by
+    /// mtime churn — which *can* un-bump back in — would get its cache
+    /// entry evicted and then need a full rescan the moment it mattered
+    /// again: a rescan storm traded for a cache that is prunable a few KB
+    /// sooner. Tying pruning to "genuinely gone or genuinely aged out"
+    /// avoids that trade; the cost is that a very large backlog (more
+    /// distinct files within the window than `maxFilesPerProvider` — not
+    /// the case on this machine today) keeps cache entries for files this
+    /// scan didn't get around to parsing, which is bounded by the window
+    /// anyway and self-corrects once file count drops back under the cap.
+    private func pruneCache(keeping seenPaths: Set<String>) -> Int {
+        let stale = cache.keys.filter { !seenPaths.contains($0) }
+        for key in stale { cache.removeValue(forKey: key) }
+        return stale.count
+    }
+
     // MARK: - Directory walking
 
     private func scanProvider(
@@ -278,19 +354,33 @@ actor LocalUsageScanner {
         now: Date,
         parsed: inout Int,
         cached: inout Int,
-        bytesRead: inout Int
+        bytesRead: inout Int,
+        oversizedLinesSkipped: inout Int,
+        seenPaths: inout Set<String>
     ) -> [Date: [String: TokenTally]] {
         let cutoff = Calendar.current.date(byAdding: .day, value: -Self.lookbackDays, to: now) ?? .distantPast
 
-        let files = roots
+        let withinWindow = roots
             .flatMap(transcriptURLs(under:))
             .filter { $0.date >= cutoff }
+
+        // Every file still inside the window counts as "seen" for pruning
+        // purposes, even the ones the `maxFilesPerProvider` cap below is
+        // about to exclude from actual parsing — see `pruneCache`'s doc
+        // comment for why that distinction matters.
+        for file in withinWindow { seenPaths.insert(file.url.path) }
+
+        let files = withinWindow
             .sorted { $0.date > $1.date }
             .prefix(Self.maxFilesPerProvider)
 
         var combined: [Date: [String: TokenTally]] = [:]
         for file in files {
-            let perDay = perDayTallies(for: file, provider: provider, parsed: &parsed, cached: &cached, bytesRead: &bytesRead)
+            let perDay = perDayTallies(
+                for: file, provider: provider,
+                parsed: &parsed, cached: &cached, bytesRead: &bytesRead,
+                oversizedLinesSkipped: &oversizedLinesSkipped
+            )
             for (day, models) in perDay {
                 combined[day, default: [:]].merge(models) { $0 + $1 }
             }
@@ -328,18 +418,43 @@ actor LocalUsageScanner {
         provider: UsageProviderKind,
         parsed: inout Int,
         cached: inout Int,
-        bytesRead: inout Int
+        bytesRead: inout Int,
+        oversizedLinesSkipped: inout Int
     ) -> [Date: [String: TokenTally]] {
         let key = file.url.path
 
-        if let entry = cache[key], entry.size == file.size, entry.modificationDate == file.date {
-            cached += 1
-            return entry.perDay
+        // A cache entry only ever describes a resume point for a file whose
+        // confirmed prefix still matches: same size and mtime aren't enough
+        // on their own (a replacement can land on either), and neither is
+        // "didn't shrink" (a replacement can be the same size or larger).
+        // The fingerprint is what actually distinguishes "this is the same
+        // file, further along" from "this is a different file that happens
+        // to occupy the same path now" — but it has to be compared over
+        // exactly as many bytes as were fingerprinted when the entry was
+        // written (capped at `fingerprintByteCount`), not a fresh 512 bytes
+        // of whatever the file looks like today: a file shorter than 512
+        // bytes that later grows past that cap would otherwise have its own
+        // legitimate append rejected, because the "first 512 bytes" window
+        // would newly include appended content that wasn't there — and
+        // wasn't hashed — the first time.
+        let resumable = cache[key].flatMap { entry -> CachedFile? in
+            guard file.size >= entry.byteOffset else { return nil }
+            let checkedBytes = min(Self.fingerprintByteCount, entry.byteOffset)
+            guard Self.headFingerprint(of: file.url, byteCount: checkedBytes) == entry.headFingerprint else { return nil }
+            return entry
         }
 
-        // A file that shrank was truncated, rotated, or replaced — the byte
-        // offset we remember no longer means anything, so start over.
-        let resumable = cache[key].flatMap { file.size >= $0.size ? $0 : nil }
+        // A full cache hit additionally requires that the *previous* pass
+        // actually reached the end of the file — a pass that stopped short
+        // (the `maxLinesPerFile` cap, or a read failure) leaves `byteOffset
+        // < size`, and such a file must still be resumed even though
+        // nothing about it changed since.
+        if let resumable, resumable.size == file.size, resumable.modificationDate == file.date,
+           resumable.byteOffset == file.size {
+            cached += 1
+            return resumable.perDay
+        }
+
         let startOffset = resumable?.byteOffset ?? 0
 
         parsed += 1
@@ -355,21 +470,43 @@ actor LocalUsageScanner {
                 seedModel: resumable?.lastKnownModel ?? Self.unknownModelKey
             )
         bytesRead += result.offset - startOffset
+        oversizedLinesSkipped += result.skippedOversizedLineCount
 
         var merged = resumable?.perDay ?? [:]
         for (day, models) in result.perDay {
             merged[day, default: [:]].merge(models) { $0 + $1 }
         }
 
+        let storedFingerprintBytes = min(Self.fingerprintByteCount, result.offset)
         cache[key] = CachedFile(
             modificationDate: file.date,
             size: file.size,
             byteOffset: result.offset,
             perDay: merged,
             dedupeKeys: result.dedupeKeys,
-            lastKnownModel: result.lastKnownModel
+            lastKnownModel: result.lastKnownModel,
+            headFingerprint: Self.headFingerprint(of: file.url, byteCount: storedFingerprintBytes)
         )
         return merged
+    }
+
+    /// SHA-256 of the file's first `byteCount` bytes — always called with
+    /// either `fingerprintByteCount` or, when the file (or the previously
+    /// confirmed prefix of it) is shorter than that, the smaller true
+    /// length, so the same call with the same `byteCount` reproduces the
+    /// same hash for an untouched prefix regardless of how much the file has
+    /// grown since. An unreadable file (permissions, mid-delete race)
+    /// fingerprints as the hash of empty data — indistinguishable from a
+    /// genuinely empty file, but harmless: either way nothing gets resumed
+    /// against content that was never actually confirmed, and the next scan
+    /// just tries again.
+    private static func headFingerprint(of url: URL, byteCount: Int) -> Data {
+        guard byteCount > 0, let handle = try? FileHandle(forReadingFrom: url) else {
+            return Data(SHA256.hash(data: Data()))
+        }
+        defer { try? handle.close() }
+        let head = (try? handle.read(upToCount: byteCount)) ?? Data()
+        return Data(SHA256.hash(data: head))
     }
 
     /// Sentinel for "this record carried no model id at all." Kept distinct
@@ -382,6 +519,7 @@ actor LocalUsageScanner {
         var offset: Int
         var dedupeKeys: Set<String> = []
         var lastKnownModel: String = LocalUsageScanner.unknownModelKey
+        var skippedOversizedLineCount: Int = 0
     }
 
     /// A line can only produce tokens if the JSON decode below finds
@@ -396,7 +534,7 @@ actor LocalUsageScanner {
         var seen = seenMessageKeys
         let calendar = Calendar.current
 
-        let endOffset = forEachLine(
+        let (endOffset, skippedOversized) = forEachLine(
             in: url,
             startOffset: startOffset,
             limit: Self.maxLinesPerFile,
@@ -438,7 +576,7 @@ actor LocalUsageScanner {
             let existing = perDay[day]?[model] ?? TokenTally()
             perDay[day, default: [:]][model] = existing + tally
         }
-        return ParseResult(perDay: perDay, offset: endOffset, dedupeKeys: seen)
+        return ParseResult(perDay: perDay, offset: endOffset, dedupeKeys: seen, skippedOversizedLineCount: skippedOversized)
     }
 
     /// Codex's `event_msg` `token_count` events carry `last_token_usage`,
@@ -466,7 +604,7 @@ actor LocalUsageScanner {
         var currentModel = seedModel
         let calendar = Calendar.current
 
-        let endOffset = forEachLine(
+        let (endOffset, skippedOversized) = forEachLine(
             in: url,
             startOffset: startOffset,
             limit: Self.maxLinesPerFile,
@@ -505,7 +643,7 @@ actor LocalUsageScanner {
             let existing = perDay[day]?[currentModel] ?? TokenTally()
             perDay[day, default: [:]][currentModel] = existing + tally
         }
-        return ParseResult(perDay: perDay, offset: endOffset, lastKnownModel: currentModel)
+        return ParseResult(perDay: perDay, offset: endOffset, lastKnownModel: currentModel, skippedOversizedLineCount: skippedOversized)
     }
 
     // `nonisolated(unsafe)`: these are only ever touched from this actor's
@@ -583,20 +721,48 @@ actor LocalUsageScanner {
         limit: Int,
         prefilter: (Data) -> Bool,
         _ body: (Substring) -> Void
-    ) -> Int {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return startOffset }
+    ) -> (offset: Int, skippedOversizedLineCount: Int) {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return (startOffset, 0) }
         defer { try? handle.close() }
-        guard (try? handle.seek(toOffset: UInt64(startOffset))) != nil else { return startOffset }
+        guard (try? handle.seek(toOffset: UInt64(startOffset))) != nil else { return (startOffset, 0) }
 
         let newline = UInt8(ascii: "\n")
         var carry = Data()
         var linesProcessed = 0
         var offset = startOffset
+        var skippedOversizedLineCount = 0
+        // Once the line in progress has grown past `maxLineBytes` with no
+        // newline in sight, its bytes are abandoned instead of buffered
+        // further: later chunks are searched for that line's terminating
+        // newline directly and never appended to `carry`, so the buffer
+        // never holds more than about one chunk of an oversized line at a
+        // time. `pendingSkipBytes` counts how much of the still-unterminated
+        // line has gone by, but is only folded into `offset` once the
+        // newline actually turns up — if the file ends first (the writer is
+        // still mid-record), nothing here is committed, the same way an
+        // ordinary partial trailing line is left whole for the next scan.
+        var skippingOversizedLine = false
+        var pendingSkipBytes = 0
         let chunkSize = 1 << 20 // 1 MB
 
         while linesProcessed < limit {
             guard let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty else { break }
-            carry.append(chunk)
+
+            if skippingOversizedLine {
+                guard let newlineIndex = chunk.firstIndex(of: newline) else {
+                    pendingSkipBytes += chunk.count
+                    continue
+                }
+                pendingSkipBytes += chunk.distance(from: chunk.startIndex, to: newlineIndex) + 1
+                offset += pendingSkipBytes
+                linesProcessed += 1
+                skippedOversizedLineCount += 1
+                skippingOversizedLine = false
+                pendingSkipBytes = 0
+                carry = Data(chunk[chunk.index(after: newlineIndex)...])
+            } else {
+                carry.append(chunk)
+            }
 
             // Walk a cursor across `carry` and drop the consumed prefix once
             // per chunk, not once per line: `Data.removeSubrange` from the
@@ -605,8 +771,16 @@ actor LocalUsageScanner {
             // real bottleneck — quadratic in the chunk size, dwarfing both
             // the prefilter and the JSON decode it protects.
             var consumedThrough = carry.startIndex
-            while linesProcessed < limit,
-                  let newlineIndex = carry[consumedThrough...].firstIndex(of: newline) {
+            lineLoop: while linesProcessed < limit {
+                guard let newlineIndex = carry[consumedThrough...].firstIndex(of: newline) else {
+                    let bufferedSoFar = carry.distance(from: consumedThrough, to: carry.endIndex)
+                    if bufferedSoFar > Self.maxLineBytes {
+                        skippingOversizedLine = true
+                        pendingSkipBytes = bufferedSoFar
+                        consumedThrough = carry.endIndex
+                    }
+                    break lineLoop
+                }
                 let lineData = carry[consumedThrough..<newlineIndex]
                 // The cheap raw-byte check runs first; only a survivor pays
                 // for UTF-8 decoding.
@@ -620,8 +794,11 @@ actor LocalUsageScanner {
             if consumedThrough > carry.startIndex {
                 carry.removeSubrange(carry.startIndex..<consumedThrough)
             }
+            if skippingOversizedLine {
+                carry = Data() // never retain the abandoned line's storage
+            }
         }
-        return offset
+        return (offset, skippedOversizedLineCount)
     }
 }
 
