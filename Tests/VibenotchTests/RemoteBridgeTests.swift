@@ -834,6 +834,7 @@ private final class RemoteBridgeFixture {
         bridge = RemoteBridge(
             engine: engine,
             sessionStore: store,
+            usageStore: FakeUsageStore(),
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,
@@ -857,6 +858,7 @@ private final class RemoteBridgeFixture {
         bridge = RemoteBridge(
             engine: engine,
             sessionStore: other.store,
+            usageStore: FakeUsageStore(),
             commandRunner: runner,
             powerSourceProvider: power,
             homeURL: scratch,

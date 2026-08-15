@@ -81,11 +81,30 @@ protocol RemoteSessionStoring: AnyObject {
 
 extension SessionStore: RemoteSessionStoring {}
 
+/// The slice of `UsageStore` the publisher needs: what each provider last
+/// loaded, and the pace engine's read on it. Pace is computed here — on the
+/// Mac — and never in JavaScript, so this is the only door into that math.
+/// `localSeries` and `scanLocalIfNeeded()` are the same door for the local
+/// token-history scan the quota tab already triggers — the bridge triggers it
+/// too, so the phone gets history even if the notch is never opened.
+@MainActor
+protocol RemoteUsageStoring: AnyObject {
+    var entries: [UsageProviderKind: UsageStore.Entry] { get }
+    var localSeries: LocalUsageSeries? { get }
+    func pace(for snapshot: UsageSnapshot, now: Date) -> [String: UsagePace]
+    func refreshIfStale(maxAge: TimeInterval, now: Date)
+    func scanLocalIfNeeded()
+}
+
+extension UsageStore: RemoteUsageStoring {}
+
 @MainActor
 final class RemoteBridge {
     private static let batteryThresholds = [50, 30, 20]
     private static let lastAppliedSettingsRevKey = "remoteBridge.lastAppliedSettingsRev"
     private static let sessionIDKeyKey = "remoteBridge.sessionIDKey"
+    private static let lastPublishedUsageDigestKey = "remoteBridge.lastPublishedUsageDigest"
+    private static let lastPublishedUsageHistoryDigestKey = "remoteBridge.lastPublishedUsageHistoryDigest"
     /// Read by the Settings window, which runs the same script from a
     /// different place and would otherwise have no way to know.
     static let scriptMismatchKey = "remoteBridge.scriptMismatch"
@@ -93,6 +112,7 @@ final class RemoteBridge {
 
     private let engine: any RemoteKeepAwakeEngine
     private let sessionStore: any RemoteSessionStoring
+    private let usageStore: any RemoteUsageStoring
     private let commandRunner: any CommandRunning
     private let powerSourceProvider: any PowerSourceProviding
     private let pairingURL: URL
@@ -135,6 +155,7 @@ final class RemoteBridge {
     init(
         engine: any RemoteKeepAwakeEngine,
         sessionStore: any RemoteSessionStoring,
+        usageStore: any RemoteUsageStoring = UsageStore(),
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
@@ -148,12 +169,15 @@ final class RemoteBridge {
         self.remoteControlServer = remoteControlServer
         self.engine = engine
         self.sessionStore = sessionStore
+        self.usageStore = usageStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
         self.powerSourceProvider = powerSourceProvider
         self.userDefaults = userDefaults
         pairingURL = homeURL.appendingPathComponent(".vibenotch/remote.json", isDirectory: false)
         previousMode = engine.mode
         lastSyncedSettingsSnapshot = RemoteSettingsSnapshot(engine.config)
+        lastPublishedUsageDigest = userDefaults.string(forKey: Self.lastPublishedUsageDigestKey)
+        lastPublishedUsageHistoryDigest = userDefaults.string(forKey: Self.lastPublishedUsageHistoryDigestKey)
     }
 
     func start() {
@@ -269,6 +293,14 @@ final class RemoteBridge {
     private var lastPublishedSessions: [PublishedSession]?
     private var lastPublishedResumable: [PublishedConversation]?
 
+    /// A digest survives restarts without retaining account or quota data in
+    /// preferences. That survival matters when the new reading is empty: nil
+    /// must mean "never published", not merely "this process just launched".
+    private var lastPublishedUsageDigest: String?
+
+    /// Same rule as `lastPublishedUsageDigest`, for local token history.
+    private var lastPublishedUsageHistoryDigest: String?
+
     /// The last request actually carried out. A clear that succeeds on the
     /// server but is not reflected in the next GET would otherwise run the
     /// same request twice.
@@ -344,6 +376,45 @@ final class RemoteBridge {
             startedAt = formatter.string(from: session.startedAt ?? session.updatedAt)
             subagents = session.subagents
         }
+    }
+
+    /// One provider's slice of the wire contract. Rendered by hand rather
+    /// than through `JSONEncoder`: on Darwin, `JSONEncoder`'s keyed
+    /// containers go through an unordered dictionary before serializing, so
+    /// the same value can come out with its keys in a different order on
+    /// every encode — exactly the "dictionary reorders itself" case that
+    /// would make `publishUsageIfChanged()`'s change-detection fire on an
+    /// unchanged snapshot.
+    fileprivate struct PublishedUsageProvider: Equatable {
+        let plan: String?
+        let account: String?
+        let windows: [PublishedUsageWindow]
+    }
+
+    /// One quota window. Field order here IS the wire order.
+    fileprivate struct PublishedUsageWindow: Equatable {
+        let kind: String
+        let percentUsed: Double
+        let resetsAt: String?
+        let scope: String?
+        let severity: String
+        let expectedPercent: Double?
+        let deltaPercent: Double?
+        let runsOutAt: String?
+    }
+
+    /// One provider's slice of the token-history wire contract. Rendered by
+    /// hand for the same reason `PublishedUsageProvider` is: a stable key
+    /// order across encodes of an identical value.
+    fileprivate struct PublishedUsageHistoryProvider: Equatable {
+        let days: [PublishedUsageHistoryDay]
+        let topModel: String?
+    }
+
+    /// One calendar day's total. Field order here IS the wire order.
+    fileprivate struct PublishedUsageHistoryDay: Equatable {
+        let day: String
+        let tokens: Int
     }
 
     // nil until the first successful reconcile; then the on/off value both
@@ -444,6 +515,18 @@ final class RemoteBridge {
         await publishMachineStateIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
+        // Ask before publishing, on a five-minute cadence rather than the
+        // bridge's ten-second one. Opening the quota tab was the only thing
+        // that ever fetched these, so the phone would have shown whatever was
+        // last looked at on the Mac — or nothing at all.
+        usageStore.refreshIfStale(maxAge: UsageStore.backgroundMaxAge, now: Date())
+        // Same reasoning for the local token-history scan: it used to run
+        // only when the quota tab opened. `scanLocalIfNeeded()` is a no-op
+        // once a scan has run or is running, so asking every tick costs
+        // nothing after the first.
+        usageStore.scanLocalIfNeeded()
+        await publishUsageIfChanged()
+        await publishUsageHistoryIfChanged()
         await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
         await updateStatusStrip(enabled: remote.statusNotification == true)
         await runPendingCommand(remote.command)
@@ -667,6 +750,226 @@ final class RemoteBridge {
         if await run(["--state-put"], stdin: body).exitCode == 0 {
             lastPublishedResumable = snapshot
         }
+    }
+
+    /// Publishes the Claude/Codex quota gauges so the phone can draw the same
+    /// bars the notch does. On change only, compared on the rendered JSON —
+    /// same rule as the status strip. Never triggers a refresh itself: this
+    /// publishes whatever `UsageStore` already holds, and a provider with
+    /// nothing loaded is left out of the object entirely rather than sent as
+    /// null.
+    /// Serialised, for the same reason `publishSessionsIfChanged` is.
+    ///
+    /// The check against the last published body and the write that follows it
+    /// are separated by an await, and the actor is free to run another tick in
+    /// that gap — the ten-second timer and an observation-driven `checkNow()`
+    /// overlap routinely. Two passes could then post the same body twice, and
+    /// if two different bodies finished out of order the older one would win
+    /// both the remote row and the cache, freezing the phone on stale numbers
+    /// until something else changed.
+    private var isPublishingUsage = false
+
+    private func publishUsageIfChanged() async {
+        guard !isPublishingUsage else { return }
+        guard let body = renderedUsagePayload() else { return }
+        let digest = Self.payloadDigest(body)
+        guard digest != lastPublishedUsageDigest else { return }
+
+        isPublishingUsage = true
+        defer { isPublishingUsage = false }
+
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedUsageDigest = digest
+            userDefaults.set(digest, forKey: Self.lastPublishedUsageDigestKey)
+        }
+    }
+
+    private func renderedUsagePayload() -> String? {
+        let claude = publishedUsageProvider(for: .claude)
+        let codex = publishedUsageProvider(for: .codex)
+        if claude == nil, codex == nil {
+            // Loading is ignorance, not an empty result. Once every attempted
+            // fetch has settled, however, a prior successful publish must be
+            // cleared or the phone keeps quotas that no provider can supply.
+            let entries = usageStore.entries.values
+            let hasFinishedFetch = !entries.isEmpty && !entries.contains { entry in
+                if case .loading = entry { return true }
+                return false
+            }
+            guard hasFinishedFetch, lastPublishedUsageDigest != nil else { return nil }
+        }
+
+        // Provider order follows the enum's own declaration order (claude,
+        // codex) rather than a dictionary, and a provider with nothing
+        // loaded is left out of the join entirely — never `"codex":null`.
+        var providers: [String] = []
+        if let claude {
+            providers.append("\"claude\":\(renderedUsageProvider(claude))")
+        }
+        if let codex {
+            providers.append("\"codex\":\(renderedUsageProvider(codex))")
+        }
+        return "{\"usage\":{\(providers.joined(separator: ","))}}"
+    }
+
+    private func renderedUsageProvider(_ provider: PublishedUsageProvider) -> String {
+        let windows = provider.windows.map(renderedUsageWindow).joined(separator: ",")
+        return "{\"plan\":\(jsonStringOrNull(provider.plan))"
+            + ",\"account\":\(jsonStringOrNull(provider.account))"
+            + ",\"windows\":[\(windows)]}"
+    }
+
+    private func renderedUsageWindow(_ window: PublishedUsageWindow) -> String {
+        "{\"kind\":\(jsonString(window.kind))"
+            + ",\"percent_used\":\(jsonNumber(window.percentUsed))"
+            + ",\"resets_at\":\(jsonStringOrNull(window.resetsAt))"
+            + ",\"scope\":\(jsonStringOrNull(window.scope))"
+            + ",\"severity\":\(jsonString(window.severity))"
+            + ",\"expected_percent\":\(jsonNumberOrNull(window.expectedPercent))"
+            + ",\"delta_percent\":\(jsonNumberOrNull(window.deltaPercent))"
+            + ",\"runs_out_at\":\(jsonStringOrNull(window.runsOutAt))}"
+    }
+
+    private func publishedUsageProvider(for kind: UsageProviderKind) -> PublishedUsageProvider? {
+        guard case .loaded(let snapshot) = usageStore.entries[kind] else { return nil }
+
+        // Pace as of when the SNAPSHOT was captured, not as of now.
+        //
+        // `expectedPercent` moves with the clock, so computing it from `Date()`
+        // made the rendered body differ on every single tick — and the whole
+        // publisher is built on "publish only when the body changes". Measured
+        // against production: `usage_updated_at` advanced every ten seconds,
+        // roughly 8,600 writes a day for a number that genuinely changes about
+        // three hundred times. The phone re-derives nothing from this; it draws
+        // what arrives, and a five-minute-old expected percentage is well
+        // inside the honesty of a bar you glance at.
+        let pace = usageStore.pace(for: snapshot, now: snapshot.capturedAt)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        let windows = snapshot.windows.map { window -> PublishedUsageWindow in
+            let windowPace = pace[window.id]
+            return PublishedUsageWindow(
+                kind: window.kind == .session ? "session" : "weekly",
+                percentUsed: window.percentUsed,
+                resetsAt: window.resetsAt.map { formatter.string(from: $0) },
+                scope: window.scopeLabel,
+                severity: window.severity.rawValue,
+                expectedPercent: windowPace?.expectedPercent,
+                deltaPercent: windowPace?.deltaPercent,
+                runsOutAt: windowPace?.runsOutAt.map { formatter.string(from: $0) }
+            )
+        }
+        return PublishedUsageProvider(plan: snapshot.plan, account: snapshot.account, windows: windows)
+    }
+
+    /// Publishes the per-day token history the local scan builds, so the
+    /// phone can draw the same bar chart the notch does instead of saying
+    /// history is unavailable. On change only, compared on the rendered
+    /// JSON — same rule as `publishUsageIfChanged()`. Never triggers the scan
+    /// itself: `reconcileRemote()` asks for that separately, and this
+    /// publishes whatever `UsageStore` already holds.
+    /// Same reentrancy rule as the quota publisher above.
+    private var isPublishingUsageHistory = false
+
+    private func publishUsageHistoryIfChanged() async {
+        guard !isPublishingUsageHistory else { return }
+        guard let body = renderedUsageHistoryPayload() else { return }
+        let digest = Self.payloadDigest(body)
+        guard digest != lastPublishedUsageHistoryDigest else { return }
+
+        isPublishingUsageHistory = true
+        defer { isPublishingUsageHistory = false }
+
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedUsageHistoryDigest = digest
+            userDefaults.set(digest, forKey: Self.lastPublishedUsageHistoryDigestKey)
+        }
+    }
+
+    private func renderedUsageHistoryPayload() -> String? {
+        let claude = publishedUsageHistoryProvider(for: .claude)
+        let codex = publishedUsageHistoryProvider(for: .codex)
+
+        // A nil series means the restart scan has not answered yet. Clearing
+        // during that gap would make valid history flicker away on every app
+        // launch and would turn each launch into two unnecessary writes.
+        guard usageStore.localSeries != nil else { return nil }
+
+        // Nothing at all to report, and nothing was ever reported: stay quiet.
+        // But once something HAS been published, silence stops being neutral —
+        // the payload replaces only the keys it carries, so an omitted
+        // provider keeps whatever the remote last saw. A provider whose last
+        // day ages out of the window would leave the phone drawing a chart
+        // that no longer exists anywhere else. So after the first publish we
+        // always say something, even if what we have to say is "nothing".
+        guard claude != nil || codex != nil || lastPublishedUsageHistoryDigest != nil else { return nil }
+
+        var providers: [String] = []
+        if let claude {
+            providers.append("\"claude\":\(renderedUsageHistoryProvider(claude))")
+        }
+        if let codex {
+            providers.append("\"codex\":\(renderedUsageHistoryProvider(codex))")
+        }
+        return "{\"usage_history\":{\(providers.joined(separator: ","))}}"
+    }
+
+    private func renderedUsageHistoryProvider(_ provider: PublishedUsageHistoryProvider) -> String {
+        let days = provider.days.map(renderedUsageHistoryDay).joined(separator: ",")
+        return "{\"days\":[\(days)],\"top_model\":\(jsonStringOrNull(provider.topModel))}"
+    }
+
+    private func renderedUsageHistoryDay(_ day: PublishedUsageHistoryDay) -> String {
+        "{\"day\":\(jsonString(day.day)),\"tokens\":\(day.tokens)}"
+    }
+
+    /// One provider's trailing-window slice of the local scan, or nil when it
+    /// has no days in that window — a provider that is a scan away from
+    /// having anything is omitted entirely rather than sent with an empty
+    /// `days` array, matching `publishedUsageProvider(for:)`'s rule for the
+    /// network-fetched quotas.
+    private func publishedUsageHistoryProvider(for kind: UsageProviderKind) -> PublishedUsageHistoryProvider? {
+        guard let series = usageStore.localSeries else { return nil }
+
+        let calendar = Calendar.current
+        let cutoff = calendar.date(
+            byAdding: .day, value: -(UsageStore.trailingDays - 1),
+            to: calendar.startOfDay(for: Date())
+        )
+        // Zero-token days are dropped, not just days absent from the scan:
+        // the wire contract says a gap is drawn rather than a flat zero, and
+        // `totalTokens` could in principle be zero without the point being
+        // absent.
+        let days = series.points
+            .filter { $0.provider == kind && $0.totalTokens > 0 }
+            .filter { point in
+                guard let cutoff else { return true }
+                return point.day >= cutoff
+            }
+            .sorted { $0.day < $1.day }
+        guard !days.isEmpty else { return nil }
+
+        // Same rule the notch's own chart uses (`UsageHistoryChart`): the top
+        // model is the top model of the single biggest day in the window,
+        // not a sum across days — the scanner only ever hands back one
+        // model per day, never a per-model breakdown across the whole
+        // series.
+        let topModel = days.max(by: { $0.totalTokens < $1.totalTokens })?.topModel
+        let renderedDays = days.map {
+            PublishedUsageHistoryDay(day: Self.wireDayString($0.day), tokens: $0.totalTokens)
+        }
+        return PublishedUsageHistoryProvider(days: renderedDays, topModel: topModel)
+    }
+
+    /// `YYYY-MM-DD` in the Mac's local time zone. The scanner already buckets
+    /// `point.day` to local midnight (`Calendar.current.startOfDay`), so this
+    /// only has to read the components back out — never re-interpreting the
+    /// instant in another zone, which is exactly what the phone must not do
+    /// either.
+    private static func wireDayString(_ date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
     }
 
     /// The phone can ask for exactly one thing, and it cannot say how.
@@ -926,8 +1229,20 @@ final class RemoteBridge {
         lastPublishedThermal = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
+        lastPublishedUsageDigest = nil
+        lastPublishedUsageHistoryDigest = nil
+        userDefaults.removeObject(forKey: Self.lastPublishedUsageDigestKey)
+        userDefaults.removeObject(forKey: Self.lastPublishedUsageHistoryDigestKey)
         lastStatusLine = nil
         lastSyncedActive = nil
+    }
+
+    private static func payloadDigest(_ body: String) -> String {
+        // 128 bits is ample for change detection while keeping preferences to
+        // a short, non-reversible marker rather than the user-facing payload.
+        SHA256.hash(data: Data(body.utf8)).prefix(16)
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 
     private func reconcileSettings(_ remote: RemoteStateWithSettings) async {
@@ -1009,6 +1324,42 @@ final class RemoteBridge {
         }
         return result
     }
+}
+
+/// Minimal hand-rolled JSON scalar rendering for the usage payload — see
+/// `RemoteBridge.PublishedUsageProvider` for why `JSONEncoder` is not used
+/// for this one value on this platform.
+private func jsonString(_ value: String) -> String {
+    var result = "\""
+    for scalar in value.unicodeScalars {
+        switch scalar {
+        case "\"": result += "\\\""
+        case "\\": result += "\\\\"
+        case "\n": result += "\\n"
+        case "\r": result += "\\r"
+        case "\t": result += "\\t"
+        default:
+            if scalar.value < 0x20 {
+                result += String(format: "\\u%04x", scalar.value)
+            } else {
+                result.unicodeScalars.append(scalar)
+            }
+        }
+    }
+    result += "\""
+    return result
+}
+
+private func jsonStringOrNull(_ value: String?) -> String {
+    value.map(jsonString) ?? "null"
+}
+
+private func jsonNumber(_ value: Double) -> String {
+    String(value)
+}
+
+private func jsonNumberOrNull(_ value: Double?) -> String {
+    value.map(jsonNumber) ?? "null"
 }
 
 /// The seven remote-managed fields of `KeepAwakeConfig`, mapped to the wire

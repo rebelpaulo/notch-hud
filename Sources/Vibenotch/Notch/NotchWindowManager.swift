@@ -18,6 +18,10 @@ final class NotchWindowManager {
     private let pendingStore: PendingStore
     private let focusDispatcher: FocusDispatcher
     private let keepAwakeEngine: KeepAwakeEngine
+    /// Owned here rather than made per-panel: the panel is rebuilt every time
+    /// it opens, and a store that died with it would re-request the quotas on
+    /// every glance.
+    private let usageStore = UsageStore()
     private let sleepGuardController: SleepGuardController
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
@@ -332,6 +336,7 @@ final class NotchWindowManager {
             focusDispatcher: focusDispatcher,
             decisionWriter: decisionWriter,
             keepAwakeEngine: keepAwakeEngine,
+            usageStore: usageStore,
             closedLidModeAvailable: closedLidModeAvailable,
             onOpenSettings: { [weak self] in
                 self?.openSettings()
@@ -492,9 +497,22 @@ final class NotchWindowManager {
 
     private func updateRenderedPanelSize(_ size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
+        // The ceiling is the screen, not a constant. It used to be a flat 560,
+        // which silently clipped anything taller — the quota tab asks for far
+        // more than a session list, and the cards below the fold simply were
+        // not drawn. Leave room for the notch band and a margin so the panel
+        // never runs off the bottom of a short display.
+        // `visibleFrame` already excludes the menu bar and the notch band, so
+        // subtracting the band again took it off twice. And the panel hangs
+        // from the screen it is PINNED to, which is not necessarily the one
+        // macOS calls main — on a two-display desk those differ, and the
+        // ceiling would be computed for a screen the panel is not on.
+        let screen = selectedScreen ?? interactivePanel?.screen ?? NSScreen.main
+        let available = screen?.visibleFrame.height ?? 560
+        let ceiling = max(560, available - 80)
         renderedPanelSize = CGSize(
             width: ceil(min(size.width, 720)),
-            height: ceil(min(size.height, 560))
+            height: ceil(min(size.height, ceiling))
         )
         positionInteractivePanel()
         if isExpanded, interactivePanel?.isVisible != true {

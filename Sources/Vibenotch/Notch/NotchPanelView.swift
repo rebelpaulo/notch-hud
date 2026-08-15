@@ -7,6 +7,7 @@ struct NotchPanelView: View {
     let focusDispatcher: FocusDispatcher
     let decisionWriter: ApprovalDecisionWriter
     @Bindable var keepAwakeEngine: KeepAwakeEngine
+    let usageStore: UsageStore
     let closedLidModeAvailable: Bool
     let onOpenSettings: @MainActor () -> Void
     let onApprovalDismiss: @MainActor (String) -> Void
@@ -15,10 +16,34 @@ struct NotchPanelView: View {
 
     @State private var feedback: [String: SessionRowFeedback] = [:]
     @State private var sessionListHeight: CGFloat?
+    /// Which half of the panel you are looking at. One or the other, never
+    /// both: the panel is already the height of a notch drawer, and stacking
+    /// quotas under a session list would push the sessions off the bottom —
+    /// the thing you open this for most often.
+    @State private var tab: PanelTab = .sessions
 
-    private let maximumPanelHeight: CGFloat = 520
+    private enum PanelTab {
+        case sessions
+        case limits
+    }
+
+    /// The quota tab is taller on purpose: two provider cards, each with a
+    /// gauge pair and a month of daily bars, do not fit in the height a
+    /// session list needs. Growing only on that tab keeps the common case —
+    /// glancing at what is running — the same size it has always been.
+    private var maximumPanelHeight: CGFloat {
+        tab == .limits ? 820 : 520
+    }
+
     private var maximumSessionListHeight: CGFloat {
         pendingStore.hasPending ? 205 : 468
+    }
+
+    /// Enough for both cards and both charts without an inner scrollbar in
+    /// the ordinary case. It still scrolls when a provider reports extra
+    /// model-scoped windows, which is the one thing that varies.
+    private var maximumUsageHeight: CGFloat {
+        pendingStore.hasPending ? 505 : 768
     }
 
     private let panelShape = UnevenRoundedRectangle(
@@ -43,6 +68,9 @@ struct NotchPanelView: View {
                 )
             }
 
+            if tab == .limits {
+                usageTab
+            } else {
             TimelineView(.periodic(from: .now, by: 30)) { context in
                 if store.sessions.isEmpty {
                     emptyState
@@ -79,6 +107,7 @@ struct NotchPanelView: View {
                         )
                     )
                 }
+            }
             }
         }
         .padding(.horizontal, 14)
@@ -124,6 +153,8 @@ struct NotchPanelView: View {
 
             allNighterControl
 
+            tabToggle
+
             Button(action: onOpenSettings) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 12, weight: .medium))
@@ -136,6 +167,82 @@ struct NotchPanelView: View {
             .accessibilityLabel(t("Settings"))
         }
         .font(.system(size: 11, weight: .medium, design: .monospaced))
+    }
+
+    /// Swaps the panel between the session list and the quota gauges. One
+    /// button rather than a segmented control: there are exactly two places to
+    /// be, and the icon can then show where you would GO, which is the thing
+    /// worth a glance in a strip this narrow.
+    private var tabToggle: some View {
+        Button {
+            tab = tab == .sessions ? .limits : .sessions
+            if tab == .limits {
+                usageStore.refreshIfStale()
+                usageStore.scanLocalIfNeeded()
+            }
+        } label: {
+            Image(systemName: tab == .sessions ? "gauge.with.needle" : "list.bullet")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.55))
+                .frame(width: 22, height: 20)
+                .background(.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .help(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
+        .accessibilityLabel(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
+    }
+
+    /// Only the providers that actually answered. A card reading
+    /// "unavailable" for a tool you do not use is noise about someone else's
+    /// product; absence says the same thing without occupying the drawer.
+    ///
+    /// A provider that answered once and then failed keeps its card, because
+    /// UsageStore holds the last good snapshot — a dropped request is not
+    /// evidence you logged out.
+    private var usageTab: some View {
+        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageSnapshot)? in
+            if case let .loaded(snapshot) = usageStore.entries[provider] {
+                return (provider, snapshot)
+            }
+            return nil
+        }
+
+        return ScrollView(.vertical) {
+            VStack(spacing: 10) {
+                if shown.isEmpty {
+                    // Not a per-card badge: one quiet line, and only when
+                    // there is genuinely nothing to draw.
+                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude or codex to see quotas"))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.35))
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                }
+
+                ForEach(shown, id: \.0.rawValue) { provider, snapshot in
+                    VStack(alignment: .leading, spacing: 10) {
+                        UsageCardView(
+                            snapshot: snapshot,
+                            paceByWindowID: usageStore.pace(for: snapshot)
+                        )
+
+                        UsageHistoryChart(
+                            provider: provider,
+                            points: usageStore.localSeries?.points ?? [],
+                            today: usageStore.tokens(for: provider, today: true),
+                            trailing: usageStore.tokens(for: provider, today: false),
+                            isCounting: usageStore.isScanningLocal
+                        )
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 10)
+                    }
+                    .background(Color.notchBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(maxHeight: maximumUsageHeight)
     }
 
     private var allNighterControl: some View {
