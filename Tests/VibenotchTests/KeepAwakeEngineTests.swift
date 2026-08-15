@@ -77,23 +77,26 @@ import Testing
     #expect(fixture.engine.mode == .off)
     #expect(fixture.assertions.activeIDs.isEmpty)
 
-    // Ticking at critical, and trying again from the notch or the phone, must
-    // not post the same warning over and over.
+    // And SILENT. "Going to sleep" is a claim about something that was
+    // awake; refusing to start was never a shutdown, so announcing one
+    // describes an event the user did not have.
     fixture.engine.tick()
     fixture.engine.setMode(.manual)
     fixture.engine.tick()
-    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
+    #expect(fixture.notifications.messages.isEmpty)
 
-    // Cooled down: it can be turned on again, and a second episode is reported.
+    // Cooled down: it can be turned on again.
     fixture.thermal.state = .nominal
     fixture.engine.tick()
     fixture.engine.setMode(.manual)
     #expect(fixture.engine.mode == .manual)
 
+    // NOW there is something to report — a session that was running has been
+    // stopped by the heat, which is the only case the sentence describes.
     fixture.thermal.state = .critical
     fixture.engine.tick()
     #expect(fixture.engine.mode == .off)
-    #expect(fixture.notifications.messages.count == 2)
+    #expect(fixture.notifications.messages == ["Gotta go!: Mac too hot, going to sleep"])
 }
 
 @MainActor
@@ -237,7 +240,7 @@ private final class KeepAwakeFixture {
     let assertions = FakeSleepAssertionProvider()
     let notifications = FakeNotificationPoster()
     let engine: KeepAwakeEngine
-    private let suiteName: String
+    let suiteName: String
     private let defaults: UserDefaults
 
     let thermal: FakeThermalState
@@ -246,9 +249,13 @@ private final class KeepAwakeFixture {
         percent: Int? = 100,
         isOnACPower: Bool = true,
         thermalState: ProcessInfo.ThermalState = .nominal,
-        applications: FakeRunningApplications = FakeRunningApplications()
+        applications: FakeRunningApplications = FakeRunningApplications(),
+        /// Shared between two fixtures when a test needs a RELAUNCH: the
+        /// engine restores its mode from here, so a second engine over the
+        /// same defaults is what "the app started again" means.
+        reusing existingSuite: String? = nil
     ) {
-        suiteName = "KeepAwakeEngineTests.\(UUID().uuidString)"
+        suiteName = existingSuite ?? "KeepAwakeEngineTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
         thermal = FakeThermalState(state: thermalState)
         engine = KeepAwakeEngine(
@@ -339,4 +346,20 @@ private func makeAwakeSession(status: SessionStatus) -> Session {
         ),
         updatedAt: Date(timeIntervalSince1970: 1_000_000)
     )
+}
+
+@MainActor
+@Test func launchingHotWithARestoredSessionDoesNotHoldTheAssertions() {
+    // A session restored from disk used to keep the Mac awake until the first
+    // tick — the app would start by holding assertions on a machine it is
+    // about to declare too hot to hold them on.
+    let warm = KeepAwakeFixture(thermalState: .nominal)
+    warm.engine.setMode(.manual)
+    #expect(warm.engine.mode == .manual)
+    #expect(!warm.assertions.activeIDs.isEmpty)
+
+    // Same persisted state, relaunched into a critically hot Mac.
+    let hot = KeepAwakeFixture(thermalState: .critical, reusing: warm.suiteName)
+    #expect(hot.engine.mode == .off)
+    #expect(hot.assertions.activeIDs.isEmpty)
 }

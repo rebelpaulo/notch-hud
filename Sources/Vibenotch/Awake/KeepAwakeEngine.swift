@@ -102,6 +102,16 @@ final class KeepAwakeEngine {
         }
         remainingTime = timerRemainingTime(at: restoreTime)
         persistConfig()
+
+        // Launching into a Mac that is ALREADY critical, with a session
+        // restored from disk, would otherwise hold the assertions until the
+        // first tick — the app would start by keeping a machine awake that it
+        // is about to declare too hot to keep awake. Decide before creating
+        // them, not after.
+        if isActive, thermalState == .critical {
+            reportCriticalHeat(now: restoreTime)
+        }
+
         reconcileAssertions()
     }
 
@@ -280,6 +290,16 @@ final class KeepAwakeEngine {
     /// Gotta go! back on posts another — which is how a safety feature turns
     /// into the reason someone mutes the app's notifications entirely.
     private func reportCriticalHeat(now: Date) {
+        // "Going to sleep" is a claim about something that was awake. Refusing
+        // to START while the Mac is already too hot goes through here too, and
+        // announcing a shutdown that never happened describes an event the
+        // user did not have. Still marked as reported, so the message is not
+        // saved up to fire later out of context.
+        guard isActive else {
+            didReportCriticalHeat = true
+            return
+        }
+
         turnOff(
             notification: didReportCriticalHeat ? nil : t("Gotta go!: Mac too hot, going to sleep"),
             now: now

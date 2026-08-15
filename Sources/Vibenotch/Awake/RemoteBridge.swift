@@ -471,6 +471,22 @@ final class RemoteBridge {
                 : engine.config.defaultMode
             engine.setMode(startMode, now: Date())
             lastSyncedActive = engine.isActive
+
+            // The engine can REFUSE: it will not start while the Mac is
+            // already critically hot. Reporting success anyway told the phone
+            // a lie and left the remote flag on, so the next poll tried again,
+            // was refused again, and sent the same cheerful confirmation —
+            // forever, once a minute, for something that never happened.
+            guard engine.isActive else {
+                await pushDesiredState(false)
+                await push(
+                    title: "Vibenotch",
+                    body: t("Gotta go! could not start — the Mac is too hot"),
+                    tag: "remote-toggle"
+                )
+                return
+            }
+
             await push(
                 title: "Vibenotch",
                 body: t("Gotta go! turned on remotely ✓"),
@@ -519,7 +535,12 @@ final class RemoteBridge {
 
         await publishMachineStateNow()
 
-        if machineStateChangedWhilePublishing {
+        // `while`, not `if`: a change arriving DURING the follow-up publish
+        // sets the flag again, and a single retry would return holding it —
+        // leaving the phone on a stale battery or thermal reading until some
+        // later reconcile happened to notice. `publishSessionsIfChanged` has
+        // drained in a loop all along; this one only retried once.
+        while machineStateChangedWhilePublishing {
             machineStateChangedWhilePublishing = false
             await publishMachineStateNow()
         }
