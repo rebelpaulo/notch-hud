@@ -756,7 +756,17 @@ final class RemoteBridge {
     private func publishedUsageProvider(for kind: UsageProviderKind) -> PublishedUsageProvider? {
         guard case .loaded(let snapshot) = usageStore.entries[kind] else { return nil }
 
-        let pace = usageStore.pace(for: snapshot, now: Date())
+        // Pace as of when the SNAPSHOT was captured, not as of now.
+        //
+        // `expectedPercent` moves with the clock, so computing it from `Date()`
+        // made the rendered body differ on every single tick — and the whole
+        // publisher is built on "publish only when the body changes". Measured
+        // against production: `usage_updated_at` advanced every ten seconds,
+        // roughly 8,600 writes a day for a number that genuinely changes about
+        // three hundred times. The phone re-derives nothing from this; it draws
+        // what arrives, and a five-minute-old expected percentage is well
+        // inside the honesty of a bar you glance at.
+        let pace = usageStore.pace(for: snapshot, now: snapshot.capturedAt)
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
 

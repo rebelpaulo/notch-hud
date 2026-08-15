@@ -67,12 +67,16 @@ struct CodexUsageFetcher: UsageFetching {
             // (that's what distinguishes it from the account-wide `rate_limit`
             // above) — a missing `limit_name` must not fall back to nil, which
             // would read as account-wide. See `UsageWindow.unspecifiedScopeLabel`.
-            if let window = UsageWindow(
-                codexWindow: additional.rateLimit?.primaryWindow,
-                scopeLabel: additional.limitName ?? UsageWindow.unspecifiedScopeLabel
-            ) {
-                windows.append(window)
-            }
+            // BOTH windows, as the account-wide path above already does. A
+            // scoped limit can carry a secondary window too, and reading only
+            // the primary dropped it from the gauges and from the phone
+            // without a trace — the same slot-name assumption this file exists
+            // to avoid, made one level down.
+            let scope = additional.limitName ?? UsageWindow.unspecifiedScopeLabel
+            windows.append(contentsOf: [
+                additional.rateLimit?.primaryWindow,
+                additional.rateLimit?.secondaryWindow
+            ].compactMap { UsageWindow(codexWindow: $0, scopeLabel: scope) })
         }
         return windows
     }

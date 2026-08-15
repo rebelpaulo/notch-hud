@@ -560,3 +560,44 @@ actor UsageFakeCommandRunner: CommandRunning {
 
     #expect(await fixture.runner.usagePutBodies().count == 1)
 }
+
+@MainActor
+@Test func anUnchangedSnapshotDoesNotRepublishAsTheClockMoves() async throws {
+    // The publisher only writes when the body changes, and pace moves with the
+    // clock — so deriving it from `Date()` made every tick a fresh body. In
+    // production that was a database write every ten seconds.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.entries[.claude] = .loaded(
+        UsageSnapshot(
+            provider: .claude,
+            account: nil,
+            plan: nil,
+            billing: .plan(nil),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 84,
+                    resetsAt: Date().addingTimeInterval(3 * 24 * 3600),
+                    windowLength: 7 * 24 * 3600,
+                    scopeLabel: nil,
+                    severity: .warning
+                )
+            ],
+            capturedAt: Date()
+        )
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterFirst = await fixture.runner.usagePutBodies().count
+    #expect(afterFirst == 1)
+
+    // Two more ticks with real time passing between them. The snapshot has not
+    // been refreshed, so there is nothing new to say.
+    try await Task.sleep(for: .milliseconds(50))
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    try await Task.sleep(for: .milliseconds(50))
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usagePutBodies().count == afterFirst)
+}

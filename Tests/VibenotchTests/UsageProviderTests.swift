@@ -329,3 +329,25 @@ private let codexFixture = Data("""
         windowLength: nil, scopeLabel: nil, severity: .critical
     ) != nil)
 }
+
+@Test func codexScopedLimitsCarryBothWindowsNotJustTheFirst() async throws {
+    // A scoped limit can have a secondary window, and reading only the primary
+    // dropped it silently — the same slot-name assumption this file exists to
+    // avoid, made one level down.
+    let body = """
+    {"plan_type":"prolite","rate_limit":{"primary_window":{"used_percent":7,"limit_window_seconds":604800,"reset_at":1787211467}},
+     "additional_rate_limits":[{"limit_name":"Spark","rate_limit":{
+       "primary_window":{"used_percent":10,"limit_window_seconds":18000,"reset_at":1787211467},
+       "secondary_window":{"used_percent":40,"limit_window_seconds":604800,"reset_at":1787336160}}}]}
+    """
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: Data(body.utf8))
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+    let scoped = snapshot.windows.filter { $0.scopeLabel == "Spark" }
+    #expect(scoped.count == 2)
+    #expect(scoped.contains { $0.kind == .session && $0.percentUsed == 10 })
+    #expect(scoped.contains { $0.kind == .weekly && $0.percentUsed == 40 })
+}

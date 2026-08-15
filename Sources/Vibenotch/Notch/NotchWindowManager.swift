@@ -502,10 +502,14 @@ final class NotchWindowManager {
         // more than a session list, and the cards below the fold simply were
         // not drawn. Leave room for the notch band and a margin so the panel
         // never runs off the bottom of a short display.
-        let screen = interactivePanel?.screen ?? NSScreen.main
-        let band = screen.map { max($0.safeAreaInsets.top, $0.frame.maxY - $0.visibleFrame.maxY) } ?? 0
+        // `visibleFrame` already excludes the menu bar and the notch band, so
+        // subtracting the band again took it off twice. And the panel hangs
+        // from the screen it is PINNED to, which is not necessarily the one
+        // macOS calls main — on a two-display desk those differ, and the
+        // ceiling would be computed for a screen the panel is not on.
+        let screen = selectedScreen ?? interactivePanel?.screen ?? NSScreen.main
         let available = screen?.visibleFrame.height ?? 560
-        let ceiling = max(560, available - band - 80)
+        let ceiling = max(560, available - 80)
         renderedPanelSize = CGSize(
             width: ceil(min(size.width, 720)),
             height: ceil(min(size.height, ceiling))
