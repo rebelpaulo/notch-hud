@@ -25,12 +25,19 @@ struct UsagePaceEngine: Sendable {
 
         // Prefer the real length when the API sent one (Codex does); fall
         // back to the nominal length implied by the window's kind (Claude
-        // always needs this). `UsageWindowKind` only has two cases today and
-        // both have a fallback, so this `guard let` is currently only ever
-        // hit by the `resetsAt == nil` path above — but it's here, not
-        // force-unwrapped, so a future kind with no known nominal length
-        // fails safe (no pace) instead of crashing.
-        guard let length = window.windowLength ?? nominalLength(for: window.kind), length > 0 else {
+        // always needs this). `??` alone was not enough: it only falls back
+        // when the reported length is NIL, so a service answering
+        // `limit_window_seconds: 0` produced a zero length, failed the
+        // positivity check, and returned no pace at all — even though the
+        // nominal fallback was sitting right there and usable. A reported
+        // length has to be positive to be preferred; otherwise it is no
+        // better than a missing one.
+        //
+        // The guard still fails safe rather than force-unwrapping: both of
+        // today's kinds have a nominal length, but a future kind without one
+        // should lose its pace, not crash.
+        let reported = window.windowLength.flatMap { $0 > 0 ? $0 : nil }
+        guard let length = reported ?? nominalLength(for: window.kind), length > 0 else {
             return nil
         }
 

@@ -208,3 +208,24 @@ struct UsagePaceEngineTests {
         // over 51 points and a real runsOutAt, not "lasts until reset."
     }
 }
+
+@Test func aZeroReportedWindowLengthFallsBackToTheNominalOne() {
+    // `??` only falls back on nil, so a service answering
+    // `limit_window_seconds: 0` used to discard a perfectly good nominal
+    // length and return no pace at all.
+    let engine = UsagePaceEngine()
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let weekly = UsageWindow(
+        kind: .weekly,
+        percentUsed: 50,
+        resetsAt: now.addingTimeInterval(3.5 * 24 * 3600),
+        windowLength: 0,
+        scopeLabel: nil,
+        severity: .normal
+    )
+
+    let pace = engine.pace(for: weekly, now: now)
+    #expect(pace != nil)
+    // Half of a nominal seven-day window has elapsed.
+    #expect(abs((pace?.expectedPercent ?? 0) - 50) < 0.5)
+}

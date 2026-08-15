@@ -79,20 +79,41 @@ final class UsageStore {
     /// Matches the caption on the card. Change one and the other is a lie.
     static let trailingDays = 31
 
-    /// Kicked off when the tab opens. The scan is the slow one, so it runs
-    /// once per launch and then rides its own on-disk cache.
-    func scanLocalIfNeeded() {
-        guard localScan == nil, localSeries == nil else { return }
-        isScanningLocal = true
+    /// Kicked off when the tab opens and by the bridge on its own cadence.
+    ///
+    /// It used to refuse to run again once a series existed, so the token
+    /// counts froze at whatever the first scan saw and stayed frozen until the
+    /// app restarted — on a machine left running for days, a chart that stops
+    /// at Tuesday. The on-disk cache exists precisely so a repeat scan is
+    /// cheap: the first one here took about three minutes over 3.4 GB, every
+    /// one after it 0.3 seconds. Rescanning is the point of having paid for it.
+    func scanLocalIfNeeded() { scanLocalIfNeeded(now: .now) }
+
+    func scanLocalIfNeeded(now: Date) {
+        guard localScan == nil else { return }
+        if let lastLocalScan, now.timeIntervalSince(lastLocalScan) < Self.localScanMaxAge {
+            return
+        }
+
+        isScanningLocal = localSeries == nil
         localScan = Task { [weak self, scanner] in
             let series = await scanner.scan()
-            await self?.applyLocal(series)
+            await self?.applyLocal(series, at: now)
         }
     }
 
-    private func applyLocal(_ series: LocalUsageSeries) {
+    /// Slower than the quota refresh: this reads the disk rather than someone
+    /// else's server, but it still walks a thousand files, and token totals
+    /// move by the minute rather than by the second.
+    static let localScanMaxAge: TimeInterval = 600
+
+    private(set) var lastLocalScan: Date?
+
+    private func applyLocal(_ series: LocalUsageSeries, at now: Date) {
         localSeries = series
+        lastLocalScan = now
         isScanningLocal = false
+        localScan = nil
     }
 
     /// Pace for every window of a snapshot, keyed the way the card wants it.
