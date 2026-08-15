@@ -65,6 +65,7 @@ struct RemoteScriptCommandRunner: CommandRunning {
 protocol RemoteKeepAwakeEngine: AnyObject {
     var isActive: Bool { get }
     var isOnACPower: Bool { get }
+    var thermalState: ProcessInfo.ThermalState { get }
     var mode: KeepAwakeMode { get }
     var lastOffReason: KeepAwakeOffReason? { get }
     var config: KeepAwakeConfig { get set }
@@ -277,6 +278,9 @@ final class RemoteBridge {
     // the phone already has. A percent change or a plug/unplug is worth a
     // write; ten identical readings a minute are not.
     private var lastPublishedBattery: PublishedBattery?
+    private var lastPublishedThermal: String?
+    private var isPublishingMachineState = false
+    private var machineStateChangedWhilePublishing = false
 
     private struct PublishedBattery: Equatable {
         let percent: Int
@@ -508,7 +512,7 @@ final class RemoteBridge {
             await reconcileDesiredState(desired)
         }
         await reconcileSettings(remote)
-        await publishBatteryIfChanged()
+        await publishMachineStateIfChanged()
         await publishSessionsIfChanged(remoteCount: remote.sessions?.count ?? 0)
         await publishResumableIfChanged(remoteCount: remote.resumable?.count ?? 0)
         // Ask before publishing, on a five-minute cadence rather than the
@@ -550,6 +554,22 @@ final class RemoteBridge {
                 : engine.config.defaultMode
             engine.setMode(startMode, now: Date())
             lastSyncedActive = engine.isActive
+
+            // The engine can REFUSE: it will not start while the Mac is
+            // already critically hot. Reporting success anyway told the phone
+            // a lie and left the remote flag on, so the next poll tried again,
+            // was refused again, and sent the same cheerful confirmation —
+            // forever, once a minute, for something that never happened.
+            guard engine.isActive else {
+                await pushDesiredState(false)
+                await push(
+                    title: "Vibenotch",
+                    body: t("Gotta go! could not start — the Mac is too hot"),
+                    tag: "remote-toggle"
+                )
+                return
+            }
+
             await push(
                 title: "Vibenotch",
                 body: t("Gotta go! turned on remotely ✓"),
@@ -580,19 +600,62 @@ final class RemoteBridge {
     /// The phone warns about the battery but could never show it. Published on
     /// change only — the state endpoint is a write, and an unchanged percentage
     /// is not news.
-    private func publishBatteryIfChanged() async {
-        let snapshot = powerSourceProvider.snapshot()
-        guard let percent = snapshot.percent else { return }
-        let reading = PublishedBattery(percent: percent, isOnACPower: snapshot.isOnACPower)
-        guard reading != lastPublishedBattery else { return }
-
-        // Battery ONLY. Sending the on/off flag alongside would write back a
-        // value read before the poll, so a toggle made on the phone in that
-        // window would be silently overwritten instead of obeyed.
-        let body = #"{"battery":{"percent":\#(percent),"on_ac":\#(snapshot.isOnACPower)}}"#
-        if await run(["--state-put"], stdin: body).exitCode == 0 {
-            lastPublishedBattery = reading
+    ///
+    /// Heat rides along in the same write: it moves on the same timescale, and
+    /// it matters most in the situation the phone exists for — the Mac working
+    /// with the lid shut, where you cannot feel how hot it has become.
+    private func publishMachineStateIfChanged() async {
+        // Serialised like the session publisher, and for the same reason:
+        // @MainActor does not prevent reentrancy across an `await`, so two
+        // ticks could both pass the guard, and the older curl finishing last
+        // would leave the phone — and the cache — holding the stale reading.
+        guard !isPublishingMachineState else {
+            machineStateChangedWhilePublishing = true
+            return
         }
+        isPublishingMachineState = true
+        defer { isPublishingMachineState = false }
+
+        await publishMachineStateNow()
+
+        // `while`, not `if`: a change arriving DURING the follow-up publish
+        // sets the flag again, and a single retry would return holding it —
+        // leaving the phone on a stale battery or thermal reading until some
+        // later reconcile happened to notice. `publishSessionsIfChanged` has
+        // drained in a loop all along; this one only retried once.
+        while machineStateChangedWhilePublishing {
+            machineStateChangedWhilePublishing = false
+            await publishMachineStateNow()
+        }
+    }
+
+    private func publishMachineStateNow() async {
+        let snapshot = powerSourceProvider.snapshot()
+        let thermal = engine.thermalState.wireName
+        let battery = snapshot.percent.map {
+            PublishedBattery(percent: $0, isOnACPower: snapshot.isOnACPower)
+        }
+
+        // Two caches, not one, because the wire has no way to say "the battery
+        // reading is gone": /api/state is a partial update, so omitting the
+        // field preserves whatever was there. A combined cache would record the
+        // absence as published and then suppress the correction forever.
+        var fields: [String] = []
+        if let battery, battery != lastPublishedBattery {
+            fields.append(#""battery":{"percent":\#(battery.percent),"on_ac":\#(battery.isOnACPower)}"#)
+        }
+        if thermal != lastPublishedThermal {
+            fields.append(#""thermal_state":"\#(thermal)""#)
+        }
+        guard !fields.isEmpty else { return }
+
+        // Battery and heat ONLY. Sending the on/off flag alongside would write
+        // back a value read before the poll, so a toggle made on the phone in
+        // that window would be silently overwritten instead of obeyed.
+        let body = "{" + fields.joined(separator: ",") + "}"
+        guard await run(["--state-put"], stdin: body).exitCode == 0 else { return }
+        if let battery { lastPublishedBattery = battery }
+        lastPublishedThermal = thermal
     }
 
     /// Publishes the session list so the phone can show which agent needs you,
@@ -1093,6 +1156,12 @@ final class RemoteBridge {
         if let percent = power.percent {
             macState.append(power.isOnACPower ? t("%d%% charging", percent) : t("%d%%", percent))
         }
+        // Only when it is bad news. The strip is glanced at, not read.
+        switch engine.thermalState {
+        case .serious: macState.append(t("hot"))
+        case .critical: macState.append(t("overheating"))
+        default: break
+        }
         lines.append(macState.joined(separator: " · "))
 
         let body = lines.joined(separator: "\n")
@@ -1157,6 +1226,7 @@ final class RemoteBridge {
         // newly paired phone shows no charge until the percentage happens to
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
+        lastPublishedThermal = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastPublishedUsageDigest = nil

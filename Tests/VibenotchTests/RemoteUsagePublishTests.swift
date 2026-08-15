@@ -418,6 +418,7 @@ final class UsageBridgeFixture {
 
 @MainActor
 final class UsageFakeEngine: RemoteKeepAwakeEngine {
+    var thermalState: ProcessInfo.ThermalState = .nominal
     var mode: KeepAwakeMode = .manual
     var isOnACPower = true
     var lastOffReason: KeepAwakeOffReason?
