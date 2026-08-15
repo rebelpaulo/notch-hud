@@ -83,11 +83,16 @@ extension SessionStore: RemoteSessionStoring {}
 /// The slice of `UsageStore` the publisher needs: what each provider last
 /// loaded, and the pace engine's read on it. Pace is computed here — on the
 /// Mac — and never in JavaScript, so this is the only door into that math.
+/// `localSeries` and `scanLocalIfNeeded()` are the same door for the local
+/// token-history scan the quota tab already triggers — the bridge triggers it
+/// too, so the phone gets history even if the notch is never opened.
 @MainActor
 protocol RemoteUsageStoring: AnyObject {
     var entries: [UsageProviderKind: UsageStore.Entry] { get }
+    var localSeries: LocalUsageSeries? { get }
     func pace(for snapshot: UsageSnapshot, now: Date) -> [String: UsagePace]
     func refreshIfStale(maxAge: TimeInterval, now: Date)
+    func scanLocalIfNeeded()
 }
 
 extension UsageStore: RemoteUsageStoring {}
@@ -285,6 +290,9 @@ final class RemoteBridge {
     /// is not worth a POST.
     private var lastPublishedUsage: String?
 
+    /// Same rule as `lastPublishedUsage`, for the local token-history series.
+    private var lastPublishedUsageHistory: String?
+
     /// The last request actually carried out. A clear that succeeds on the
     /// server but is not reflected in the next GET would otherwise run the
     /// same request twice.
@@ -385,6 +393,20 @@ final class RemoteBridge {
         let expectedPercent: Double?
         let deltaPercent: Double?
         let runsOutAt: String?
+    }
+
+    /// One provider's slice of the token-history wire contract. Rendered by
+    /// hand for the same reason `PublishedUsageProvider` is: a stable key
+    /// order across encodes of an identical value.
+    fileprivate struct PublishedUsageHistoryProvider: Equatable {
+        let days: [PublishedUsageHistoryDay]
+        let topModel: String?
+    }
+
+    /// One calendar day's total. Field order here IS the wire order.
+    fileprivate struct PublishedUsageHistoryDay: Equatable {
+        let day: String
+        let tokens: Int
     }
 
     // nil until the first successful reconcile; then the on/off value both
@@ -490,7 +512,13 @@ final class RemoteBridge {
         // that ever fetched these, so the phone would have shown whatever was
         // last looked at on the Mac — or nothing at all.
         usageStore.refreshIfStale(maxAge: UsageStore.backgroundMaxAge, now: Date())
+        // Same reasoning for the local token-history scan: it used to run
+        // only when the quota tab opened. `scanLocalIfNeeded()` is a no-op
+        // once a scan has run or is running, so asking every tick costs
+        // nothing after the first.
+        usageStore.scanLocalIfNeeded()
         await publishUsageIfChanged()
+        await publishUsageHistoryIfChanged()
         await publishRemoteControlIfChanged(remoteValue: remote.remoteControl)
         await updateStatusStrip(enabled: remote.statusNotification == true)
         await runPendingCommand(remote.command)
@@ -730,6 +758,94 @@ final class RemoteBridge {
             )
         }
         return PublishedUsageProvider(plan: snapshot.plan, account: snapshot.account, windows: windows)
+    }
+
+    /// Publishes the per-day token history the local scan builds, so the
+    /// phone can draw the same bar chart the notch does instead of saying
+    /// history is unavailable. On change only, compared on the rendered
+    /// JSON — same rule as `publishUsageIfChanged()`. Never triggers the scan
+    /// itself: `reconcileRemote()` asks for that separately, and this
+    /// publishes whatever `UsageStore` already holds.
+    private func publishUsageHistoryIfChanged() async {
+        guard let body = renderedUsageHistoryPayload() else { return }
+        guard body != lastPublishedUsageHistory else { return }
+        if await run(["--state-put"], stdin: body).exitCode == 0 {
+            lastPublishedUsageHistory = body
+        }
+    }
+
+    private func renderedUsageHistoryPayload() -> String? {
+        let claude = publishedUsageHistoryProvider(for: .claude)
+        let codex = publishedUsageHistoryProvider(for: .codex)
+        // Neither provider has any days: no usage_history key at all, not an
+        // empty one.
+        guard claude != nil || codex != nil else { return nil }
+
+        var providers: [String] = []
+        if let claude {
+            providers.append("\"claude\":\(renderedUsageHistoryProvider(claude))")
+        }
+        if let codex {
+            providers.append("\"codex\":\(renderedUsageHistoryProvider(codex))")
+        }
+        return "{\"usage_history\":{\(providers.joined(separator: ","))}}"
+    }
+
+    private func renderedUsageHistoryProvider(_ provider: PublishedUsageHistoryProvider) -> String {
+        let days = provider.days.map(renderedUsageHistoryDay).joined(separator: ",")
+        return "{\"days\":[\(days)],\"top_model\":\(jsonStringOrNull(provider.topModel))}"
+    }
+
+    private func renderedUsageHistoryDay(_ day: PublishedUsageHistoryDay) -> String {
+        "{\"day\":\(jsonString(day.day)),\"tokens\":\(day.tokens)}"
+    }
+
+    /// One provider's trailing-window slice of the local scan, or nil when it
+    /// has no days in that window — a provider that is a scan away from
+    /// having anything is omitted entirely rather than sent with an empty
+    /// `days` array, matching `publishedUsageProvider(for:)`'s rule for the
+    /// network-fetched quotas.
+    private func publishedUsageHistoryProvider(for kind: UsageProviderKind) -> PublishedUsageHistoryProvider? {
+        guard let series = usageStore.localSeries else { return nil }
+
+        let calendar = Calendar.current
+        let cutoff = calendar.date(
+            byAdding: .day, value: -(UsageStore.trailingDays - 1),
+            to: calendar.startOfDay(for: Date())
+        )
+        // Zero-token days are dropped, not just days absent from the scan:
+        // the wire contract says a gap is drawn rather than a flat zero, and
+        // `totalTokens` could in principle be zero without the point being
+        // absent.
+        let days = series.points
+            .filter { $0.provider == kind && $0.totalTokens > 0 }
+            .filter { point in
+                guard let cutoff else { return true }
+                return point.day >= cutoff
+            }
+            .sorted { $0.day < $1.day }
+        guard !days.isEmpty else { return nil }
+
+        // Same rule the notch's own chart uses (`UsageHistoryChart`): the top
+        // model is the top model of the single biggest day in the window,
+        // not a sum across days — the scanner only ever hands back one
+        // model per day, never a per-model breakdown across the whole
+        // series.
+        let topModel = days.max(by: { $0.totalTokens < $1.totalTokens })?.topModel
+        let renderedDays = days.map {
+            PublishedUsageHistoryDay(day: Self.wireDayString($0.day), tokens: $0.totalTokens)
+        }
+        return PublishedUsageHistoryProvider(days: renderedDays, topModel: topModel)
+    }
+
+    /// `YYYY-MM-DD` in the Mac's local time zone. The scanner already buckets
+    /// `point.day` to local midnight (`Calendar.current.startOfDay`), so this
+    /// only has to read the components back out — never re-interpreting the
+    /// instant in another zone, which is exactly what the phone must not do
+    /// either.
+    private static func wireDayString(_ date: Date) -> String {
+        let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
     }
 
     /// The phone can ask for exactly one thing, and it cannot say how.
@@ -982,6 +1098,8 @@ final class RemoteBridge {
         lastPublishedBattery = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
+        lastPublishedUsage = nil
+        lastPublishedUsageHistory = nil
         lastStatusLine = nil
         lastSyncedActive = nil
     }

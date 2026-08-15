@@ -114,6 +114,169 @@ import Testing
     #expect(await fixture.runner.usagePutBodies().isEmpty)
 }
 
+@MainActor
+@Test func remoteBridgePublishesTheExactUsageHistoryWireShape() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    let today = startOfToday()
+    let yesterday = day(offset: -1, from: today)
+    fixture.usage.localSeries = LocalUsageSeries(
+        points: [
+            LocalUsageDayPoint(day: yesterday, provider: .claude, totalTokens: 12_000, topModel: "claude-fable-4"),
+            LocalUsageDayPoint(day: today, provider: .claude, totalTokens: 967_461_947, topModel: "claude-fable-5"),
+            LocalUsageDayPoint(day: today, provider: .codex, totalTokens: 500, topModel: "gpt-6"),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.usageHistoryPutBodies().first)
+    let todayString = wireDayString(today)
+    let yesterdayString = wireDayString(yesterday)
+    let expected = #"""
+    {"usage_history":{"claude":{"days":[{"day":"\#(yesterdayString)","tokens":12000},{"day":"\#(todayString)","tokens":967461947}],"top_model":"claude-fable-5"},"codex":{"days":[{"day":"\#(todayString)","tokens":500}],"top_model":"gpt-6"}}}
+    """#
+    #expect(body == expected)
+}
+
+@MainActor
+@Test func remoteBridgeCapsUsageHistoryToTheTrailingWindowAndSortsAscending() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    let today = startOfToday()
+    let insideWindow = day(offset: -(UsageStore.trailingDays - 1), from: today)
+    let outsideWindow = day(offset: -UsageStore.trailingDays, from: today)
+    fixture.usage.localSeries = LocalUsageSeries(
+        // Inserted out of order on purpose: the publisher must sort, not
+        // just pass through the scanner's own order.
+        points: [
+            LocalUsageDayPoint(day: today, provider: .claude, totalTokens: 100, topModel: "claude-fable-5"),
+            LocalUsageDayPoint(day: outsideWindow, provider: .claude, totalTokens: 999_999, topModel: "claude-old"),
+            LocalUsageDayPoint(day: insideWindow, provider: .claude, totalTokens: 50, topModel: "claude-fable-4"),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.usageHistoryPutBodies().first)
+    #expect(!body.contains(wireDayString(outsideWindow)))
+    let insideIndex = body.range(of: wireDayString(insideWindow))
+    let todayIndex = body.range(of: wireDayString(today))
+    let insideStart = try #require(insideIndex).lowerBound
+    let todayStart = try #require(todayIndex).lowerBound
+    #expect(insideStart < todayStart)
+    // The window's biggest day (999,999 tokens) is outside the window, so
+    // the top model must come from what is actually published, not the
+    // excluded day.
+    #expect(body.contains("\"top_model\":\"claude-fable-5\""))
+    #expect(!body.contains("claude-old"))
+}
+
+@MainActor
+@Test func remoteBridgeOmitsAProviderWithNoUsageHistoryDays() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    fixture.usage.localSeries = LocalUsageSeries(
+        points: [
+            LocalUsageDayPoint(day: startOfToday(), provider: .claude, totalTokens: 100, topModel: "claude-fable-5"),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.usageHistoryPutBodies().first)
+    #expect(body.contains("\"claude\""))
+    #expect(!body.contains("codex"))
+}
+
+@MainActor
+@Test func remoteBridgePublishesNoUsageHistoryWhenNeitherProviderHasDays() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    // A scan that ran and found nothing (empty, not nil) is exactly as
+    // silent as one that never ran.
+    fixture.usage.localSeries = LocalUsageSeries(points: [], today: .zero, trailingThirtyOneDays: .zero)
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usageHistoryPutBodies().isEmpty)
+}
+
+@MainActor
+@Test func remoteBridgePublishesAnUnchangedUsageHistoryOnlyOnce() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.localSeries = LocalUsageSeries(
+        points: [
+            LocalUsageDayPoint(day: startOfToday(), provider: .claude, totalTokens: 100, topModel: "claude-fable-5"),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usageHistoryPutBodies().count == 1)
+}
+
+@MainActor
+@Test func remoteBridgeRetriesUsageHistoryAfterAFailedWrite() async throws {
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.localSeries = LocalUsageSeries(
+        points: [
+            LocalUsageDayPoint(day: startOfToday(), provider: .claude, totalTokens: 100, topModel: "claude-fable-5"),
+        ],
+        today: .zero,
+        trailingThirtyOneDays: .zero
+    )
+    await fixture.runner.setFailStatePut(true)
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.usageHistoryPutBodies().count == 1)
+
+    await fixture.runner.setFailStatePut(false)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(await fixture.runner.usageHistoryPutBodies().count == 2)
+}
+
+@MainActor
+@Test func remoteBridgeAsksForALocalScanEveryTick() async throws {
+    // Without this the phone never gets history unless someone opens the
+    // notch on the Mac — `scanLocalIfNeeded()` is cheap to call repeatedly.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    #expect(fixture.usage.scanRequestCount == 1)
+}
+
+private func startOfToday() -> Date {
+    Calendar.current.startOfDay(for: Date())
+}
+
+private func day(offset: Int, from date: Date) -> Date {
+    Calendar.current.date(byAdding: .day, value: offset, to: date)!
+}
+
+private func wireDayString(_ date: Date) -> String {
+    let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
+    return String(format: "%04d-%02d-%02d", components.year ?? 0, components.month ?? 0, components.day ?? 0)
+}
+
 private func isoDate(_ string: String) -> Date {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = [.withInternetDateTime]
@@ -151,6 +314,16 @@ final class UsageBridgeFixture {
 
     private let suiteName: String
     private let defaults: UserDefaults
+
+    /// Rewrites the pairing file the way pointing the Mac at another remote
+    /// would, so the bridge sees a URL it has not published to before.
+    func repair(to url: String) throws {
+        try "{\"url\":\"\(url)\",\"secret\":\"test-secret\"}".write(
+            to: scratch.appendingPathComponent(".vibenotch/remote.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+    }
 
     init(stateOutput: String = #"{"keep_awake_enabled":true,"settings":{},"settings_rev":0}"#) throws {
         scratch = FileManager.default.temporaryDirectory
@@ -207,13 +380,24 @@ final class UsageFakeSessionStore: RemoteSessionStoring {
 final class FakeUsageStore: RemoteUsageStoring {
     var entries: [UsageProviderKind: UsageStore.Entry] = [:]
     var paceByWindowID: [String: UsagePace] = [:]
+    /// Set directly by a test, standing in for whatever the real scan would
+    /// have produced. nil means "no scan has completed yet."
+    var localSeries: LocalUsageSeries?
     /// Recorded rather than acted on: the bridge asking for a refresh is
     /// behaviour worth asserting, but a fake that actually fetched would put
     /// the network back into these tests.
     private(set) var refreshRequests: [TimeInterval] = []
+    /// Same reasoning as `refreshRequests`: a fake that actually scanned
+    /// would put the filesystem back into these tests, and the ticket only
+    /// needs to know the bridge asked.
+    private(set) var scanRequestCount = 0
 
     func refreshIfStale(maxAge: TimeInterval, now: Date) {
         refreshRequests.append(maxAge)
+    }
+
+    func scanLocalIfNeeded() {
+        scanRequestCount += 1
     }
 
     func pace(for snapshot: UsageSnapshot, now: Date) -> [String: UsagePace] {
@@ -267,6 +451,16 @@ actor UsageFakeCommandRunner: CommandRunning {
             .compactMap { $0.1 }
             .filter { $0.contains("\"usage\"") }
     }
+
+    /// Every `--state-put` body carrying the token-history payload —
+    /// distinguished from `usagePutBodies()` by requiring the full
+    /// `"usage_history"` key rather than the `"usage"` prefix it shares.
+    func usageHistoryPutBodies() -> [String] {
+        zip(calls, stdins)
+            .filter { $0.0 == ["--state-put"] }
+            .compactMap { $0.1 }
+            .filter { $0.contains("\"usage_history\"") }
+    }
 }
 
 @MainActor
@@ -278,4 +472,45 @@ actor UsageFakeCommandRunner: CommandRunning {
 
     #expect(fixture.usage.refreshRequests == [UsageStore.backgroundMaxAge])
     #expect(UsageStore.backgroundMaxAge > UsageStore.staleAfter)
+}
+
+@MainActor
+@Test func rePairingRepublishesTheQuotasToTheNewRemote() async throws {
+    // The quota publishers cache the last body they sent. Pairing to a
+    // different remote makes that cache a claim about somebody else's
+    // database — and quotas move slowly, so without clearing it the new
+    // phone could sit blank for hours waiting for a percentage to change.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+    fixture.usage.entries[.claude] = .loaded(
+        UsageSnapshot(
+            provider: .claude,
+            account: nil,
+            plan: nil,
+            billing: .plan(nil),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 84,
+                    resetsAt: isoDate("2026-08-16T17:00:00Z"),
+                    windowLength: nil,
+                    scopeLabel: nil,
+                    severity: .warning
+                )
+            ],
+            capturedAt: isoDate("2026-08-14T20:00:00Z")
+        )
+    )
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let firstCount = await fixture.runner.usagePutBodies().count
+    #expect(firstCount > 0)
+
+    // Same snapshot, second tick: nothing new to say.
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.usagePutBodies().count == firstCount)
+
+    try fixture.repair(to: "https://elsewhere.example")
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.usagePutBodies().count > firstCount)
 }
