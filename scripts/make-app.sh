@@ -25,7 +25,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSAppleEventsUsageDescription</key>
-  <string>Vibenotch raises the terminal window of the agent session you click.</string>
+  <string>Vibenotch raises agent terminal windows and opens Terminal when you choose to install an update.</string>
 </dict>
 </plist>
 PLIST

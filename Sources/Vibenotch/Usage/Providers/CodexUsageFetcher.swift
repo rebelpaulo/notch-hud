@@ -52,6 +52,7 @@ struct CodexUsageFetcher: UsageFetching {
             // signal. Without it we are talking to something billed per token.
             billing: payload.planType.map(UsageBilling.plan) ?? .apiKey,
             windows: Self.windows(from: payload),
+            limitResetCredits: Self.limitResetCredits(from: payload),
             capturedAt: now
         )
     }
@@ -61,6 +62,15 @@ struct CodexUsageFetcher: UsageFetching {
         if let rateLimit = payload.rateLimit {
             windows.append(contentsOf: [rateLimit.primaryWindow, rateLimit.secondaryWindow]
                 .compactMap { UsageWindow(codexWindow: $0, scopeLabel: nil) })
+        }
+        if let codeReview = payload.codeReviewRateLimit {
+            // Code review is narrower than the account-wide allowance, so it
+            // belongs on the existing scoped-row path. Keeping that fact in
+            // `scopeLabel` also prevents either window from becoming the
+            // Session/Weekly headline selected by `UsageSnapshot.window(_:)`.
+            let scope = t("Code review")
+            windows.append(contentsOf: [codeReview.primaryWindow, codeReview.secondaryWindow]
+                .compactMap { UsageWindow(codexWindow: $0, scopeLabel: scope) })
         }
         for additional in payload.additionalRateLimits ?? [] {
             // Everything in `additional_rate_limits` is scoped by construction
@@ -79,6 +89,16 @@ struct CodexUsageFetcher: UsageFetching {
             ].compactMap { UsageWindow(codexWindow: $0, scopeLabel: scope) })
         }
         return windows
+    }
+
+    private static func limitResetCredits(from payload: CodexUsageResponse) -> Int? {
+        guard let count = payload.rateLimitResetCredits?.availableCount, count >= 0 else {
+            // A missing/renamed field (or an impossible negative count) is no
+            // knowledge at all. Returning zero here would falsely say that a
+            // capability absent from the response exists but is exhausted.
+            return nil
+        }
+        return count
     }
 
     /// `reset_at` is epoch SECONDS today. Nothing in the payload says so, and a
@@ -167,15 +187,27 @@ struct CodexUsageResponse: Decodable {
         }
     }
 
+    struct RateLimitResetCredits: Decodable {
+        let availableCount: Int?
+
+        enum CodingKeys: String, CodingKey {
+            case availableCount = "available_count"
+        }
+    }
+
     let email: String?
     let planType: String?
     let rateLimit: RateLimit?
+    let codeReviewRateLimit: RateLimit?
     let additionalRateLimits: [AdditionalLimit]?
+    let rateLimitResetCredits: RateLimitResetCredits?
 
     enum CodingKeys: String, CodingKey {
         case email
         case planType = "plan_type"
         case rateLimit = "rate_limit"
+        case codeReviewRateLimit = "code_review_rate_limit"
         case additionalRateLimits = "additional_rate_limits"
+        case rateLimitResetCredits = "rate_limit_reset_credits"
     }
 }

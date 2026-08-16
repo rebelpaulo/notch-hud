@@ -127,6 +127,16 @@
 "You: %@" = "Tu: %@";
 "Done — click to jump" = "Concluído — clica para saltar";
 
+/* Update card */
+"Install Vibenotch %@ in Terminal" = "Instalar o Vibenotch %@ no Terminal";
+"Update helper missing — run ./scripts/install.sh once" = "O assistente de atualização não está instalado — corre ./scripts/install.sh uma vez";
+"Could not open the updater in Terminal" = "Não foi possível abrir o atualizador no Terminal";
+" · Version %@ available" = " · Versão %@ disponível";
+"Update opened in Terminal" = "Atualização aberta no Terminal";
+"New version — click to update in Terminal" = "Nova versão — clica para atualizar no Terminal";
+"Update" = "Atualizar";
+"Update available" = "Atualização disponível";
+
 /* Approval card */
 "Unknown file" = "Ficheiro desconhecido";
 "Deny" = "Negar";
@@ -137,6 +147,9 @@
 "Session" = "Sessão";
 "Weekly" = "Semanal";
 "Model" = "Modelo";
+"Code review" = "Revisão de código";
+"1 limit reset available" = "1 reposição de limite disponível";
+"%d limit resets available" = "%d reposições de limite disponíveis";
 "Resetting…" = "A reiniciar…";
 "Resets in %@" = "Reinicia em %@";
 "Runs out in %@" = "Esgota em %@";

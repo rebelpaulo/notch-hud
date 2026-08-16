@@ -23,6 +23,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingWatcher: PendingWatcher?
     private var stalenessSweeper: StalenessSweeper?
     private var codexRolloutPoller: CodexRolloutPoller?
+    private var updateStore: UpdateStore?
     private var keepAwakeEngine: KeepAwakeEngine?
     private var sleepGuardController: SleepGuardController?
     private var remoteBridge: RemoteBridge?
@@ -41,6 +42,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let focusDispatcher = FocusDispatcher()
         let spoolWatcher = SpoolWatcher(spoolURL: environment.spoolURL, store: sessionStore)
         let codexRolloutPoller = CodexRolloutPoller(spoolURL: environment.spoolURL)
+        let updateStore = UpdateStore()
         let stalenessSweeper = StalenessSweeper(
             spoolURL: environment.spoolURL,
             store: sessionStore,
@@ -58,6 +60,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             store: sessionStore,
             pendingStore: pendingStore,
             focusDispatcher: focusDispatcher,
+            updateStore: updateStore,
             keepAwakeEngine: keepAwakeEngine,
             sleepGuardController: sleepGuardController
         )
@@ -73,6 +76,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.pendingWatcher = pendingWatcher
         self.stalenessSweeper = stalenessSweeper
         self.codexRolloutPoller = codexRolloutPoller
+        self.updateStore = updateStore
         self.keepAwakeEngine = keepAwakeEngine
         self.sleepGuardController = sleepGuardController
         self.remoteBridge = remoteBridge
@@ -80,6 +84,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         spoolWatcher.start()
         codexRolloutPoller.start()
+        updateStore.start()
         pendingWatcher.start()
         stalenessSweeper.start()
         keepAwakeEngine.start()
@@ -102,6 +107,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         remoteBridge?.stop()
         keepAwakeEngine?.stop()
         codexRolloutPoller?.stop()
+        updateStore?.stop()
         stalenessSweeper?.stop()
         pendingWatcher?.stop()
         spoolWatcher?.stop()

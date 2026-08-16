@@ -1,0 +1,54 @@
+#!/bin/sh
+
+# Downloads one validated Vibenotch release and runs its existing installer.
+# The app passes only the GitHub release tag shown in the update card.
+
+set -eu
+
+tag=${1:-}
+if ! printf '%s\n' "$tag" | /usr/bin/grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    printf '%s\n' "vibenotch-update: expected a release tag such as v0.4.0" >&2
+    exit 64
+fi
+
+[ -x /usr/bin/curl ] || {
+    printf '%s\n' "vibenotch-update: curl is required" >&2
+    exit 1
+}
+[ -x /usr/bin/tar ] || {
+    printf '%s\n' "vibenotch-update: tar is required" >&2
+    exit 1
+}
+
+work_dir=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/vibenotch-update.XXXXXX") || exit 1
+cleanup() {
+    case $work_dir in
+        */vibenotch-update.*) /bin/rm -rf -- "$work_dir" ;;
+    esac
+}
+trap cleanup EXIT HUP INT TERM
+
+archive=$work_dir/release.tar.gz
+version=${tag#v}
+source_dir=$work_dir/notch-hud-$version
+archive_url=https://github.com/rebelpaulo/notch-hud/archive/refs/tags/$tag.tar.gz
+
+printf '%s\n' "Downloading Vibenotch $version from GitHub..."
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL "$archive_url" -o "$archive"
+/usr/bin/tar -xzf "$archive" -C "$work_dir"
+
+if [ ! -f "$source_dir/scripts/install.sh" ]; then
+    printf '%s\n' "vibenotch-update: the release archive has an unexpected layout" >&2
+    exit 1
+fi
+
+printf '%s\n' "Installing Vibenotch $version..."
+/bin/sh "$source_dir/scripts/install.sh" --yes
+
+# The installer replaces the bundle while this version is still running.
+# Restart only after every helper and adapter has also been refreshed.
+/usr/bin/pkill -x Vibenotch >/dev/null 2>&1 || true
+/bin/sleep 1
+/usr/bin/open /Applications/Vibenotch.app
+
+printf '%s\n' "Vibenotch $version installed."

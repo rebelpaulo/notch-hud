@@ -5,6 +5,8 @@ struct NotchPanelView: View {
     let store: SessionStore
     let pendingStore: PendingStore
     let focusDispatcher: FocusDispatcher
+    let updateStore: UpdateStore
+    let updateLauncher: TerminalUpdateLauncher
     let decisionWriter: ApprovalDecisionWriter
     @Bindable var keepAwakeEngine: KeepAwakeEngine
     let usageStore: UsageStore
@@ -15,6 +17,8 @@ struct NotchPanelView: View {
     let onSizeChange: @MainActor (CGSize) -> Void
 
     @State private var feedback: [String: SessionRowFeedback] = [:]
+    @State private var updateFeedback: UpdateNoticeFeedback?
+    @State private var updateDidStart = false
     @State private var sessionListHeight: CGFloat?
     /// Which half of the panel you are looking at. One or the other, never
     /// both: the panel is already the height of a notch drawer, and stacking
@@ -72,11 +76,22 @@ struct NotchPanelView: View {
                 usageTab
             } else {
             TimelineView(.periodic(from: .now, by: 30)) { context in
-                if store.sessions.isEmpty {
+                if store.sessions.isEmpty && updateStore.availableUpdate == nil {
                     emptyState
                 } else {
                     ScrollView(.vertical) {
                         VStack(spacing: 6) {
+                            if let update = updateStore.availableUpdate {
+                                UpdateNoticeView(
+                                    update: update,
+                                    currentVersion: updateStore.currentVersion,
+                                    feedback: updateFeedback,
+                                    didStart: updateDidStart,
+                                    onSelect: { launchUpdate(update) },
+                                    onGrantAccess: openAutomationSettings
+                                )
+                            }
+
                             ForEach(store.sessions) { session in
                                 SessionRowView(
                                     session: session,
@@ -436,6 +451,21 @@ struct NotchPanelView: View {
             case .failure(.notFound), .failure(.scriptFailed):
                 show(.notFound, for: session.id, duration: .seconds(2))
             }
+        }
+    }
+
+    private func launchUpdate(_ update: AvailableUpdate) {
+        updateFeedback = nil
+
+        switch updateLauncher.launch(update) {
+        case .success:
+            updateDidStart = true
+        case .failure(.permissionDenied):
+            updateFeedback = .permissionDenied
+        case .failure(.notFound):
+            updateFeedback = .helperMissing
+        case .failure(.scriptFailed):
+            updateFeedback = .launchFailed
         }
     }
 

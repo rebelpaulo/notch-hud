@@ -224,6 +224,10 @@ struct UsageSnapshot: Sendable, Equatable {
     let plan: String?
     let billing: UsageBilling
     let windows: [UsageWindow]
+    /// One-shot quota resets are an account capability, not a time window.
+    /// Keeping the count alongside (rather than inside) `windows` prevents a
+    /// missing field from masquerading as another healthy 0%-used gauge.
+    let limitResetCredits: Int?
     let capturedAt: Date
 
     init(
@@ -232,12 +236,14 @@ struct UsageSnapshot: Sendable, Equatable {
         plan: String?,
         billing: UsageBilling,
         windows: [UsageWindow],
+        limitResetCredits: Int? = nil,
         capturedAt: Date
     ) {
         self.provider = provider
         self.account = account
         self.plan = plan
         self.billing = billing
+        self.limitResetCredits = limitResetCredits
         self.capturedAt = capturedAt
 
         // The APIs already give us a meaningful order. Reusing it is the only

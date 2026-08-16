@@ -200,6 +200,14 @@ install_runtime_scripts() {
         cp "$script_dir/$name" "$install_bin/$name" || exit 1
         chmod +x "$install_bin/$name" || exit 1
     done
+
+    # Atomic because this helper can replace itself while an update is still
+    # running. Renaming keeps the executing process on its original inode.
+    update_temp=$install_bin/.vibenotch-update.$$
+    cp "$script_dir/vibenotch-update" "$update_temp" || exit 1
+    chmod +x "$update_temp" || exit 1
+    mv -f "$update_temp" "$install_bin/vibenotch-update" || exit 1
+
     cp "$script_dir/codex-shim" "$install_bin/codex" || exit 1
     chmod +x "$install_bin/codex" || exit 1
     printf '%s\n' "Scripts installed in $install_bin"
