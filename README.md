@@ -217,6 +217,29 @@ That builds `Vibenotch.app`, installs it to `/Applications`, puts the helper
 scripts in `~/.vibenotch/bin`, merges the five Claude Code hooks into
 `~/.claude/settings.json`, and installs the Codex adapter.
 
+### Updates
+
+Vibenotch checks the repository's latest published GitHub release when it
+starts and every six hours while it remains open. When a newer semantic
+version exists, the sessions panel shows a **Vibenotch · Version … available**
+card. Clicking it opens Terminal, downloads that exact tagged release, runs
+`scripts/install.sh --yes`, and restarts the app after the app bundle, hooks,
+and helper scripts have all been refreshed.
+
+The release tag is strictly validated before it reaches the shell; update
+commands are not read from the network. The updater accepts only tags shaped
+like `v1.2.3` and always downloads from `rebelpaulo/notch-hud` over HTTPS.
+
+Versions installed before this checker existed cannot discover it
+retroactively. Those users need one final manual update from their checkout:
+
+```bash
+git pull
+./scripts/install.sh --yes
+```
+
+After that bootstrap update, future releases appear in the notch itself.
+
 Flags: `--yes` (no prompts), `--skip-claude-hooks`, `--skip-codex`,
 `--uninstall`.
 

@@ -17,6 +17,8 @@ final class NotchWindowManager {
     private let store: SessionStore
     private let pendingStore: PendingStore
     private let focusDispatcher: FocusDispatcher
+    private let updateStore: UpdateStore
+    private let updateLauncher: TerminalUpdateLauncher
     private let keepAwakeEngine: KeepAwakeEngine
     /// Owned here rather than made per-panel: the panel is rebuilt every time
     /// it opens, and a store that died with it would re-request the quotas on
@@ -53,6 +55,8 @@ final class NotchWindowManager {
         store: SessionStore,
         pendingStore: PendingStore,
         focusDispatcher: FocusDispatcher,
+        updateStore: UpdateStore,
+        updateLauncher: TerminalUpdateLauncher = TerminalUpdateLauncher(),
         keepAwakeEngine: KeepAwakeEngine,
         sleepGuardController: SleepGuardController
     ) {
@@ -60,6 +64,8 @@ final class NotchWindowManager {
         self.store = store
         self.pendingStore = pendingStore
         self.focusDispatcher = focusDispatcher
+        self.updateStore = updateStore
+        self.updateLauncher = updateLauncher
         self.keepAwakeEngine = keepAwakeEngine
         self.sleepGuardController = sleepGuardController
         decisionWriter = ApprovalDecisionWriter(
@@ -327,6 +333,8 @@ final class NotchWindowManager {
         let store = store
         let pendingStore = pendingStore
         let focusDispatcher = focusDispatcher
+        let updateStore = updateStore
+        let updateLauncher = updateLauncher
         let decisionWriter = decisionWriter
         let keepAwakeEngine = keepAwakeEngine
         let closedLidModeAvailable = sleepGuardController.isInstalled
@@ -334,6 +342,8 @@ final class NotchWindowManager {
             store: store,
             pendingStore: pendingStore,
             focusDispatcher: focusDispatcher,
+            updateStore: updateStore,
+            updateLauncher: updateLauncher,
             decisionWriter: decisionWriter,
             keepAwakeEngine: keepAwakeEngine,
             usageStore: usageStore,
