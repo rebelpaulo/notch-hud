@@ -102,6 +102,48 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: marker.path))
 }
 
+@Test func updateScriptVerifiesTheSignedArtifactBeforeExtraction() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/vibenotch-update"),
+        encoding: .utf8
+    )
+    let trustedKey = try String(
+        contentsOf: root.appendingPathComponent("scripts/release-signing-public.pem"),
+        encoding: .utf8
+    ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let signatureCheck = try #require(script.range(of: "openssl dgst -sha256 -verify"))
+    let checksumCheck = try #require(script.range(of: "actual_hash=$(/usr/bin/shasum -a 256"))
+    let extraction = try #require(script.range(of: "/usr/bin/tar -xzf"))
+
+    #expect(signatureCheck.lowerBound < checksumCheck.lowerBound)
+    #expect(checksumCheck.lowerBound < extraction.lowerBound)
+    #expect(script.contains("releases/download/$tag"))
+    #expect(script.contains(trustedKey))
+}
+
+@Test func updateAndReleaseScriptsHaveValidShellSyntax() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    for name in ["vibenotch-update", "package-release.sh"] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-n", root.appendingPathComponent("scripts/\(name)").path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+    }
+}
+
 private struct FakeReleaseChecker: LatestReleaseChecking {
     let tag: String
     let releaseURL: URL
