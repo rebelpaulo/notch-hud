@@ -24,13 +24,15 @@ final class SessionStore {
     }
 
     private func rebuildSessions() {
-        sessions = sourceSessions.map { session in
+        let overlaidSessions = sourceSessions.map { session in
             var session = session
             if pendingSessionIDs.contains(session.id) {
                 session.status = .needs_me
             }
             return session
-        }.sorted { lhs, rhs in
+        }
+
+        sessions = Self.sessionsForDisplay(overlaidSessions).sorted { lhs, rhs in
             let lhsRank = Self.sortRank(for: lhs.displayStatus)
             let rhsRank = Self.sortRank(for: rhs.displayStatus)
 
@@ -47,6 +49,32 @@ final class SessionStore {
             }
             return lhs.id < rhs.id
         }
+    }
+
+    /// Finished windows are history, not separate ongoing work. Keep active
+    /// sessions visible, but collapse a project's finished history to its most
+    /// recent entry (and hide that history while the project is active).
+    private static func sessionsForDisplay(_ sessions: [Session]) -> [Session] {
+        Dictionary(grouping: sessions, by: \.project).values.flatMap { projectSessions in
+            let activeSessions = projectSessions.filter { session in
+                session.displayStatus == .working || session.displayStatus == .needsMe
+            }
+            if !activeSessions.isEmpty {
+                return activeSessions
+            }
+
+            return projectSessions.max(by: isOlderForDisplay).map { [$0] } ?? []
+        }
+    }
+
+    private static func isOlderForDisplay(_ lhs: Session, _ rhs: Session) -> Bool {
+        if lhs.updatedAt != rhs.updatedAt {
+            return lhs.updatedAt < rhs.updatedAt
+        }
+        if lhs.seq != rhs.seq {
+            return lhs.seq < rhs.seq
+        }
+        return lhs.id < rhs.id
     }
 
     var counts: (working: Int, needsMe: Int, done: Int) {
