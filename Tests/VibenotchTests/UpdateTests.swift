@@ -102,6 +102,78 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: marker.path))
 }
 
+@Test func updateScriptVerifiesTheSignedArtifactBeforeExtraction() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/vibenotch-update"),
+        encoding: .utf8
+    )
+    let trustedKey = try String(
+        contentsOf: root.appendingPathComponent("scripts/release-signing-public.pem"),
+        encoding: .utf8
+    ).trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let signatureCheck = try #require(script.range(of: "openssl dgst -sha256 -verify"))
+    let checksumCheck = try #require(script.range(of: "actual_hash=$(/usr/bin/shasum -a 256"))
+    let extraction = try #require(script.range(of: "/usr/bin/tar -xzf"))
+
+    #expect(signatureCheck.lowerBound < checksumCheck.lowerBound)
+    #expect(checksumCheck.lowerBound < extraction.lowerBound)
+    #expect(script.contains("releases/download/$tag"))
+    #expect(script.contains(trustedKey))
+}
+
+@Test func updateAndReleaseScriptsHaveValidShellSyntax() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    for name in ["vibenotch-update", "package-release.sh"] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-n", root.appendingPathComponent("scripts/\(name)").path]
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+    }
+}
+
+@Test func installerRestartsOnlyAfterEveryInstallStepCompletes() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/install.sh"),
+        encoding: .utf8
+    )
+    let main = try #require(script.range(of: "# --- main"))
+    let mainScript = script[main.lowerBound...]
+
+    let bundleInstall = try #require(mainScript.range(of: "\ninstall_app_bundle\n"))
+    let runtimeInstall = try #require(mainScript.range(of: "\ninstall_runtime_scripts\n"))
+    let claudeInstall = try #require(mainScript.range(of: "\ninstall_claude_hooks_step\n"))
+    let codexInstall = try #require(mainScript.range(of: "\ninstall_codex_step\n"))
+    let restart = try #require(mainScript.range(of: "\nrestart_app\n"))
+
+    #expect(bundleInstall.lowerBound < runtimeInstall.lowerBound)
+    #expect(runtimeInstall.lowerBound < claudeInstall.lowerBound)
+    #expect(claudeInstall.lowerBound < codexInstall.lowerBound)
+    #expect(codexInstall.lowerBound < restart.lowerBound)
+    #expect(script.contains("osascript_command\""))
+    #expect(script.contains("app_binary=$app_target/Contents/MacOS/Vibenotch"))
+    #expect(script.contains("pkill_command\" -f -x \"$app_binary"))
+    #expect(script.contains("pgrep_command\" -f -x \"$app_binary"))
+    #expect(script.contains("case $pgrep_status in"))
+    #expect(script.contains("could not wait for the previous app to stop"))
+}
+
 private struct FakeReleaseChecker: LatestReleaseChecking {
     let tag: String
     let releaseURL: URL

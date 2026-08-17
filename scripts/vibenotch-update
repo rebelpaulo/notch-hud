@@ -1,7 +1,9 @@
 #!/bin/sh
 
-# Downloads one validated Vibenotch release and runs its existing installer.
-# The app passes only the GitHub release tag shown in the update card.
+# Downloads one signed Vibenotch release and runs its existing installer.
+# The app passes only the GitHub release tag shown in the update card. Release
+# assets are accepted only when their checksum manifest verifies against the
+# public key embedded below.
 
 set -eu
 
@@ -19,6 +21,14 @@ fi
     printf '%s\n' "vibenotch-update: tar is required" >&2
     exit 1
 }
+[ -x /usr/bin/openssl ] || {
+    printf '%s\n' "vibenotch-update: openssl is required" >&2
+    exit 1
+}
+[ -x /usr/bin/shasum ] || {
+    printf '%s\n' "vibenotch-update: shasum is required" >&2
+    exit 1
+}
 
 work_dir=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/vibenotch-update.XXXXXX") || exit 1
 cleanup() {
@@ -28,13 +38,58 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-archive=$work_dir/release.tar.gz
 version=${tag#v}
+archive_name=Vibenotch-$version.tar.gz
+manifest_name=$archive_name.sha256
+signature_name=$manifest_name.sig
+archive=$work_dir/$archive_name
+manifest=$work_dir/$manifest_name
+signature=$work_dir/$signature_name
+public_key=$work_dir/release-signing-public.pem
 source_dir=$work_dir/notch-hud-$version
-archive_url=https://github.com/rebelpaulo/notch-hud/archive/refs/tags/$tag.tar.gz
+release_url=https://github.com/rebelpaulo/notch-hud/releases/download/$tag
 
 printf '%s\n' "Downloading Vibenotch $version from GitHub..."
-/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL "$archive_url" -o "$archive"
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL "$release_url/$archive_name" -o "$archive"
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL "$release_url/$manifest_name" -o "$manifest"
+/usr/bin/curl --proto '=https' --tlsv1.2 -fsSL "$release_url/$signature_name" -o "$signature"
+
+/bin/cat > "$public_key" <<'PUBLIC_KEY'
+-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEArR5a3eza1A8DsVALag86
+fg6EGzDPeicD0iO8km2sKPu1R9gGqidnRmaOGuYwqAwnN2ClVoYp0TdWFvwQCXio
+E9z4H9fv17Fs+NQlVh/VTNWq+gIS66jj6QtZS/mvi+di/2C7KmxCRLluMLuTweL9
++INwxnhGeOe0PDw9/GEK7hvsj12O9sCaIU2aIsrsRYfaOAfLix6N+LLp+sYX6ggV
+87yea25CE8ipGYkZPbBij94oOcJm3wVffMQxVMNr2YmSaw2q2bQm6LZt8tqFbx0D
+GBmvQPKgTO8OGnEOOd53gRgr8YK7pWaP57te4PAKX/IoowT0URIP513uAMzBm94a
+7evwdLGY5vbGDgoj1Ums6EUPkNOt7BvKO4bC2rcbh9skychDSGvTBxEtmXq+cJJu
+iFuSd411bXOJT2yTaliTje8PzGb+OKU9TPq/AY5CijJsbJUUHvxTNiEByOAhclgl
+gitOOwySFYKv2iW/2B2Q3KClk28E+V2armtxDU+NpSO/AgMBAAE=
+-----END PUBLIC KEY-----
+PUBLIC_KEY
+
+if ! /usr/bin/openssl dgst -sha256 -verify "$public_key" \
+    -signature "$signature" "$manifest" >/dev/null 2>&1; then
+    printf '%s\n' "vibenotch-update: release signature verification failed" >&2
+    exit 1
+fi
+
+line_count=$(/usr/bin/wc -l < "$manifest" | /usr/bin/tr -d ' ')
+manifest_line=$(/usr/bin/sed -n '1p' "$manifest")
+manifest_suffix="  $archive_name"
+expected_hash=${manifest_line%"$manifest_suffix"}
+if [ "$line_count" != 1 ] || [ "$manifest_line" != "$expected_hash$manifest_suffix" ] \
+    || ! printf '%s\n' "$expected_hash" | /usr/bin/grep -Eq '^[0-9a-f]{64}$'; then
+    printf '%s\n' "vibenotch-update: signed checksum manifest has an unexpected format" >&2
+    exit 1
+fi
+
+actual_hash=$(/usr/bin/shasum -a 256 "$archive" | /usr/bin/awk '{ print $1 }')
+if [ "$actual_hash" != "$expected_hash" ]; then
+    printf '%s\n' "vibenotch-update: release checksum verification failed" >&2
+    exit 1
+fi
+
 /usr/bin/tar -xzf "$archive" -C "$work_dir"
 
 if [ ! -f "$source_dir/scripts/install.sh" ]; then
@@ -44,11 +99,5 @@ fi
 
 printf '%s\n' "Installing Vibenotch $version..."
 /bin/sh "$source_dir/scripts/install.sh" --yes
-
-# The installer replaces the bundle while this version is still running.
-# Restart only after every helper and adapter has also been refreshed.
-/usr/bin/pkill -x Vibenotch >/dev/null 2>&1 || true
-/bin/sleep 1
-/usr/bin/open /Applications/Vibenotch.app
 
 printf '%s\n' "Vibenotch $version installed."

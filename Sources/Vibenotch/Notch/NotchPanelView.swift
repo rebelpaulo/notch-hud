@@ -456,6 +456,7 @@ struct NotchPanelView: View {
 
     private func launchUpdate(_ update: AvailableUpdate) {
         updateFeedback = nil
+        updateDidStart = false
 
         switch updateLauncher.launch(update) {
         case .success:

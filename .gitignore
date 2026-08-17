@@ -12,3 +12,4 @@ credentials*.json
 client_secret*.json
 .env
 build/
+dist/

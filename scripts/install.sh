@@ -14,6 +14,10 @@
 #   VIBENOTCH_INSTALL_APPLICATIONS_DIR default /Applications
 #   VIBENOTCH_INSTALL_MAKE_APP         default $script_dir/make-app.sh (build step)
 #   VIBENOTCH_INSTALL_OPEN             default `open` (launch step)
+#   VIBENOTCH_INSTALL_OSASCRIPT        default /usr/bin/osascript (graceful quit)
+#   VIBENOTCH_INSTALL_PKILL            default /usr/bin/pkill (restart step)
+#   VIBENOTCH_INSTALL_PGREP            default /usr/bin/pgrep (restart step)
+#   VIBENOTCH_INSTALL_SLEEP            default /bin/sleep (restart step)
 
 set -eu
 
@@ -186,8 +190,76 @@ install_app_bundle() {
     printf '%s\n' "App installed at $app_target"
 }
 
-launch_app() {
+restart_app() {
     if [ -d "$app_target" ]; then
+        osascript_command=${VIBENOTCH_INSTALL_OSASCRIPT:-/usr/bin/osascript}
+        pkill_command=${VIBENOTCH_INSTALL_PKILL:-/usr/bin/pkill}
+        pgrep_command=${VIBENOTCH_INSTALL_PGREP:-/usr/bin/pgrep}
+        sleep_command=${VIBENOTCH_INSTALL_SLEEP:-/bin/sleep}
+        app_binary=$app_target/Contents/MacOS/Vibenotch
+
+        # `open` only activates an existing process. Stop it first so replacing
+        # the bundle while Vibenotch is open cannot leave yesterday's binary
+        # running behind today's files on disk. Ask AppKit to quit first so its
+        # termination hooks can stop watchers and close windows cleanly.
+        app_was_running=0
+        if "$pgrep_command" -f -x "$app_binary" >/dev/null 2>&1; then
+            app_was_running=1
+            "$osascript_command" \
+                -e 'tell application id "com.rebelpaulo.vibenotch" to quit' \
+                >/dev/null 2>&1 || true
+        else
+            pgrep_status=$?
+            case $pgrep_status in
+                1) ;;
+                *)
+                    printf '%s\n' "vibenotch: could not inspect the running app (pgrep status $pgrep_status)." >&2
+                    return 1
+                    ;;
+            esac
+        fi
+
+        attempts=0
+        while [ "$app_was_running" -eq 1 ]; do
+            if "$pgrep_command" -f -x "$app_binary" >/dev/null 2>&1; then
+                :
+            else
+                pgrep_status=$?
+                case $pgrep_status in
+                    1) break ;;
+                    *)
+                        printf '%s\n' "vibenotch: could not inspect the stopping app (pgrep status $pgrep_status)." >&2
+                        return 1
+                        ;;
+                esac
+            fi
+
+            attempts=$((attempts + 1))
+            if [ "$attempts" -eq 20 ]; then
+                # Explicit fallback for a hung app or a denied Apple event.
+                if "$pkill_command" -f -x "$app_binary" >/dev/null 2>&1; then
+                    :
+                else
+                    pkill_status=$?
+                    case $pkill_status in
+                        1) ;;
+                        *)
+                            printf '%s\n' "vibenotch: could not stop the previous app (pkill status $pkill_status)." >&2
+                            return 1
+                            ;;
+                    esac
+                fi
+            fi
+            if [ "$attempts" -ge 50 ]; then
+                printf '%s\n' "vibenotch: the previous app did not stop; reopen it manually." >&2
+                return 1
+            fi
+            "$sleep_command" 0.1 || {
+                printf '%s\n' "vibenotch: could not wait for the previous app to stop." >&2
+                return 1
+            }
+        done
+
         "${VIBENOTCH_INSTALL_OPEN:-open}" "$app_target" >/dev/null 2>&1 || printf '%s\n' "warning: could not open the app automatically; open $app_target yourself." >&2
     fi
 }
@@ -234,10 +306,10 @@ install_codex_step() {
 preflight
 build_and_bundle
 install_app_bundle
-launch_app
 install_runtime_scripts
 install_claude_hooks_step
 install_codex_step
+restart_app
 
 claude_hooks_summary=$([ "$skip_claude_hooks" -eq 1 ] && printf 'skipped' || printf 'see above')
 codex_summary=$([ "$skip_codex" -eq 1 ] && printf 'skipped' || printf 'see above')
