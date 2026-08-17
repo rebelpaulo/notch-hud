@@ -215,7 +215,8 @@ cd notch-hud
 
 That builds `Vibenotch.app`, installs it to `/Applications`, puts the helper
 scripts in `~/.vibenotch/bin`, merges the five Claude Code hooks into
-`~/.claude/settings.json`, and installs the Codex adapter.
+`~/.claude/settings.json`, installs the Codex adapter, and restarts Vibenotch so
+an already-running process cannot keep using the previous binary.
 
 ### Updates
 

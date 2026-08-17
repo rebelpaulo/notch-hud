@@ -144,6 +144,36 @@ import Testing
     }
 }
 
+@Test func installerRestartsOnlyAfterEveryInstallStepCompletes() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/install.sh"),
+        encoding: .utf8
+    )
+    let main = try #require(script.range(of: "# --- main"))
+    let mainScript = script[main.lowerBound...]
+
+    let bundleInstall = try #require(mainScript.range(of: "\ninstall_app_bundle\n"))
+    let runtimeInstall = try #require(mainScript.range(of: "\ninstall_runtime_scripts\n"))
+    let claudeInstall = try #require(mainScript.range(of: "\ninstall_claude_hooks_step\n"))
+    let codexInstall = try #require(mainScript.range(of: "\ninstall_codex_step\n"))
+    let restart = try #require(mainScript.range(of: "\nrestart_app\n"))
+
+    #expect(bundleInstall.lowerBound < runtimeInstall.lowerBound)
+    #expect(runtimeInstall.lowerBound < claudeInstall.lowerBound)
+    #expect(claudeInstall.lowerBound < codexInstall.lowerBound)
+    #expect(codexInstall.lowerBound < restart.lowerBound)
+    #expect(script.contains("osascript_command\""))
+    #expect(script.contains("app_binary=$app_target/Contents/MacOS/Vibenotch"))
+    #expect(script.contains("pkill_command\" -f -x \"$app_binary"))
+    #expect(script.contains("pgrep_command\" -f -x \"$app_binary"))
+    #expect(script.contains("case $pgrep_status in"))
+    #expect(script.contains("could not wait for the previous app to stop"))
+}
+
 private struct FakeReleaseChecker: LatestReleaseChecking {
     let tag: String
     let releaseURL: URL

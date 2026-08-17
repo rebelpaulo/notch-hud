@@ -100,10 +100,4 @@ fi
 printf '%s\n' "Installing Vibenotch $version..."
 /bin/sh "$source_dir/scripts/install.sh" --yes
 
-# The installer replaces the bundle while this version is still running.
-# Restart only after every helper and adapter has also been refreshed.
-/usr/bin/pkill -x Vibenotch >/dev/null 2>&1 || true
-/bin/sleep 1
-/usr/bin/open /Applications/Vibenotch.app
-
 printf '%s\n' "Vibenotch $version installed."
