@@ -18,6 +18,11 @@ extension UsageProviderKind {
             // A cobalt blue rather than iOS system blue's cyan lean, which
             // washed out next to the orange at small sizes.
             Color(red: 0.32, green: 0.52, blue: 0.92)
+        case .grok:
+            // A warm off-white/light grey — reads clearly on the black panel
+            // without being confused for Claude's terracotta or Codex's blue
+            // at a glance, which a third saturated hue risked at 6pt tall.
+            Color(red: 0.88, green: 0.85, blue: 0.78)
         }
     }
 }

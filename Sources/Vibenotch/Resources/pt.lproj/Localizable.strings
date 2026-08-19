@@ -182,5 +182,5 @@
 "Top model: %@" = "Modelo principal: %@";
 "Day" = "Dia";
 "Tokens" = "Tokens";
-"Sign in with claude or codex to see quotas" = "Inicia sessão no claude ou no codex para veres as quotas";
+"Sign in with claude, codex, or grok to see quotas" = "Inicia sessão no claude, codex ou grok para veres as quotas";
 "Gotta go! could not start — the Mac is too hot" = "Gotta go! não arrancou — o Mac está demasiado quente";

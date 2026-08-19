@@ -39,7 +39,7 @@ final class UsageStore {
     private var localScan: Task<Void, Never>?
 
     init(
-        fetchers: [any UsageFetching] = [ClaudeUsageFetcher(), CodexUsageFetcher()],
+        fetchers: [any UsageFetching] = [ClaudeUsageFetcher(), CodexUsageFetcher(), GrokUsageFetcher()],
         scanner: LocalUsageScanner = LocalUsageScanner()
     ) {
         self.fetchers = fetchers

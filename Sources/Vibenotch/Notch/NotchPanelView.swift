@@ -208,19 +208,43 @@ struct NotchPanelView: View {
         .accessibilityLabel(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
     }
 
-    /// Only the providers that actually answered. A card reading
+    /// What one provider's slot in the tab draws, once it has anything to
+    /// say at all.
+    private enum UsageTabEntry {
+        case loaded(UsageSnapshot)
+        case unavailable(UsageUnavailable)
+    }
+
+    /// Only the providers with something to show. A card reading
     /// "unavailable" for a tool you do not use is noise about someone else's
     /// product; absence says the same thing without occupying the drawer.
     ///
-    /// A provider that answered once and then failed keeps its card, because
-    /// UsageStore holds the last good snapshot — a dropped request is not
-    /// evidence you logged out.
+    /// "Not signed in" is the one reason that disappears entirely — "a regra
+    /// se não tem login não apresenta" — because there is nothing here that
+    /// is this app's problem to report: the fix is the user signing in, and
+    /// showing a row for every service they have never used would make the
+    /// drawer about Claude/Codex/Grok's product line instead of about their
+    /// sessions. Network hiccups, an expired login, and a reshaped response
+    /// ARE this app's business (or at least worth a glance), so those keep a
+    /// row via `UsageCardView`'s `unavailable` init. One rule, applied the
+    /// same way to all three providers rather than special-cased per one.
+    ///
+    /// A provider that answered once and then failed keeps its LOADED card,
+    /// because UsageStore holds the last good snapshot — a dropped request
+    /// is not evidence you logged out. Only a provider that has never once
+    /// loaded successfully can show the unavailable row instead.
     private var usageTab: some View {
-        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageSnapshot)? in
-            if case let .loaded(snapshot) = usageStore.entries[provider] {
-                return (provider, snapshot)
+        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageTabEntry)? in
+            switch usageStore.entries[provider] {
+            case .loaded(let snapshot):
+                return (provider, .loaded(snapshot))
+            case .failed(let reason) where reason != .notLoggedIn:
+                return (provider, .unavailable(reason))
+            default:
+                // .none (never fetched), .loading, and .failed(.notLoggedIn)
+                // all render nothing — see the doc comment above.
+                return nil
             }
-            return nil
         }
 
         return ScrollView(.vertical) {
@@ -228,31 +252,36 @@ struct NotchPanelView: View {
                 if shown.isEmpty {
                     // Not a per-card badge: one quiet line, and only when
                     // there is genuinely nothing to draw.
-                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude or codex to see quotas"))
+                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude, codex, or grok to see quotas"))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.35))
                         .frame(maxWidth: .infinity, minHeight: 60)
                 }
 
-                ForEach(shown, id: \.0.rawValue) { provider, snapshot in
-                    VStack(alignment: .leading, spacing: 10) {
-                        UsageCardView(
-                            snapshot: snapshot,
-                            paceByWindowID: usageStore.pace(for: snapshot)
-                        )
+                ForEach(shown, id: \.0.rawValue) { provider, entry in
+                    switch entry {
+                    case .loaded(let snapshot):
+                        VStack(alignment: .leading, spacing: 10) {
+                            UsageCardView(
+                                snapshot: snapshot,
+                                paceByWindowID: usageStore.pace(for: snapshot)
+                            )
 
-                        UsageHistoryChart(
-                            provider: provider,
-                            points: usageStore.localSeries?.points ?? [],
-                            today: usageStore.tokens(for: provider, today: true),
-                            trailing: usageStore.tokens(for: provider, today: false),
-                            isCounting: usageStore.isScanningLocal
-                        )
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                            UsageHistoryChart(
+                                provider: provider,
+                                points: usageStore.localSeries?.points ?? [],
+                                today: usageStore.tokens(for: provider, today: true),
+                                trailing: usageStore.tokens(for: provider, today: false),
+                                isCounting: usageStore.isScanningLocal
+                            )
+                            .padding(.horizontal, 12)
+                            .padding(.bottom, 10)
+                        }
+                        .background(Color.notchBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    case .unavailable(let reason):
+                        UsageCardView(provider: provider, unavailable: reason)
                     }
-                    .background(Color.notchBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
             .frame(maxWidth: .infinity)
