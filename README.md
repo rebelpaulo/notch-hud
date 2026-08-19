@@ -135,22 +135,37 @@ to sleep.
 ### 3. Quota gauges and token history
 
 The gauge button beside the bolt opens a second tab in the notch panel,
-replacing the session list with Claude and Codex quota gauges. Each provider
-gets session and weekly windows, with model-scoped limits in a compact list
-below. If you are not signed in to a provider, Vibenotch leaves it out: no
-empty card and no "unavailable" badge.
+replacing the session list with Claude, Codex and Grok quota gauges. Each
+provider gets whatever windows it reports — session and weekly for Claude,
+weekly for Codex and Grok — with model-scoped limits in a compact list below.
+If you are not signed in to a provider, Vibenotch leaves it out: no empty card
+and no "unavailable" badge.
+
+The cards are collapsible, one open at a time. Collapsed, a card shows its
+provider and its first window; the rest and the daily chart are a click away.
+Three providers each with a month of history is not something you take in at a
+glance.
 
 The numbers come from endpoints the CLIs already authenticate against. For
 Claude, Vibenotch reads the OAuth token that Claude Code stores in the macOS
 Keychain item `Claude Code-credentials`, then calls Claude's OAuth usage
 endpoint. macOS may ask for Keychain authorisation the first time. For Codex,
-it reads `~/.codex/auth.json` and calls the ChatGPT backend usage endpoint.
+it reads `~/.codex/auth.json` and calls the ChatGPT backend usage endpoint. For
+Grok, it reads `~/.grok/auth.json` and calls the Grok CLI's billing endpoint;
+that one also needs an `x-xai-token-auth` header, and answers 401 without
+explanation if you omit it.
 
-Anthropic and OpenAI do not document either endpoint, and either response can
-change shape without notice. Vibenotch drops a window when a field is missing
-or unbelievable. A 0% gauge built from bad data would be worse than no gauge.
-It classifies windows by how long they last, never by which slot they occupy;
-OpenAI puts the seven-day window in `primary_window` on some accounts.
+None of the three endpoints is documented, and any of them can change shape
+without notice. For Claude and Codex, Vibenotch drops a window when a field is
+missing or unbelievable: a 0% gauge built from bad data would be worse than no
+gauge. It classifies windows by how long they last, never by which slot they
+occupy; OpenAI puts the seven-day window in `primary_window` on some accounts.
+
+Grok is the deliberate exception, and it is worth knowing why. Its payload is
+protobuf underneath, and proto3 omits any field whose value is zero — so an
+absent percentage there means 0%, not unknown. Applying the other rule would
+blank the Grok card exactly when you have used nothing, which is when an empty
+bar is both true and reassuring.
 
 A thin stripe across each bar marks the share that a linear, even spend would
 have used by now. It turns red when you are ahead of that pace and green when
@@ -181,7 +196,7 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   answer from the sofa. A list that stops being updated dims and freezes
   rather than going on claiming work is still running.
 - **Check quota and token history.** A quota button beside the settings gear
-  opens the same Claude and Codex gauges, plus a per-day token chart. The phone
+  opens the same Claude, Codex and Grok gauges, plus a per-day token chart. The phone
   hides quota data older than 30 minutes rather than presenting it as current.
 - **Reopen a past conversation.** A conversation the Claude app shows as
   *Disconnected* has no way back from the phone — only from the machine it ran
