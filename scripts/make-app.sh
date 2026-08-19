@@ -18,8 +18,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Vibenotch</string>
   <key>CFBundleDisplayName</key><string>Vibenotch</string>
   <key>CFBundleIdentifier</key><string>com.rebelpaulo.vibenotch</string>
-  <key>CFBundleVersion</key><string>0.4.0</string>
-  <key>CFBundleShortVersionString</key><string>0.4.0</string>
+  <key>CFBundleVersion</key><string>1.0.0</string>
+  <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundleExecutable</key><string>Vibenotch</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
@@ -34,7 +34,32 @@ PLIST
 # the bundle copy, and anything reading it through CFBundle — LaunchServices
 # included — saw a malformed file. Fail the build rather than ship that again.
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
-# Stable ad-hoc signature keyed to the bundle identifier (keeps TCC grants sticky).
-codesign --force --sign - --identifier com.rebelpaulo.vibenotch "$APP"
-codesign -dv "$APP" 2>&1 | grep -E "Identifier|Signature"
+# Sign with a stable identity when one exists, ad-hoc otherwise.
+#
+# This is not about trust — nobody is verifying us — it is about IDENTITY
+# STAYING THE SAME between builds. An ad-hoc signature has no certificate, so
+# the identity IS the hash of the binary: change one byte and macOS sees a
+# different application. Every Keychain "Always Allow" and every Automation
+# grant is recorded against that identity, so every rebuild silently orphans
+# them and the prompts come back. Signing with a certificate makes the identity
+# the certificate, and the grants survive.
+#
+# VIBENOTCH_SIGN_IDENTITY overrides; otherwise we look for a local self-signed
+# "Vibenotch Signing" certificate. Not finding one is NORMAL and not an error:
+# ad-hoc still produces a working app, and asking someone to create a root
+# certificate just to try a menu-bar app would be a rude thing to require.
+SIGN_IDENTITY="${VIBENOTCH_SIGN_IDENTITY:-}"
+if [ -z "$SIGN_IDENTITY" ] && security find-certificate -c "Vibenotch Signing" >/dev/null 2>&1; then
+  SIGN_IDENTITY="Vibenotch Signing"
+fi
+if [ -n "$SIGN_IDENTITY" ]; then
+  codesign --force --sign "$SIGN_IDENTITY" --identifier com.rebelpaulo.vibenotch "$APP"
+  echo "signed with: $SIGN_IDENTITY (grants survive rebuilds)"
+else
+  codesign --force --sign - --identifier com.rebelpaulo.vibenotch "$APP"
+  echo "signed ad-hoc — macOS will re-ask for Keychain/Automation access after each rebuild."
+  echo "  To stop that: create a self-signed Code Signing certificate named 'Vibenotch Signing'"
+  echo "  in Keychain Access (Certificate Assistant > Create a Certificate), then rebuild."
+fi
+codesign -dv "$APP" 2>&1 | grep -E "Identifier|Authority|Signature"
 echo "built: $APP"

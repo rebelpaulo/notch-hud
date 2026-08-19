@@ -95,9 +95,21 @@ final class UsageStore {
             return
         }
 
-        isScanningLocal = localSeries == nil
+        // Only the first-ever call (nothing published yet) has any use for
+        // the cache-only bridge: once a series exists — cache-only or full —
+        // it is already better than what a fresh cache-only read could offer,
+        // so later rescans go straight to the full scan.
+        let bridgeWithCacheOnly = localSeries == nil
+        isScanningLocal = bridgeWithCacheOnly
         localScan = Task { [weak self, scanner] in
-            let series = await scanner.scan()
+            // Cache-only first, awaited to completion before the full scan
+            // even starts: the panel gets real numbers within a moment
+            // instead of sitting on "Counting the local logs…" for however
+            // long the directory walk below takes.
+            if bridgeWithCacheOnly, let cacheOnly = await scanner.cachedSeries(now: now) {
+                await self?.applyCacheOnlyLocal(cacheOnly)
+            }
+            let series = await scanner.scan(now: now)
             await self?.applyLocal(series, at: now)
         }
     }
@@ -108,6 +120,24 @@ final class UsageStore {
     static let localScanMaxAge: TimeInterval = 600
 
     private(set) var lastLocalScan: Date?
+
+    /// Publishes a cache-only series as the first-paint stand-in for a still-
+    /// running full scan.
+    ///
+    /// Guarded by `localSeries == nil` even though `scanLocalIfNeeded` only
+    /// ever calls this once per cold start, strictly before it starts the
+    /// full scan: the guard is what actually *makes* "freshest wins" true,
+    /// rather than true by accident of today's call order. A full scan's
+    /// answer is always newer and more complete than a cache-only one by
+    /// construction, so this must never land on top of one — from this call
+    /// site or a future one. Left non-private (rather than folded inline into
+    /// `scanLocalIfNeeded`'s task) so that invariant is directly testable
+    /// without having to win a race against real actor scheduling.
+    func applyCacheOnlyLocal(_ series: LocalUsageSeries) {
+        guard localSeries == nil else { return }
+        localSeries = series
+        isScanningLocal = false
+    }
 
     private func applyLocal(_ series: LocalUsageSeries, at now: Date) {
         localSeries = series

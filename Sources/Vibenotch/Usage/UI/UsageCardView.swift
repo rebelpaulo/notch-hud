@@ -12,21 +12,41 @@ struct UsageCardView: View {
     /// keying happens here rather than on the model.
     private let paceByWindowID: [String: UsagePace]
     private let now: Date
+    /// Whether this card shows everything or just its header + first window.
+    /// Owned by the parent, not local `@State`: exactly one card across the
+    /// whole tab may be expanded at a time, which only the parent can enforce.
+    private let isExpanded: Bool
+    private let onToggleExpanded: () -> Void
 
-    init(snapshot: UsageSnapshot, paceByWindowID: [String: UsagePace] = [:], now: Date = .now) {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHoveringHeader = false
+
+    init(
+        snapshot: UsageSnapshot,
+        paceByWindowID: [String: UsagePace] = [:],
+        now: Date = .now,
+        isExpanded: Bool = true,
+        onToggleExpanded: @escaping () -> Void = {}
+    ) {
         provider = snapshot.provider
         self.snapshot = snapshot
         unavailable = nil
         self.paceByWindowID = paceByWindowID
         self.now = now
+        self.isExpanded = isExpanded
+        self.onToggleExpanded = onToggleExpanded
     }
 
+    /// Unavailable cards have no windows to hide, so they are never
+    /// collapsible — `isExpanded` always reads true and the header ignores taps.
     init(provider: UsageProviderKind, unavailable: UsageUnavailable, now: Date = .now) {
         self.provider = provider
         snapshot = nil
         self.unavailable = unavailable
         paceByWindowID = [:]
         self.now = now
+        isExpanded = true
+        onToggleExpanded = {}
     }
 
     var body: some View {
@@ -34,27 +54,35 @@ struct UsageCardView: View {
             header
 
             if let snapshot {
-                if let session = snapshot.window(.session) {
-                    section(title: t("Session"), window: session)
-                }
-                if let weekly = snapshot.window(.weekly) {
-                    section(title: t("Weekly"), window: weekly)
-                }
-
-                let scoped = snapshot.windows.filter { $0.scopeLabel != nil }
-                if !scoped.isEmpty {
-                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
-                        ForEach(scoped) { window in
-                            compactRow(window)
-                        }
+                if isExpanded {
+                    if let session = snapshot.window(.session) {
+                        section(title: windowTitle(session), window: session)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    if let weekly = snapshot.window(.weekly) {
+                        section(title: windowTitle(weekly), window: weekly)
+                    }
 
-                if let credits = UsageFormatting.limitResetCredits(snapshot.limitResetCredits) {
-                    Text(credits)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.55))
+                    let scoped = snapshot.windows.filter { $0.scopeLabel != nil }
+                    if !scoped.isEmpty {
+                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                            ForEach(scoped) { window in
+                                compactRow(window)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if let credits = UsageFormatting.limitResetCredits(snapshot.limitResetCredits) {
+                        Text(credits)
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.55))
+                    }
+                } else if let firstWindow = snapshot.windows.first {
+                    // Whichever window the provider reported first — never a
+                    // hardcoded "Session" — because that is the one fact still
+                    // true the day a provider's shape changes, as Grok (no
+                    // session window at all) already proves.
+                    section(title: windowTitle(firstWindow), window: firstWindow)
                 }
             } else {
                 unavailableRow
@@ -72,41 +100,95 @@ struct UsageCardView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(.white.opacity(0.08), lineWidth: 0.5)
         }
+        // Collapsed, the WHOLE card opens it — not just the title row. What is
+        // on screen when collapsed is a summary of one thing, so every part of
+        // it means the same "show me the rest"; making the user find the 20pt
+        // header is a hit-target puzzle with no upside.
+        //
+        // Expanded, only the header collapses it again. A card full of gauges
+        // is content to read, and a stray click while reading should not make
+        // it vanish.
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .onTapGesture {
+            guard !isExpanded else { return }
+            onToggleExpanded()
+        }
     }
 
     // MARK: Header
 
+    /// The whole row is the click target, not just the chevron — a real
+    /// `Button` so VoiceOver announces it as one, rather than a tap gesture
+    /// bolted onto a stack. Disabled (and un-hoverable) when there is no
+    /// snapshot: an unavailable card has nothing behind it to expand.
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(provider.displayName)
-                    .font(.system(size: 13, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white)
-                if let snapshot {
-                    Text(UsageFormatting.relativeUpdated(snapshot.capturedAt, now: now))
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-
-            Spacer()
-
-            if let snapshot {
-                VStack(alignment: .trailing, spacing: 2) {
-                    if let account = snapshot.account, !account.isEmpty {
-                        Text(account)
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.7))
-                            .lineLimit(1)
+        Button(action: onToggleExpanded) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(provider.displayName)
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundStyle(.white)
+                        if snapshot != nil {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.4))
+                                .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                                .animation(reduceMotion ? nil : .easeInOut(duration: 0.15), value: isExpanded)
+                        }
                     }
-                    if let plan = snapshot.plan, !plan.isEmpty {
-                        Text(plan)
+                    if let snapshot {
+                        Text(UsageFormatting.relativeUpdated(snapshot.capturedAt, now: now))
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.white.opacity(0.4))
                     }
                 }
+
+                Spacer()
+
+                if let snapshot {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if let account = snapshot.account, !account.isEmpty {
+                            Text(account)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.7))
+                                .lineLimit(1)
+                        }
+                        if let plan = snapshot.plan, !plan.isEmpty {
+                            Text(plan)
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.4))
+                        }
+                    }
+                }
             }
+            .background(.white.opacity(isHoveringHeader && snapshot != nil ? 0.06 : 0))
+            .clipShape(.rect(cornerRadius: 8))
+            .contentShape(.rect)
         }
+        .buttonStyle(.plain)
+        .disabled(snapshot == nil)
+        .onHover { hovering in
+            isHoveringHeader = snapshot != nil && hovering
+        }
+        .accessibilityLabel(headerAccessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var headerAccessibilityLabel: String {
+        guard snapshot != nil else { return provider.displayName }
+        return isExpanded
+            ? t("%@ usage, expanded. Tap to collapse.", provider.displayName)
+            : t("%@ usage, collapsed. Tap to expand.", provider.displayName)
+    }
+
+    /// The label a window's own section carries — its scope name if it has
+    /// one, else derived from `kind`. Never a fixed per-provider guess: this
+    /// is what lets the collapsed row show whichever window came first
+    /// without knowing which provider it belongs to.
+    private func windowTitle(_ window: UsageWindow) -> String {
+        if let scopeLabel = window.scopeLabel { return scopeLabel }
+        return window.kind == .session ? t("Session") : t("Weekly")
     }
 
     // MARK: Session / Weekly section
@@ -349,6 +431,34 @@ struct UsageCardView: View {
         UsageCardView(provider: .claude, unavailable: .notLoggedIn)
         UsageCardView(provider: .codex, unavailable: .network("timed out"))
     }
+    .padding()
+    .background(Color.notchBackground)
+}
+
+// Grok, not Claude or Codex: it has no session window at all, so the
+// collapsed row below has to lead with Weekly — proof this reads whatever
+// window came back first instead of a hardcoded "Session".
+#Preview("Collapsed — Grok, weekly leads") {
+    UsageCardView(
+        snapshot: UsageSnapshot(
+            provider: .grok,
+            account: "paulo@originaly.dev",
+            plan: "SuperGrok",
+            billing: .plan("SuperGrok"),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 47,
+                    resetsAt: Date().addingTimeInterval(3 * 86_400 + 6 * 3_600),
+                    windowLength: 7 * 86_400,
+                    scopeLabel: nil,
+                    severity: .normal
+                )
+            ],
+            capturedAt: Date().addingTimeInterval(-90)
+        ),
+        isExpanded: false
+    )
     .padding()
     .background(Color.notchBackground)
 }
