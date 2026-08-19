@@ -661,3 +661,43 @@ actor UsageFakeCommandRunner: CommandRunning {
 
     #expect(await fixture.runner.usagePutBodies().count == afterFirst)
 }
+
+@MainActor
+@Test func everyProviderInTheEnumReachesThePayload() async throws {
+    // The renderer used to name "claude" and "codex" by hand while its own
+    // comment claimed to follow the enum's declaration order. Adding Grok
+    // compiled, ran, and drew a card in the notch — and never reached the
+    // phone. This asserts against the enum itself, so the next provider added
+    // either publishes or fails here.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    for kind in UsageProviderKind.allCases {
+        fixture.usage.entries[kind] = .loaded(
+            UsageSnapshot(
+                provider: kind,
+                account: nil,
+                plan: nil,
+                billing: .plan(nil),
+                windows: [
+                    UsageWindow(
+                        kind: .weekly,
+                        percentUsed: 10,
+                        resetsAt: isoDate("2026-08-21T14:23:52Z"),
+                        windowLength: 7 * 24 * 3600,
+                        scopeLabel: nil,
+                        severity: .normal
+                    )
+                ],
+                capturedAt: isoDate("2026-08-19T20:00:00Z")
+            )
+        )
+    }
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let body = try #require(await fixture.runner.usagePutBodies().last)
+
+    for kind in UsageProviderKind.allCases {
+        #expect(body.contains("\"\(kind.rawValue)\":"), "\(kind.rawValue) missing from the payload")
+    }
+}

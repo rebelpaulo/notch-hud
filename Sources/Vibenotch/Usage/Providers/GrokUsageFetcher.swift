@@ -75,8 +75,24 @@ struct GrokUsageFetcher: UsageFetching {
 
     private static func windows(from payload: GrokBillingResponse) -> [UsageWindow] {
         guard let config = payload.config else { return [] }
+
+        // A BILLING PERIOD IS THE PROOF THAT THIS IS A QUOTA REPORT.
+        //
+        // Every key below is optional, and the proto3 rule turns a missing
+        // percentage into 0%. Together those were too generous: a renamed
+        // field (`credit_usage_percent` instead of `creditUsagePercent`), or a
+        // `config` object that is not a billing report at all, still decoded —
+        // and then minted a weekly gauge reading 0% used. That is the
+        // confident zero this whole layer refuses everywhere else, arrived at
+        // from the other direction.
+        //
+        // The zero rule is only trustworthy about a period we can see. With a
+        // start and an end in hand, an absent percentage genuinely means the
+        // period has had no usage. Without them there is no period to be zero
+        // about, and the honest answer is no gauge.
         let start = parseISO8601(config.currentPeriod?.start)
         let end = parseISO8601(config.currentPeriod?.end)
+        guard start != nil, end != nil else { return [] }
         // Derived from the payload, never hardcoded: a weekly period is the
         // one observed so far, but nothing here assumes 604800 seconds.
         let length: TimeInterval? = {

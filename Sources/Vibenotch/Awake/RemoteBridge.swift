@@ -799,15 +799,15 @@ final class RemoteBridge {
             guard hasFinishedFetch, lastPublishedUsageDigest != nil else { return nil }
         }
 
-        // Provider order follows the enum's own declaration order (claude,
-        // codex) rather than a dictionary, and a provider with nothing
-        // loaded is left out of the join entirely — never `"codex":null`.
-        var providers: [String] = []
-        if let claude {
-            providers.append("\"claude\":\(renderedUsageProvider(claude))")
-        }
-        if let codex {
-            providers.append("\"codex\":\(renderedUsageProvider(codex))")
+        // ITERATES the enum rather than naming providers by hand. The hand-
+        // written version claimed in its own comment to follow the enum's
+        // declaration order while doing nothing of the sort, so adding Grok to
+        // `UsageProviderKind` compiled, ran, drew a card in the notch — and
+        // never reached the phone. A provider with nothing loaded is left out
+        // of the join entirely, never sent as null.
+        let providers = UsageProviderKind.allCases.compactMap { kind -> String? in
+            guard let provider = publishedUsageProvider(for: kind) else { return nil }
+            return "\"\(kind.rawValue)\":\(renderedUsageProvider(provider))"
         }
         return "{\"usage\":{\(providers.joined(separator: ","))}}"
     }
@@ -903,16 +903,12 @@ final class RemoteBridge {
         // day ages out of the window would leave the phone drawing a chart
         // that no longer exists anywhere else. So after the first publish we
         // always say something, even if what we have to say is "nothing".
-        guard claude != nil || codex != nil || lastPublishedUsageHistoryDigest != nil else { return nil }
-
-        var providers: [String] = []
-        if let claude {
-            providers.append("\"claude\":\(renderedUsageHistoryProvider(claude))")
+        let rendered = UsageProviderKind.allCases.compactMap { kind -> String? in
+            guard let provider = publishedUsageHistoryProvider(for: kind) else { return nil }
+            return "\"\(kind.rawValue)\":\(renderedUsageHistoryProvider(provider))"
         }
-        if let codex {
-            providers.append("\"codex\":\(renderedUsageHistoryProvider(codex))")
-        }
-        return "{\"usage_history\":{\(providers.joined(separator: ","))}}"
+        guard !rendered.isEmpty || lastPublishedUsageHistoryDigest != nil else { return nil }
+        return "{\"usage_history\":{\(rendered.joined(separator: ","))}}"
     }
 
     private func renderedUsageHistoryProvider(_ provider: PublishedUsageHistoryProvider) -> String {

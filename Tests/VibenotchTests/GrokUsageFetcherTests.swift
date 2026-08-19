@@ -244,3 +244,41 @@ private let settingsFixture = Data("""
     #expect(snapshot.plan == nil)
     #expect(snapshot.window(.weekly)?.percentUsed == 1)
 }
+
+@Test func grokWithoutABillingPeriodDrawsNoGaugeRatherThanZero() async throws {
+    // From Grok's own review of this file. Every key is optional and the
+    // proto3 rule turns a missing percentage into 0%, so a RENAMED field — or
+    // a `config` that is not a billing report at all — decoded happily and
+    // minted a weekly gauge reading "0% used". A confident zero, reached from
+    // the other direction.
+    //
+    // The zero rule is only trustworthy about a period we can actually see.
+    let renamedField = Data("""
+    {"config":{"credit_usage_percent":84.0,"currentPeriod":{"start":"2026-08-14T14:23:52.962831+00:00","end":"2026-08-21T14:23:52.962831+00:00"}}}
+    """.utf8)
+    let unrelatedConfig = Data("""
+    {"config":{"isUnifiedBillingUser":true}}
+    """.utf8)
+
+    // A renamed percentage still has a real period, so the zero rule holds and
+    // the gauge is honest: that period has no usage we can see.
+    let renamed = try await GrokUsageFetcher(
+        credentials: FakeGrokCredentials(credential: GrokCredential(key: "k", email: nil)),
+        http: TwoEndpointFakeHTTP(
+            billingStatus: 200, billingBody: renamedField,
+            settingsStatus: 200, settingsBody: settingsFixture
+        )
+    ).fetch(now: Date())
+    #expect(renamed.windows.count == 1)
+    #expect(renamed.windows.first?.percentUsed == 0)
+
+    // No period at all: nothing to be zero ABOUT, so no gauge.
+    let unrelated = try await GrokUsageFetcher(
+        credentials: FakeGrokCredentials(credential: GrokCredential(key: "k", email: nil)),
+        http: TwoEndpointFakeHTTP(
+            billingStatus: 200, billingBody: unrelatedConfig,
+            settingsStatus: 200, settingsBody: settingsFixture
+        )
+    ).fetch(now: Date())
+    #expect(unrelated.windows.isEmpty)
+}
