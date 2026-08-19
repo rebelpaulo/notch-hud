@@ -270,7 +270,50 @@ cd notch-hud
 
 That builds `Vibenotch.app`, installs it to `/Applications`, puts the helper
 scripts in `~/.vibenotch/bin`, merges the five Claude Code hooks into
-`~/.claude/settings.json`, and installs the Codex adapter.
+`~/.claude/settings.json`, installs the Codex adapter, and restarts Vibenotch so
+an already-running process cannot keep using the previous binary.
+
+### Updates
+
+Vibenotch checks the repository's latest published GitHub release when it
+starts and every six hours while it remains open. When a newer semantic
+version exists, the sessions panel shows a **Vibenotch · Version … available**
+card. Clicking it opens Terminal, downloads that exact tagged release, verifies
+its signed checksum, runs `scripts/install.sh --yes`, and restarts the app after
+the app bundle, hooks, and helper scripts have all been refreshed.
+
+The release tag is strictly validated before it reaches the shell; update
+commands are not read from the network. The updater accepts only tags shaped
+like `v1.2.3`, always downloads from `rebelpaulo/notch-hud` over HTTPS, and
+refuses to extract or execute an archive unless its checksum manifest was
+signed by Vibenotch's embedded release key.
+
+Versions installed before this checker existed cannot discover it
+retroactively. Those users need one final manual update from their checkout:
+
+```bash
+git pull
+./scripts/install.sh --yes
+```
+
+After that bootstrap update, future releases appear in the notch itself.
+
+#### Publishing a release
+
+Maintainers must bump the version in `Sources/Vibenotch/Info.plist` and
+`scripts/make-app.sh`, merge it, and create a matching tag. From that clean,
+tagged commit, build the signed assets with:
+
+```bash
+./scripts/package-release.sh v0.4.0
+gh release create v0.4.0 dist/v0.4.0/* --title "Vibenotch 0.4.0"
+```
+
+The dedicated private key defaults to
+`~/Library/Application Support/Vibenotch/release-signing-private.pem`. It must
+be backed up securely and never committed. The packaging script fails if the
+key does not match `scripts/release-signing-public.pem`; the updater fails
+closed if any of the archive, manifest, or signature is missing or invalid.
 
 Flags: `--yes` (no prompts), `--skip-claude-hooks`, `--skip-codex`,
 `--uninstall`.

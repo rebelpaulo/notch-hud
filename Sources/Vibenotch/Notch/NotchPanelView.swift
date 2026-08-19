@@ -5,6 +5,8 @@ struct NotchPanelView: View {
     let store: SessionStore
     let pendingStore: PendingStore
     let focusDispatcher: FocusDispatcher
+    let updateStore: UpdateStore
+    let updateLauncher: TerminalUpdateLauncher
     let decisionWriter: ApprovalDecisionWriter
     @Bindable var keepAwakeEngine: KeepAwakeEngine
     let usageStore: UsageStore
@@ -15,35 +17,50 @@ struct NotchPanelView: View {
     let onSizeChange: @MainActor (CGSize) -> Void
 
     @State private var feedback: [String: SessionRowFeedback] = [:]
+    @State private var updateFeedback: UpdateNoticeFeedback?
+    @State private var updateDidStart = false
     @State private var sessionListHeight: CGFloat?
+    @State private var usageListHeight: CGFloat?
+    /// Which provider card is open in the quota tab. Exactly one at a time —
+    /// this lives here, not in `UsageCardView`, because only the parent can
+    /// see every card at once and enforce that. `nil` means everything is
+    /// collapsed, which is also where the tab starts each time it is opened.
+    @State private var expandedUsageProvider: UsageProviderKind?
     /// Which half of the panel you are looking at. One or the other, never
     /// both: the panel is already the height of a notch drawer, and stacking
     /// quotas under a session list would push the sessions off the bottom —
     /// the thing you open this for most often.
     @State private var tab: PanelTab = .sessions
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private enum PanelTab {
         case sessions
         case limits
     }
 
-    /// The quota tab is taller on purpose: two provider cards, each with a
-    /// gauge pair and a month of daily bars, do not fit in the height a
-    /// session list needs. Growing only on that tab keeps the common case —
-    /// glancing at what is running — the same size it has always been.
+    /// The quota tab used to reserve room for two fully expanded cards at
+    /// once; now that cards are an accordion, the tallest it gets is one
+    /// expanded card plus its chart alongside up to two collapsed headers.
+    /// `maximumUsageHeight` is the real driver — this just has to be tall
+    /// enough to also fit the panel's own header and padding around it.
     private var maximumPanelHeight: CGFloat {
-        tab == .limits ? 820 : 520
+        tab == .limits ? 680 : 520
     }
 
     private var maximumSessionListHeight: CGFloat {
         pendingStore.hasPending ? 205 : 468
     }
 
-    /// Enough for both cards and both charts without an inner scrollbar in
-    /// the ordinary case. It still scrolls when a provider reports extra
-    /// model-scoped windows, which is the one thing that varies.
+    /// One expanded card (gauge sections, any scoped rows, the daily chart)
+    /// plus up to two collapsed headers — collapsed cards are a name and one
+    /// bar, so three providers no longer need anything close to the height
+    /// two always-expanded cards used to. Still a cap, not a floor: the
+    /// height applied below tracks the measured content and only hits this
+    /// ceiling if a card's scoped-window list runs long enough to need the
+    /// inner scrollbar.
     private var maximumUsageHeight: CGFloat {
-        pendingStore.hasPending ? 505 : 768
+        pendingStore.hasPending ? 420 : 620
     }
 
     private let panelShape = UnevenRoundedRectangle(
@@ -72,11 +89,22 @@ struct NotchPanelView: View {
                 usageTab
             } else {
             TimelineView(.periodic(from: .now, by: 30)) { context in
-                if store.sessions.isEmpty {
+                if store.sessions.isEmpty && updateStore.availableUpdate == nil {
                     emptyState
                 } else {
                     ScrollView(.vertical) {
                         VStack(spacing: 6) {
+                            if let update = updateStore.availableUpdate {
+                                UpdateNoticeView(
+                                    update: update,
+                                    currentVersion: updateStore.currentVersion,
+                                    feedback: updateFeedback,
+                                    didStart: updateDidStart,
+                                    onSelect: { launchUpdate(update) },
+                                    onGrantAccess: openAutomationSettings
+                                )
+                            }
+
                             ForEach(store.sessions) { session in
                                 SessionRowView(
                                     session: session,
@@ -179,6 +207,9 @@ struct NotchPanelView: View {
             if tab == .limits {
                 usageStore.refreshIfStale()
                 usageStore.scanLocalIfNeeded()
+                // Every time the tab opens, not just the first time — a card
+                // left expanded from the last visit is still "not the default".
+                expandedUsageProvider = nil
             }
         } label: {
             Image(systemName: tab == .sessions ? "gauge.with.needle" : "list.bullet")
@@ -193,19 +224,43 @@ struct NotchPanelView: View {
         .accessibilityLabel(tab == .sessions ? t("Show the quota limits") : t("Show the sessions"))
     }
 
-    /// Only the providers that actually answered. A card reading
+    /// What one provider's slot in the tab draws, once it has anything to
+    /// say at all.
+    private enum UsageTabEntry {
+        case loaded(UsageSnapshot)
+        case unavailable(UsageUnavailable)
+    }
+
+    /// Only the providers with something to show. A card reading
     /// "unavailable" for a tool you do not use is noise about someone else's
     /// product; absence says the same thing without occupying the drawer.
     ///
-    /// A provider that answered once and then failed keeps its card, because
-    /// UsageStore holds the last good snapshot — a dropped request is not
-    /// evidence you logged out.
+    /// "Not signed in" is the one reason that disappears entirely — "a regra
+    /// se não tem login não apresenta" — because there is nothing here that
+    /// is this app's problem to report: the fix is the user signing in, and
+    /// showing a row for every service they have never used would make the
+    /// drawer about Claude/Codex/Grok's product line instead of about their
+    /// sessions. Network hiccups, an expired login, and a reshaped response
+    /// ARE this app's business (or at least worth a glance), so those keep a
+    /// row via `UsageCardView`'s `unavailable` init. One rule, applied the
+    /// same way to all three providers rather than special-cased per one.
+    ///
+    /// A provider that answered once and then failed keeps its LOADED card,
+    /// because UsageStore holds the last good snapshot — a dropped request
+    /// is not evidence you logged out. Only a provider that has never once
+    /// loaded successfully can show the unavailable row instead.
     private var usageTab: some View {
-        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageSnapshot)? in
-            if case let .loaded(snapshot) = usageStore.entries[provider] {
-                return (provider, snapshot)
+        let shown = UsageProviderKind.allCases.compactMap { provider -> (UsageProviderKind, UsageTabEntry)? in
+            switch usageStore.entries[provider] {
+            case .loaded(let snapshot):
+                return (provider, .loaded(snapshot))
+            case .failed(let reason) where reason != .notLoggedIn:
+                return (provider, .unavailable(reason))
+            default:
+                // .none (never fetched), .loading, and .failed(.notLoggedIn)
+                // all render nothing — see the doc comment above.
+                return nil
             }
-            return nil
         }
 
         return ScrollView(.vertical) {
@@ -213,36 +268,73 @@ struct NotchPanelView: View {
                 if shown.isEmpty {
                     // Not a per-card badge: one quiet line, and only when
                     // there is genuinely nothing to draw.
-                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude or codex to see quotas"))
+                    Text(usageStore.isLoading ? t("Checking…") : t("Sign in with claude, codex, or grok to see quotas"))
                         .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.35))
                         .frame(maxWidth: .infinity, minHeight: 60)
                 }
 
-                ForEach(shown, id: \.0.rawValue) { provider, snapshot in
-                    VStack(alignment: .leading, spacing: 10) {
-                        UsageCardView(
-                            snapshot: snapshot,
-                            paceByWindowID: usageStore.pace(for: snapshot)
-                        )
+                ForEach(shown, id: \.0.rawValue) { provider, entry in
+                    switch entry {
+                    case .loaded(let snapshot):
+                        let isExpanded = expandedUsageProvider == provider
+                        VStack(alignment: .leading, spacing: 10) {
+                            UsageCardView(
+                                snapshot: snapshot,
+                                paceByWindowID: usageStore.pace(for: snapshot),
+                                isExpanded: isExpanded,
+                                onToggleExpanded: { toggleUsageExpanded(provider) }
+                            )
 
-                        UsageHistoryChart(
-                            provider: provider,
-                            points: usageStore.localSeries?.points ?? [],
-                            today: usageStore.tokens(for: provider, today: true),
-                            trailing: usageStore.tokens(for: provider, today: false),
-                            isCounting: usageStore.isScanningLocal
-                        )
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
+                            // The chart is more detail on top of a card that is
+                            // already fully expanded — collapsing the card
+                            // hides it too, the same as the model-scoped rows
+                            // and the second window do.
+                            if isExpanded {
+                                UsageHistoryChart(
+                                    provider: provider,
+                                    points: usageStore.localSeries?.points ?? [],
+                                    today: usageStore.tokens(for: provider, today: true),
+                                    trailing: usageStore.tokens(for: provider, today: false),
+                                    isCounting: usageStore.isScanningLocal
+                                )
+                                .padding(.horizontal, 12)
+                                .padding(.bottom, 10)
+                            }
+                        }
+                        .background(Color.notchBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    case .unavailable(let reason):
+                        UsageCardView(provider: provider, unavailable: reason)
                     }
-                    .background(Color.notchBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
             }
             .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear {
+                            usageListHeight = proxy.size.height
+                        }
+                        .onChange(of: proxy.size.height) { _, height in
+                            usageListHeight = height
+                        }
+                }
+            }
         }
-        .frame(maxHeight: maximumUsageHeight)
+        // Sized to its actual content, capped rather than forced to fill —
+        // an unconstrained ScrollView otherwise always claims
+        // `maximumUsageHeight`, which is exactly how three collapsed headers
+        // used to sit inside a reserved 768pt of empty panel. Same fix as
+        // the session list just above.
+        .frame(height: min(usageListHeight ?? maximumUsageHeight, maximumUsageHeight))
+    }
+
+    private func toggleUsageExpanded(_ provider: UsageProviderKind) {
+        let animation: Animation? = reduceMotion ? nil : .easeInOut(duration: 0.2)
+        withAnimation(animation) {
+            expandedUsageProvider = expandedUsageProvider == provider ? nil : provider
+        }
     }
 
     private var allNighterControl: some View {
@@ -436,6 +528,22 @@ struct NotchPanelView: View {
             case .failure(.notFound), .failure(.scriptFailed):
                 show(.notFound, for: session.id, duration: .seconds(2))
             }
+        }
+    }
+
+    private func launchUpdate(_ update: AvailableUpdate) {
+        updateFeedback = nil
+        updateDidStart = false
+
+        switch updateLauncher.launch(update) {
+        case .success:
+            updateDidStart = true
+        case .failure(.permissionDenied):
+            updateFeedback = .permissionDenied
+        case .failure(.notFound):
+            updateFeedback = .helperMissing
+        case .failure(.scriptFailed):
+            updateFeedback = .launchFailed
         }
     }
 

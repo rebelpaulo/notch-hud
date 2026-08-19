@@ -23,6 +23,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pendingWatcher: PendingWatcher?
     private var stalenessSweeper: StalenessSweeper?
     private var codexRolloutPoller: CodexRolloutPoller?
+    private var updateStore: UpdateStore?
     private var keepAwakeEngine: KeepAwakeEngine?
     private var sleepGuardController: SleepGuardController?
     private var remoteBridge: RemoteBridge?
@@ -41,6 +42,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         let focusDispatcher = FocusDispatcher()
         let spoolWatcher = SpoolWatcher(spoolURL: environment.spoolURL, store: sessionStore)
         let codexRolloutPoller = CodexRolloutPoller(spoolURL: environment.spoolURL)
+        let updateStore = UpdateStore()
         let stalenessSweeper = StalenessSweeper(
             spoolURL: environment.spoolURL,
             store: sessionStore,
@@ -52,13 +54,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
             notificationPoster: SystemNotificationPoster()
         )
         let sleepGuardController = SleepGuardController(engine: keepAwakeEngine)
-        let remoteBridge = RemoteBridge(engine: keepAwakeEngine, sessionStore: sessionStore)
+        // ONE store, shared. Each side used to make its own: the bridge got the
+        // default from its initialiser and the window manager held a private
+        // one. Both then polled the same undocumented endpoints and both walked
+        // the same gigabytes of logs — and, worse, the panel drew the state of
+        // the store that was NOT doing the work, so it sat on "Counting the
+        // local logs…" showing zeros while the other one had finished and
+        // published real numbers to the phone.
+        let usageStore = UsageStore()
+        let remoteBridge = RemoteBridge(
+            engine: keepAwakeEngine,
+            sessionStore: sessionStore,
+            usageStore: usageStore
+        )
         let windowManager = NotchWindowManager(
             environment: environment,
             store: sessionStore,
             pendingStore: pendingStore,
             focusDispatcher: focusDispatcher,
+            updateStore: updateStore,
             keepAwakeEngine: keepAwakeEngine,
+            usageStore: usageStore,
             sleepGuardController: sleepGuardController
         )
         let pendingWatcher = PendingWatcher(pendingURL: environment.pendingURL) {
@@ -73,6 +89,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         self.pendingWatcher = pendingWatcher
         self.stalenessSweeper = stalenessSweeper
         self.codexRolloutPoller = codexRolloutPoller
+        self.updateStore = updateStore
         self.keepAwakeEngine = keepAwakeEngine
         self.sleepGuardController = sleepGuardController
         self.remoteBridge = remoteBridge
@@ -80,6 +97,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
         spoolWatcher.start()
         codexRolloutPoller.start()
+        updateStore.start()
         pendingWatcher.start()
         stalenessSweeper.start()
         keepAwakeEngine.start()
@@ -102,6 +120,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
         remoteBridge?.stop()
         keepAwakeEngine?.stop()
         codexRolloutPoller?.stop()
+        updateStore?.stop()
         stalenessSweeper?.stop()
         pendingWatcher?.stop()
         spoolWatcher?.stop()

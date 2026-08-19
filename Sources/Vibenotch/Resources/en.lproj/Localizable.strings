@@ -1,1 +1,8 @@
+/* DELIBERATELY EMPTY — do not add keys here.
+   The English sentence IS the lookup key, so `t("Session")` returns "Session"
+   with no entry at all. This file exists only so macOS counts English among
+   the available localizations; without it a device set to English falls
+   through to the single `pt` table and shows Portuguese.
+   Adding keys here means every new string has to be written twice, and the
+   two copies drift. See Localization.swift. */
 /* English is the source language: keys are the strings themselves. */

@@ -103,9 +103,11 @@ private let codexFixture = Data("""
  "rate_limit":{"allowed":true,"limit_reached":false,
    "primary_window":{"used_percent":7,"limit_window_seconds":604800,"reset_after_seconds":480107,"reset_at":1787211467},
    "secondary_window":null},
+ "code_review_rate_limit":null,
  "additional_rate_limits":[{"limit_name":"GPT-5.3-Codex-Spark","metered_feature":"codex_bengalfox",
    "rate_limit":{"primary_window":{"used_percent":0,"limit_window_seconds":604800,"reset_at":1787336160},"secondary_window":null}}],
- "credits":{"has_credits":false,"balance":"0"}}
+ "credits":{"has_credits":false,"balance":"0"},
+ "rate_limit_reset_credits":{"available_count":0,"applicable_available_count":0}}
 """.utf8)
 
 @Test func codexFetcherDecodesRealPayload() async throws {
@@ -119,6 +121,7 @@ private let codexFixture = Data("""
     #expect(snapshot.provider == .codex)
     #expect(snapshot.account == "someone@example.com")
     #expect(snapshot.plan == "prolite")
+    #expect(snapshot.limitResetCredits == 0)
     // secondary_window is null and must not turn into a phantom window.
     #expect(snapshot.windows.count == 2)
 
@@ -131,6 +134,60 @@ private let codexFixture = Data("""
     let additional = try #require(snapshot.windows.first { $0.scopeLabel == "GPT-5.3-Codex-Spark" })
     #expect(additional.percentUsed == 0)
     #expect(additional.kind == .weekly)
+}
+
+@Test func codexNullCodeReviewRateLimitProducesNoWindows() async throws {
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: codexFixture)
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    #expect(snapshot.windows.contains { $0.scopeLabel == t("Code review") } == false)
+}
+
+@Test func codexCodeReviewRateLimitUsesScopedWindows() async throws {
+    let body = """
+    {"plan_type":"prolite","rate_limit":{
+       "primary_window":{"used_percent":5,"limit_window_seconds":18000,"reset_at":1787211467},
+       "secondary_window":{"used_percent":10,"limit_window_seconds":604800,"reset_at":1787336160}},
+     "code_review_rate_limit":{
+       "primary_window":{"used_percent":25,"limit_window_seconds":18000,"reset_at":1787211467},
+       "secondary_window":{"used_percent":60,"limit_window_seconds":604800,"reset_at":1787336160}},
+     "additional_rate_limits":[],
+     "rate_limit_reset_credits":{"available_count":2}}
+    """
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: Data(body.utf8))
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+    let codeReview = snapshot.windows.filter { $0.scopeLabel == t("Code review") }
+
+    #expect(codeReview.count == 2)
+    #expect(codeReview.contains { $0.kind == .session && $0.percentUsed == 25 })
+    #expect(codeReview.contains { $0.kind == .weekly && $0.percentUsed == 60 })
+    #expect(snapshot.limitResetCredits == 2)
+    // A scoped code-review quota must never claim the account-wide headline.
+    #expect(snapshot.window(.session)?.scopeLabel == nil)
+    #expect(snapshot.window(.weekly)?.scopeLabel == nil)
+}
+
+@Test func codexMissingOrRenamedResetCreditCountStaysAbsent() async throws {
+    let body = """
+    {"plan_type":"prolite","rate_limit":null,
+     "rate_limit_reset_credits":{"renamed_available_count":4}}
+    """
+    let fetcher = CodexUsageFetcher(
+        credentials: FakeCodexCredentials(),
+        http: FakeUsageHTTP(statusCode: 200, body: Data(body.utf8))
+    )
+
+    let snapshot = try await fetcher.fetch(now: Date())
+
+    #expect(snapshot.limitResetCredits == nil)
 }
 
 @Test func codexPrimaryWindowClassifiesByDurationNotBySlotName() async throws {

@@ -306,6 +306,62 @@ import Testing
     #expect(point.topModel == "gpt-5.6-terra")
 }
 
+// MARK: - Cache-only series (first paint before a full scan lands)
+
+@Test func cachedSeriesReflectsASeededCacheWithoutReadingAnyFileBytes() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+    let now = Date()
+
+    try fixture.writeClaudeSession(lines: [
+        assistantLine(timestamp: now, messageID: "msg_bridge", requestID: "req_bridge", input: 300, output: 30)
+    ])
+
+    // Seed the cache with a real scan first, exactly as an earlier launch
+    // would have left it on disk.
+    let seeder = fixture.scanner()
+    _ = await seeder.scan(now: now)
+    let seededStats = await seeder.lastScanStats
+    #expect(seededStats.bytesRead > 0) // sanity: the seeding scan really did read the file
+
+    // A fresh actor — the "app just relaunched, tab just opened" case —
+    // reading only the persisted cache.
+    let scanner = fixture.scanner()
+    let cachedSeries = await scanner.cachedSeries(now: now)
+    let statsAfterCacheOnly = await scanner.lastScanStats
+
+    let point = try #require(cachedSeries?.points.first { $0.provider == .claude })
+    #expect(point.totalTokens == 330)
+    // No further file reads: a scanner that has only ever called
+    // `cachedSeries()` still shows the all-zero default stats a fresh actor
+    // starts with — proof this path never touched `perDayTallies` at all.
+    #expect(statsAfterCacheOnly == LocalUsageScanStats(filesParsed: 0, filesCached: 0, bytesRead: 0, oversizedLinesSkipped: 0, filesPruned: 0))
+}
+
+@Test func cachedSeriesIsNilWhenTheCacheIsMissingRatherThanAConfidentZero() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+
+    // Never scanned, so no cache file exists on disk at all.
+    let scanner = fixture.scanner()
+    #expect(await scanner.cachedSeries() == nil)
+}
+
+@Test func cachedSeriesIsNilWhenTheCacheFileIsCorrupt() async throws {
+    let fixture = try LocalUsageFixture()
+    defer { fixture.remove() }
+
+    try FileManager.default.createDirectory(at: fixture.cacheDirectoryURL, withIntermediateDirectories: true)
+    let cacheFile = fixture.cacheDirectoryURL
+        .appendingPathComponent("local-usage-scan-cache.v\(LocalUsageScanner.cacheSchemaVersion).json")
+    try Data("{ not valid json at all".utf8).write(to: cacheFile)
+
+    let scanner = fixture.scanner()
+    // Must come back nil, not an empty-but-present series that would render
+    // as Today 0 / Last 31 days 0 — the "confident zero" this app refuses.
+    #expect(await scanner.cachedSeries() == nil)
+}
+
 // MARK: - Fixtures
 
 private func isoString(_ date: Date) -> String {

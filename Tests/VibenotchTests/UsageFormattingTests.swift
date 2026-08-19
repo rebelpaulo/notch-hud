@@ -107,6 +107,18 @@ struct UsageFormattingTests {
         #expect(!pace.willLastToReset)
         #expect(UsageFormatting.projectionPhrase(pace, now: now) == "Runs out in 5h 4m")
     }
+
+    // MARK: one-shot limit resets
+
+    @Test func zeroAvailableLimitResetCreditsRendersNothing() {
+        #expect(UsageFormatting.limitResetCredits(nil) == nil)
+        #expect(UsageFormatting.limitResetCredits(0) == nil)
+    }
+
+    @Test func positiveLimitResetCreditsRenderAsOneLine() {
+        #expect(UsageFormatting.limitResetCredits(1) == "1 limit reset available")
+        #expect(UsageFormatting.limitResetCredits(3) == "3 limit resets available")
+    }
 }
 
 @Test func tokenCountsCompactWithoutLosingTheDistinctionBetweenBillions() {

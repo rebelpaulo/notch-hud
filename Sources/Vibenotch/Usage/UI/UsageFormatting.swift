@@ -109,6 +109,16 @@ enum UsageFormatting {
         guard let runsOutAt = pace.runsOutAt else { return t("Lasts until reset") }
         return runsOut(at: runsOutAt, from: now)
     }
+
+    /// One-shot resets only earn a row when the account can use one. Zero is
+    /// a valid API value, but showing "0 available" on accounts that never
+    /// receive this capability turns absence into persistent visual noise.
+    static func limitResetCredits(_ count: Int?) -> String? {
+        guard let count, count > 0 else { return nil }
+        return count == 1
+            ? t("1 limit reset available")
+            : t("%d limit resets available", count)
+    }
 }
 
 extension UsageFormatting {
