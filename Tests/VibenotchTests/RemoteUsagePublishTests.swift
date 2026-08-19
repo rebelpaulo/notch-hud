@@ -741,3 +741,42 @@ actor UsageFakeCommandRunner: CommandRunning {
     #expect(body.contains("\"grok\":"))
     #expect(!body.contains("\"claude\":"))
 }
+
+@MainActor
+@Test func grokPublishesWhileTheOtherProvidersAreStillLoading() async throws {
+    // The second way the named gate dropped Grok, and the one the Grok-only
+    // test does NOT cover: everyone is signed in, but Grok answered first.
+    // `claude == nil, codex == nil` was true for that tick too, so a whole
+    // publish was thrown away and the phone waited for the slowest provider.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    fixture.usage.entries[.grok] = .loaded(
+        UsageSnapshot(
+            provider: .grok,
+            account: nil,
+            plan: "SuperGrok Lite",
+            billing: .plan("SuperGrok Lite"),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 12,
+                    resetsAt: isoDate("2026-08-21T14:23:52Z"),
+                    windowLength: 7 * 24 * 3600,
+                    scopeLabel: nil,
+                    severity: .normal
+                )
+            ],
+            capturedAt: isoDate("2026-08-19T21:00:00Z")
+        )
+    )
+    fixture.usage.entries[.claude] = .loading
+    fixture.usage.entries[.codex] = .loading
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.usagePutBodies().last)
+    #expect(body.contains("\"grok\":"))
+    #expect(!body.contains("\"claude\":"))
+    #expect(!body.contains("\"codex\":"))
+}
