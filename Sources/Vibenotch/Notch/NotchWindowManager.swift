@@ -20,10 +20,10 @@ final class NotchWindowManager {
     private let updateStore: UpdateStore
     private let updateLauncher: TerminalUpdateLauncher
     private let keepAwakeEngine: KeepAwakeEngine
-    /// Owned here rather than made per-panel: the panel is rebuilt every time
-    /// it opens, and a store that died with it would re-request the quotas on
-    /// every glance.
-    private let usageStore = UsageStore()
+    /// Injected, not owned: the remote bridge needs the same one. Two stores
+    /// meant two polls of the same endpoints and a panel showing the progress
+    /// of whichever one was not doing the work.
+    private let usageStore: UsageStore
     private let sleepGuardController: SleepGuardController
     private let decisionWriter: ApprovalDecisionWriter
     private var hoverController: HoverController?
@@ -58,6 +58,7 @@ final class NotchWindowManager {
         updateStore: UpdateStore,
         updateLauncher: TerminalUpdateLauncher = TerminalUpdateLauncher(),
         keepAwakeEngine: KeepAwakeEngine,
+        usageStore: UsageStore,
         sleepGuardController: SleepGuardController
     ) {
         self.environment = environment
@@ -67,6 +68,7 @@ final class NotchWindowManager {
         self.updateStore = updateStore
         self.updateLauncher = updateLauncher
         self.keepAwakeEngine = keepAwakeEngine
+        self.usageStore = usageStore
         self.sleepGuardController = sleepGuardController
         decisionWriter = ApprovalDecisionWriter(
             decisionsURL: environment.decisionsURL,

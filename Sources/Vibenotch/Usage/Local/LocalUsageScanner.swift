@@ -245,6 +245,16 @@ actor LocalUsageScanner {
         return base.appendingPathComponent("com.rebelpaulo.vibenotch", isDirectory: true)
     }
 
+    /// `realpath(3)`, not `URL.resolvingSymlinksInPath()` — see the call site
+    /// in `cachedSeries()` for why the latter is the wrong tool here. Falls
+    /// back to the URL's own path unresolved when the path does not (yet)
+    /// exist on disk, since `realpath` can only resolve what it can `stat`.
+    private static func resolvedPath(_ url: URL) -> String {
+        guard let resolved = realpath(url.path, nil) else { return url.path }
+        defer { free(resolved) }
+        return String(cString: resolved)
+    }
+
     /// `FileManager.default`: this runs off the main actor, and Apple
     /// documents the shared instance as safe for concurrent read-only calls —
     /// same reasoning `ClaudeConversationIndex` uses.
@@ -285,6 +295,76 @@ actor LocalUsageScanner {
         // gone from the in-memory cache the moment this scan returns.
         if parsed > 0 || pruned > 0 { persistCache() }
 
+        return Self.buildSeries(claudeDays: claudeDays, codexDays: codexDays, now: now)
+    }
+
+    /// Builds a `LocalUsageSeries` from the persisted cache alone — no
+    /// directory walk, no file reads beyond `loadCacheIfNeeded()` loading the
+    /// cache file itself. The cache already stores per-day, per-model tallies
+    /// for every file it knows about, which is everything a series needs.
+    ///
+    /// Returns nil when the cache is missing, empty, or unreadable (a corrupt
+    /// file leaves `cache` empty the same way a first-ever run does — see
+    /// `loadCacheIfNeeded()`) — precisely the cases where there is nothing to
+    /// show yet. Handing back an empty series instead would render as the
+    /// "confident zero" this codebase refuses everywhere else.
+    ///
+    /// Deliberately does not touch `lastScanStats`: this does no scanning
+    /// work, so overwriting whatever the last real scan measured with zeros
+    /// would misrepresent that scan's own cost.
+    func cachedSeries(now: Date = Date()) -> LocalUsageSeries? {
+        loadCacheIfNeeded()
+        guard !cache.isEmpty else { return nil }
+
+        // `FileManager`'s enumerator (used by `transcriptURLs(under:)`, and
+        // so every path this scanner ever wrote as a cache key) walks the
+        // real, symlink-resolved filesystem — on this very machine `/var`
+        // is a symlink to `/private/var`, so a temp-directory root turns
+        // into a `/private/...` cache key. `claudeProjectsURL`/
+        // `codexRootURLs` are built straight from the constructor argument
+        // and never go through that resolution, so comparing against them
+        // as-is silently matches nothing under a temp directory.
+        // `URL.resolvingSymlinksInPath()` looks like the fix but is not:
+        // Foundation deliberately leaves a handful of top-level symlinks
+        // like `/var` and `/tmp` alone for display purposes, so it hands
+        // back the same unresolved path. Raw `realpath(3)` has no such
+        // carve-out — it is what the enumerator's own resolution is built
+        // on — so it is what has to be used here too. Resolved once per
+        // call rather than cached at init, since the directory may not
+        // exist yet when the scanner is constructed (`realpath` requires
+        // the full path to exist) and an unresolvable symlink component
+        // would otherwise freeze into a wrong prefix forever.
+        let claudePrefix = Self.resolvedPath(claudeProjectsURL)
+        let codexPrefixes = codexRootURLs.map(Self.resolvedPath)
+
+        var claudeDays: [Date: [String: TokenTally]] = [:]
+        var codexDays: [Date: [String: TokenTally]] = [:]
+
+        for (path, entry) in cache {
+            // Only claude/codex are scanned locally today (see `scan()`) —
+            // `UsageProviderKind` also has `.grok`, which never has a cache
+            // entry, so this is a two-way branch on path prefix rather than
+            // an exhaustive switch over the provider enum.
+            if path.hasPrefix(claudePrefix) {
+                for (day, models) in entry.perDay { claudeDays[day, default: [:]].merge(models) { $0 + $1 } }
+            } else if codexPrefixes.contains(where: { path.hasPrefix($0) }) {
+                for (day, models) in entry.perDay { codexDays[day, default: [:]].merge(models) { $0 + $1 } }
+            }
+        }
+        guard !claudeDays.isEmpty || !codexDays.isEmpty else { return nil }
+
+        return Self.buildSeries(claudeDays: claudeDays, codexDays: codexDays, now: now)
+    }
+
+    /// Shared by `scan()` and `cachedSeries()`: turns per-provider day/model
+    /// tallies into the sorted point list plus the two rollups the notch
+    /// displays. Pure and static — no actor state, so both callers can use it
+    /// without caring which one is on the fast path.
+    private static func buildSeries(
+        claudeDays: [Date: [String: TokenTally]],
+        codexDays: [Date: [String: TokenTally]],
+        now: Date
+    ) -> LocalUsageSeries {
         var points: [LocalUsageDayPoint] = []
         points.append(contentsOf: claudeDays.map { day, models in Self.point(day: day, provider: .claude, models: models) })
         points.append(contentsOf: codexDays.map { day, models in Self.point(day: day, provider: .codex, models: models) })

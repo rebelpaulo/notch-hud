@@ -1,16 +1,18 @@
 import Foundation
 
-/// The two agents Vibenotch already watches. Deliberately not a general
+/// The three agents Vibenotch already watches. Deliberately not a general
 /// provider registry: the app that inspired this supports thirty-odd services
 /// and pays for it in surface area we would gain nothing from.
 enum UsageProviderKind: String, Sendable, CaseIterable {
     case claude
     case codex
+    case grok
 
     var displayName: String {
         switch self {
         case .claude: "Claude"
         case .codex: "Codex"
+        case .grok: "Grok"
         }
     }
 }
