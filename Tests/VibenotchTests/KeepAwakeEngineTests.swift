@@ -363,3 +363,34 @@ private func makeAwakeSession(status: SessionStatus) -> Session {
     #expect(hot.engine.mode == .off)
     #expect(hot.assertions.activeIDs.isEmpty)
 }
+
+@MainActor
+@Test func aSessionGoneQuietMidToolKeepsTheMacAwake() {
+    // The hook writes on PreToolUse, Stop and Notification — there is no
+    // PostToolUse and no heartbeat. A session doing ONE long thing (a build, a
+    // test run, a render) writes once when the tool starts and then says
+    // nothing, so StalenessSweeper demotes it to `.unknown` after 90 seconds.
+    // Treating that as finished started the grace countdown under a live
+    // agent and put the Mac to sleep on top of the work.
+    let fixture = KeepAwakeFixture()
+    let start = Date(timeIntervalSince1970: 1_000_000)
+    fixture.engine.config.graceSeconds = 10
+    fixture.store.apply([makeAwakeSession(status: .working)])
+
+    fixture.engine.setMode(.whileAgentsWork, now: start)
+    fixture.engine.tick(now: start)
+    #expect(fixture.engine.isActive)
+
+    // The sweeper's verdict once the tool has been running quietly: not that
+    // it finished, only that we can no longer tell.
+    fixture.store.apply([makeAwakeSession(status: .unknown)])
+    fixture.engine.tick(now: start.addingTimeInterval(11))
+    fixture.engine.tick(now: start.addingTimeInterval(120))
+    #expect(fixture.engine.isActive)
+
+    // `done` is the agent speaking about itself, and that still ends it.
+    fixture.store.apply([makeAwakeSession(status: .done)])
+    fixture.engine.tick(now: start.addingTimeInterval(121))
+    fixture.engine.tick(now: start.addingTimeInterval(132))
+    #expect(fixture.engine.mode == .off)
+}

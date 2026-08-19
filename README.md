@@ -115,9 +115,10 @@ phone. At critical pressure, Gotta go! turns itself off. Vibenotch only reads
 the verdict: firmware controls the fans, and macOS exposes no API that can
 change their speed.
 
-A closed MacBook tends to run hotter because its exhaust vents into a closed
-clamshell, while the machine loses the display back and top case as places to
-radiate heat.
+A closed MacBook tends to run hotter: the exhaust vents into the closed gap
+between the deck and the display instead of into open air, and the keyboard
+deck — a large warm surface when the lid is up — is pressed shut against the
+display and stops shedding heat to the room.
 
 **Closed-lid** support needs one extra step, because keeping a MacBook awake
 with the lid shut requires `pmset -a disablesleep`, which is root-only. The

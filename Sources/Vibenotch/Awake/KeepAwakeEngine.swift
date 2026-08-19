@@ -246,9 +246,29 @@ final class KeepAwakeEngine {
         return max(0, until.timeIntervalSince(now))
     }
 
+    /// Whether anything is still going — for the purpose of keeping the Mac
+    /// awake, which is a lower bar than "is definitely running".
+    ///
+    /// `.idle` (a `.unknown` status) counts, and that is the point. The hook
+    /// writes on PreToolUse, Stop and Notification — there is no PostToolUse
+    /// and no heartbeat — so a session doing ONE long thing writes once when
+    /// the tool starts and then says nothing until the next one. After 90
+    /// seconds StalenessSweeper demotes it to `.unknown`, and treating that as
+    /// finished started the grace countdown under a live agent: about eleven
+    /// and a half minutes into a long build or test run, the Mac went to sleep
+    /// on top of it.
+    ///
+    /// "I do not know what this agent is doing" is not "this agent finished".
+    /// The sweeper already owns the question of when a session is really gone
+    /// — it removes it at `dropSeconds` — so holding the machine awake until
+    /// then costs at most a few idle minutes, while getting it wrong costs the
+    /// work. Only `.done`, which the agent said about itself, ends the watch.
     private var hasWorkingAgents: Bool {
         sessionStore.sessions.contains {
-            $0.displayStatus == .working || $0.displayStatus == .needsMe
+            switch $0.displayStatus {
+            case .working, .needsMe, .idle: true
+            case .done: false
+            }
         }
     }
 
