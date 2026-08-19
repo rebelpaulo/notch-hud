@@ -701,3 +701,43 @@ actor UsageFakeCommandRunner: CommandRunning {
         #expect(body.contains("\"\(kind.rawValue)\":"), "\(kind.rawValue) missing from the payload")
     }
 }
+
+@MainActor
+@Test func aGrokOnlyAccountPublishesOnItsFirstTick() async throws {
+    // Grok's review of the enum-iterating fix: the fix survived in the loop
+    // but not in the gate above it, which still asked `claude == nil, codex
+    // == nil`. On a fresh install where only Grok is signed in, that gate
+    // returned nil before the loop ever ran — the notch drew a Grok card and
+    // the phone stayed blank, which is the exact bug the loop was written to
+    // end, for the one user it hurt most.
+    let fixture = try UsageBridgeFixture()
+    defer { fixture.remove() }
+
+    fixture.usage.entries[.grok] = .loaded(
+        UsageSnapshot(
+            provider: .grok,
+            account: nil,
+            plan: "SuperGrok Lite",
+            billing: .plan("SuperGrok Lite"),
+            windows: [
+                UsageWindow(
+                    kind: .weekly,
+                    percentUsed: 12,
+                    resetsAt: isoDate("2026-08-21T14:23:52Z"),
+                    windowLength: 7 * 24 * 3600,
+                    scopeLabel: nil,
+                    severity: .normal
+                )
+            ],
+            capturedAt: isoDate("2026-08-19T21:00:00Z")
+        )
+    )
+    fixture.usage.entries[.claude] = .failed(.notLoggedIn)
+    fixture.usage.entries[.codex] = .failed(.notLoggedIn)
+
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.usagePutBodies().last)
+    #expect(body.contains("\"grok\":"))
+    #expect(!body.contains("\"claude\":"))
+}

@@ -290,7 +290,16 @@ struct NotchPanelView: View {
                             // already fully expanded — collapsing the card
                             // hides it too, the same as the model-scoped rows
                             // and the second window do.
-                            if isExpanded {
+                            // No chart at all for a provider whose logs carry
+                            // no token counts — not an empty one, and not a
+                            // line explaining the absence. Grok records a
+                            // message count and nothing else; messages are a
+                            // different unit in the same visual slot, and xAI
+                            // says different actions cost different compute,
+                            // so charting them would invite a comparison that
+                            // does not hold. A permanent absence needs no
+                            // permanent caption.
+                            if isExpanded, provider.hasLocalTokenHistory {
                                 UsageHistoryChart(
                                     provider: provider,
                                     points: usageStore.localSeries?.points ?? [],

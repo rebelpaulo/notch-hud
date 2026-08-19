@@ -785,9 +785,20 @@ final class RemoteBridge {
     }
 
     private func renderedUsagePayload() -> String? {
-        let claude = publishedUsageProvider(for: .claude)
-        let codex = publishedUsageProvider(for: .codex)
-        if claude == nil, codex == nil {
+        // ITERATES the enum rather than naming providers by hand — including
+        // in the emptiness check below, which is where the hand-written
+        // version survived its own fix. Asking `claude == nil, codex == nil`
+        // meant a Grok-only account never got past the first-publish gate: the
+        // notch drew its card and the phone stayed blank, which is precisely
+        // the bug the loop was written to end. Grok also lost any tick where
+        // it had finished while the other two were still loading, because that
+        // gate never ran when Claude happened to be present.
+        let providers = UsageProviderKind.allCases.compactMap { kind -> String? in
+            guard let provider = publishedUsageProvider(for: kind) else { return nil }
+            return "\"\(kind.rawValue)\":\(renderedUsageProvider(provider))"
+        }
+
+        if providers.isEmpty {
             // Loading is ignorance, not an empty result. Once every attempted
             // fetch has settled, however, a prior successful publish must be
             // cleared or the phone keeps quotas that no provider can supply.
@@ -799,16 +810,6 @@ final class RemoteBridge {
             guard hasFinishedFetch, lastPublishedUsageDigest != nil else { return nil }
         }
 
-        // ITERATES the enum rather than naming providers by hand. The hand-
-        // written version claimed in its own comment to follow the enum's
-        // declaration order while doing nothing of the sort, so adding Grok to
-        // `UsageProviderKind` compiled, ran, drew a card in the notch — and
-        // never reached the phone. A provider with nothing loaded is left out
-        // of the join entirely, never sent as null.
-        let providers = UsageProviderKind.allCases.compactMap { kind -> String? in
-            guard let provider = publishedUsageProvider(for: kind) else { return nil }
-            return "\"\(kind.rawValue)\":\(renderedUsageProvider(provider))"
-        }
         return "{\"usage\":{\(providers.joined(separator: ","))}}"
     }
 
