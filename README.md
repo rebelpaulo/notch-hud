@@ -14,6 +14,8 @@ or desktop app that owns that session comes to the front.
 
 ![The expanded panel](docs/images/notch-panel.png)
 
+*This screenshot predates the quota tab and its gauge button beside the bolt.*
+
 The red outline in both shots is **Gotta go!** — the keep-awake mode — telling
 you the Mac will not fall asleep while your agents are still working.
 
@@ -25,10 +27,11 @@ you the Mac will not fall asleep while your agents are still working.
 - [What Vibenotch adds](#what-vibenotch-adds)
   - [Codex support](#1-codex-support-cli-and-desktop)
   - [Gotta go!](#2-gotta-go--the-lid-closed-problem)
-  - [Phone companion](#3-phone-companion)
-  - [Settings](#4-a-real-settings-window)
-  - [Follows your language](#5-follows-your-devices-language)
-  - [One-command install](#6-one-command-install)
+  - [Quota gauges and token history](#3-quota-gauges-and-token-history)
+  - [Phone companion](#4-phone-companion)
+  - [Settings](#5-a-real-settings-window)
+  - [Follows your language](#6-follows-your-devices-language)
+  - [One-command install](#7-one-command-install)
 - [Install](#install)
 - [How it works](#how-it-works)
 - [Every option](#every-option)
@@ -106,6 +109,16 @@ It is deliberately hard to leave running by accident:
 - **Turn off on unlock.** Back at the keyboard, it stands down.
 - **Idle reminder.** Still on hours later with nothing running? It tells you.
 
+Gotta go! watches the thermal-pressure verdict from macOS. At **serious**
+or **critical**, the notch shows a thermometer and sends the same state to the
+phone. At critical pressure, Gotta go! turns itself off. Vibenotch only reads
+the verdict: firmware controls the fans, and macOS exposes no API that can
+change their speed.
+
+A closed MacBook tends to run hotter because its exhaust vents into a closed
+clamshell, while the machine loses the display back and top case as places to
+radiate heat.
+
 **Closed-lid** support needs one extra step, because keeping a MacBook awake
 with the lid shut requires `pmset -a disablesleep`, which is root-only. The
 installer adds a sudoers rule scoped to **exactly two commands** — nothing
@@ -119,7 +132,58 @@ A LaunchAgent watchdog runs every 60s and turns `disablesleep` back **off** if
 Vibenotch isn't running — so a crash can't leave your Mac permanently unable
 to sleep.
 
-### 3. Phone companion
+### 3. Quota gauges and token history
+
+The gauge button beside the bolt opens a second tab in the notch panel,
+replacing the session list with Claude, Codex and Grok quota gauges. Each
+provider gets whatever windows it reports — session and weekly for Claude,
+weekly for Codex and Grok — with model-scoped limits in a compact list below.
+If you are not signed in to a provider, Vibenotch leaves it out: no empty card
+and no "unavailable" badge.
+
+The cards are collapsible, one open at a time. Collapsed, a card shows its
+provider and its first window; the rest and the daily chart are a click away.
+Three providers each with a month of history is not something you take in at a
+glance.
+
+The numbers come from endpoints the CLIs already authenticate against. For
+Claude, Vibenotch reads the OAuth token that Claude Code stores in the macOS
+Keychain item `Claude Code-credentials`, then calls Claude's OAuth usage
+endpoint. macOS may ask for Keychain authorisation the first time. For Codex,
+it reads `~/.codex/auth.json` and calls the ChatGPT backend usage endpoint. For
+Grok, it reads `~/.grok/auth.json` and calls the Grok CLI's billing endpoint;
+that one also needs an `x-xai-token-auth` header, and answers 401 without
+explanation if you omit it.
+
+None of the three endpoints is documented, and any of them can change shape
+without notice. For Claude and Codex, Vibenotch drops a window when a field is
+missing or unbelievable: a 0% gauge built from bad data would be worse than no
+gauge. It classifies windows by how long they last, never by which slot they
+occupy; OpenAI puts the seven-day window in `primary_window` on some accounts.
+
+Grok is the deliberate exception, and it is worth knowing why. Its payload is
+protobuf underneath, and proto3 omits any field whose value is zero — so an
+absent percentage there means 0%, not unknown. Applying the other rule would
+blank the Grok card exactly when you have used nothing, which is when an empty
+bar is both true and reassuring.
+
+A thin stripe across each bar marks the share that a linear, even spend would
+have used by now. It turns red when you are ahead of that pace and green when
+you are not. The comparison gives an 85% reading its missing context: whether
+you are ahead of schedule and heading to run out before the reset.
+
+Below each provider's gauges, Vibenotch draws a per-day token history from the
+logs both CLIs already write under `~/.claude/projects` and
+`~/.codex/sessions`. This needs no API or authentication. The first scan has
+to walk the existing history; one 3.4 GB history took about three minutes.
+Vibenotch caches the result under `~/Library/Caches`, so later scans take a
+fraction of a second.
+
+The history reports token counts. Both accounts used here are subscriptions,
+so there is no per-token charge to report. Turning the counts into dollars
+would mean inventing a bill from API list prices.
+
+### 4. Phone companion
 
 An optional PWA you add to your phone's home screen ([notch-remote](https://github.com/rebelpaulo/notch-remote)):
 
@@ -131,6 +195,9 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   with the same sprites and status colours, so "which one needs me?" has an
   answer from the sofa. A list that stops being updated dims and freezes
   rather than going on claiming work is still running.
+- **Check quota and token history.** A quota button beside the settings gear
+  opens the same Claude, Codex and Grok gauges, plus a per-day token chart. The phone
+  hides quota data older than 30 minutes rather than presenting it as current.
 - **Reopen a past conversation.** A conversation the Claude app shows as
   *Disconnected* has no way back from the phone — only from the machine it ran
   on. Tapping **Reopen** asks the Mac to run `claude --remote-control --resume`
@@ -140,8 +207,8 @@ An optional PWA you add to your phone's home screen ([notch-remote](https://gith
   can be started from the phone. The button shows which state you are in.
 - **Tap a live session** to bring the agent's own app to the front — the Claude
   app or the Codex app, whichever is running it.
-- **The Mac's battery**, so "is it about to die?" does not require walking
-  over to look.
+- **The Mac's battery and thermal state**, so "is it about to die or getting
+  too hot?" does not require walking over to look.
 - **The last 20 alerts**, so "what did I miss?" still has an answer after the
   phone's notification shade has cleared itself.
 - **Change the settings** from the phone, split by which machine they change:
@@ -175,10 +242,13 @@ your prompts, the tool lines, or the paths you work in.
   <img src="docs/images/phone-settings.png" alt="Settings, split between this phone and the Mac" width="300">
 </p>
 
+*The first phone screenshot predates the quota tab and its button beside
+Settings.*
+
 It's your own deployment (Vercel + Supabase + a shared secret you choose), not
 a service anyone else runs.
 
-### 4. A real Settings window
+### 5. A real Settings window
 
 ![The settings window](docs/images/settings.png)
 
@@ -186,13 +256,13 @@ Everything is adjustable in one place — modes, quick-start timers, thresholds,
 which apps count as "an agent is running", the pairing status of the phone, and
 a test-push button.
 
-### 5. Follows your device's language
+### 6. Follows your device's language
 
 English and Portuguese, chosen from the system language, on both the Mac app
 and the phone app. English is the source language; a missing translation falls
 back to English rather than to a key name.
 
-### 6. One-command install
+### 7. One-command install
 
 `scripts/install.sh` builds the app, installs it, wires up the Claude Code
 hooks and the Codex adapter, and can undo all of it. Every change to a file
@@ -295,8 +365,8 @@ screen.
 
 ## How it works
 
-There is no daemon and no IPC. Everything goes through a **spool directory** of
-small JSON files:
+Session tracking uses no daemon or IPC. It goes through a **spool directory**
+of small JSON files:
 
 ```text
 ~/.vibenotch/sessions/<agent>-<id>.json
@@ -308,6 +378,10 @@ small JSON files:
 - **Codex** writes through the `notify` adapter, the PATH shim, and the
   rollout poller described above.
 - **The app** watches that directory and renders it.
+
+Quota data follows the separate authenticated path described above. Token
+history stays on the Mac: Vibenotch scans the CLI session logs and reads its
+own cache on later passes.
 
 Writes are atomic (temp file + rename) and carry a sequence number, so a slow
 writer can't overwrite a newer state. Anything that stops updating is marked
@@ -374,6 +448,11 @@ engage on battery unless you turn off *Only on AC power*.
 one: System Settings → General → Language & Region → Applications → add
 Vibenotch.
 
+**A quota gauge is missing.** Sign in through that provider's CLI first. The
+Claude gauge may trigger a one-time Keychain prompt. Vibenotch also hides a
+window when the undocumented endpoint omits a field or returns an implausible
+value, rather than turning suspect data into 0%.
+
 ---
 
 ## Credits and licensing
@@ -381,8 +460,9 @@ Vibenotch.
 **Built on [coopersimson96/notch-hud](https://github.com/coopersimson96/notch-hud)**
 by Cooper Simson — the notch HUD foundation, the Claude Code session model,
 click-to-focus and the inline approval cards come from that project. Vibenotch
-is a fork that adds Codex support, Gotta go!, the phone companion, the settings
-window, localization and the installer.
+is a fork that adds Codex support, Gotta go!, quota and token views, thermal
+awareness, the phone companion, the settings window, localization and the
+installer.
 
 **[DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit)** by Kai Azim,
 vendored under `vendor/`, MIT licensed — see `vendor/DynamicNotchKit/LICENSE`.
