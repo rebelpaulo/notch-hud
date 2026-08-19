@@ -49,7 +49,14 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 # ad-hoc still produces a working app, and asking someone to create a root
 # certificate just to try a menu-bar app would be a rude thing to require.
 SIGN_IDENTITY="${VIBENOTCH_SIGN_IDENTITY:-}"
-if [ -z "$SIGN_IDENTITY" ] && security find-certificate -c "Vibenotch Signing" >/dev/null 2>&1; then
+# `find-identity -v -p codesigning`, NOT `find-certificate`. A certificate is
+# only half of an identity: the other half is the private key. find-certificate
+# happily matches one whose key is missing, expired, or untrusted — and then
+# codesign FAILS outright instead of taking the ad-hoc path below, so a stray
+# certificate in someone's keychain would break their build rather than leave
+# them where they started. `-v` reports only identities that actually sign.
+if [ -z "$SIGN_IDENTITY" ] \
+  && security find-identity -v -p codesigning 2>/dev/null | grep -q '"Vibenotch Signing"'; then
   SIGN_IDENTITY="Vibenotch Signing"
 fi
 if [ -n "$SIGN_IDENTITY" ]; then

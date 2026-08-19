@@ -178,8 +178,8 @@ struct UsageCardView: View {
     private var headerAccessibilityLabel: String {
         guard snapshot != nil else { return provider.displayName }
         return isExpanded
-            ? t("%@ usage, expanded. Tap to collapse.", provider.displayName)
-            : t("%@ usage, collapsed. Tap to expand.", provider.displayName)
+            ? t("%@ usage, expanded", provider.displayName)
+            : t("%@ usage, collapsed", provider.displayName)
     }
 
     /// The label a window's own section carries — its scope name if it has

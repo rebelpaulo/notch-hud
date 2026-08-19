@@ -71,12 +71,24 @@ private func iso8601(_ value: String) -> Date {
 /// `FileGrokCredentialReader` pointed at it, so the expiry-parsing test
 /// exercises the real reader instead of a fake standing in for it — while
 /// never touching the real `~/.grok`.
-private func fileReader(authJSON: String, now: @escaping @Sendable () -> Date = { Date() }) -> FileGrokCredentialReader {
+/// Throws rather than swallowing setup failures with `try?`.
+///
+/// A missing auth.json ALSO yields `.notLoggedIn`, so a fixture that silently
+/// failed to write left the expiry test passing while never once exercising
+/// the expiry check it exists for. The test must fail when its own setup
+/// fails, or it is only measuring the absence of a file.
+private func fileReader(
+    authJSON: String,
+    now: @escaping @Sendable () -> Date = { Date() }
+) throws -> FileGrokCredentialReader {
     let home = FileManager.default.temporaryDirectory
         .appendingPathComponent("grok-usage-fetcher-tests-\(UUID().uuidString)", isDirectory: true)
     let grokDir = home.appendingPathComponent(".grok", isDirectory: true)
-    try? FileManager.default.createDirectory(at: grokDir, withIntermediateDirectories: true)
-    try? Data(authJSON.utf8).write(to: grokDir.appendingPathComponent("auth.json"))
+    try FileManager.default.createDirectory(at: grokDir, withIntermediateDirectories: true)
+    let authURL = grokDir.appendingPathComponent("auth.json")
+    try Data(authJSON.utf8).write(to: authURL)
+    // Proves the fixture is really there before the assertion depends on it.
+    #expect(FileManager.default.fileExists(atPath: authURL.path))
     return FileGrokCredentialReader(homeDirectory: home, now: now)
 }
 
@@ -148,13 +160,13 @@ private let settingsFixture = Data("""
 
 // MARK: - Credentials
 
-@Test func grokExpiredTokenYieldsNotLoggedInWithNoRequestAttempted() async {
+@Test func grokExpiredTokenYieldsNotLoggedInWithNoRequestAttempted() async throws {
     let expiresAt = "2026-01-01T00:00:00.000000+00:00"
     let authJSON = """
     {"https://auth.x.ai::abc-123":{"key":"should-never-be-sent","refresh_token":"r","expires_at":"\(expiresAt)","email":"someone@example.com"}}
     """
     let fetcher = GrokUsageFetcher(
-        credentials: fileReader(authJSON: authJSON, now: { iso8601("2026-08-19T00:00:00.000000+00:00") }),
+        credentials: try fileReader(authJSON: authJSON, now: { iso8601("2026-08-19T00:00:00.000000+00:00") }),
         http: FailIfCalledHTTP()
     )
 
@@ -163,7 +175,7 @@ private let settingsFixture = Data("""
     }
 }
 
-@Test func grokMissingAuthFileYieldsNotLoggedInWithNoRequestAttempted() async {
+@Test func grokMissingAuthFileYieldsNotLoggedInWithNoRequestAttempted() async throws {
     let fetcher = GrokUsageFetcher(
         credentials: FileGrokCredentialReader(
             homeDirectory: FileManager.default.temporaryDirectory
@@ -177,7 +189,7 @@ private let settingsFixture = Data("""
     }
 }
 
-@Test func grok401SurfacesAsCredentialExpired() async {
+@Test func grok401SurfacesAsCredentialExpired() async throws {
     let fetcher = GrokUsageFetcher(
         credentials: FakeGrokCredentials(credential: GrokCredential(key: "fake-grok-key", email: nil)),
         http: FakeUsageHTTP(statusCode: 401, body: Data())
