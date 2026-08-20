@@ -15,6 +15,21 @@ enum UsageProviderKind: String, Sendable, CaseIterable {
         case .grok: "Grok"
         }
     }
+
+    /// Whether this provider's local logs carry token counts we can total.
+    ///
+    /// Claude and Codex both write per-message usage into their session logs.
+    /// Grok's sessions record `num_messages` and nothing else — no tokens at
+    /// all — so there is no history to draw, and drawing "0" would say you
+    /// used nothing when the truth is that we do not count it. xAI also states
+    /// that different actions cost different amounts of compute, so counting
+    /// messages would not be a substitute even if we wanted one.
+    var hasLocalTokenHistory: Bool {
+        switch self {
+        case .claude, .codex: true
+        case .grok: false
+        }
+    }
 }
 
 /// Which bucket a window is, decided by how long it lasts.

@@ -248,11 +248,16 @@ struct UsageCardView: View {
                 .foregroundStyle(.white.opacity(0.55))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                // Scoped names should size their shared Grid column naturally
-                // now that the card is wide. The cap is what keeps an absurdly
-                // long server-provided name from consuming the gauge or the
-                // fixed percentage column at the far edge.
-                .frame(maxWidth: 220, alignment: .leading)
+                // NO width frame here. `maxWidth: 220` did not cap the column,
+                // it CLAIMED it: a Grid gives a flexible cell its maximum, so
+                // "Fable" reserved 220pt and pushed its bar to the middle of
+                // the card while Session and Weekly started at the edge. The
+                // column now sizes to the longest name actually present.
+                //
+                // A very long server-provided name cannot eat the gauge: the
+                // gauge below holds `minWidth: 120` and the percentage column
+                // is fixed, so the card's width runs out here first and the
+                // truncation above is what gives way.
 
             UsageGauge(
                 percentUsed: window.percentUsed,

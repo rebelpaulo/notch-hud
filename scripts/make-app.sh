@@ -49,15 +49,48 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 # ad-hoc still produces a working app, and asking someone to create a root
 # certificate just to try a menu-bar app would be a rude thing to require.
 SIGN_IDENTITY="${VIBENOTCH_SIGN_IDENTITY:-}"
-# `find-identity -v -p codesigning`, NOT `find-certificate`. A certificate is
-# only half of an identity: the other half is the private key. find-certificate
-# happily matches one whose key is missing, expired, or untrusted — and then
-# codesign FAILS outright instead of taking the ad-hoc path below, so a stray
-# certificate in someone's keychain would break their build rather than leave
-# them where they started. `-v` reports only identities that actually sign.
-if [ -z "$SIGN_IDENTITY" ] \
-  && security find-identity -v -p codesigning 2>/dev/null | grep -q '"Vibenotch Signing"'; then
-  SIGN_IDENTITY="Vibenotch Signing"
+# `find-identity -p codesigning`, NOT `find-certificate`. A certificate is only
+# half of an identity: the other half is the private key. find-certificate
+# happily matches one whose key is missing — and then codesign FAILS outright
+# instead of taking the ad-hoc path below, so a stray certificate in someone's
+# keychain would break their build rather than leave them where they started.
+# find-identity lists only real cert+key pairs.
+#
+# WITHOUT `-v`, deliberately. `-v` means "valid", and a self-signed certificate
+# is never trusted by default — Keychain Access reports it as
+# CSSMERR_TP_NOT_TRUSTED until someone marks it Always Trust. codesign does not
+# care: it signs with an untrusted certificate perfectly well. Filtering on
+# `-v` therefore skipped the one certificate this block exists to find, fell
+# back to ad-hoc, and silently changed the app's identity — which is precisely
+# what costs the user their Keychain grants on the next rebuild. Trust is a
+# question for whoever VERIFIES a signature; we only need a stable one.
+#
+# Selected by SHA-1 HASH, not by name. Dropping `-v` widened the match set, and
+# a common name is not unique: a certificate expires after a year, whoever
+# renews it creates a second "Vibenotch Signing", and both remain in the
+# keychain. codesign REFUSES an ambiguous name rather than choosing — so
+# matching by name would fail the build outright on the very day the renewal
+# happens, which is the exact "break their build rather than leave them where
+# they started" failure the paragraph above exists to prevent. A hash names one
+# certificate; if more than one matches, prefer the valid one, and if that is
+# still ambiguous take the ad-hoc path and say so.
+if [ -z "$SIGN_IDENTITY" ]; then
+  sign_hashes() {
+    security find-identity ${1:+-v} -p codesigning 2>/dev/null \
+      | grep '"Vibenotch Signing"' \
+      | awk '{print $2}'
+  }
+  hashes="$(sign_hashes)"
+  if [ "$(printf '%s\n' "$hashes" | grep -c .)" -gt 1 ]; then
+    valid="$(sign_hashes v)"
+    [ "$(printf '%s\n' "$valid" | grep -c .)" -eq 1 ] && hashes="$valid"
+  fi
+  case "$(printf '%s\n' "$hashes" | grep -c .)" in
+    1) SIGN_IDENTITY="$(printf '%s\n' "$hashes" | head -1)" ;;
+    0) ;;
+    *) echo "note: several 'Vibenotch Signing' certificates found; signing ad-hoc."
+       echo "      Delete the stale ones, or set VIBENOTCH_SIGN_IDENTITY to a hash." ;;
+  esac
 fi
 if [ -n "$SIGN_IDENTITY" ]; then
   codesign --force --sign "$SIGN_IDENTITY" --identifier com.rebelpaulo.vibenotch "$APP"

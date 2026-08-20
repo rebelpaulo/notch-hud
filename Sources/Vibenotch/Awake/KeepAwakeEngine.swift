@@ -259,10 +259,16 @@ final class KeepAwakeEngine {
     /// on top of it.
     ///
     /// "I do not know what this agent is doing" is not "this agent finished".
-    /// The sweeper already owns the question of when a session is really gone
-    /// — it removes it at `dropSeconds` — so holding the machine awake until
-    /// then costs at most a few idle minutes, while getting it wrong costs the
-    /// work. Only `.done`, which the agent said about itself, ends the watch.
+    /// Only `.done`, which the agent said about itself, ends the watch early.
+    ///
+    /// The cost of being wrong is bounded by `dropSeconds + graceSeconds`, NOT
+    /// by `dropSeconds` alone: removing the row is what STARTS the grace, it
+    /// does not end the watch. On the defaults that is 900 + 600 — twenty-five
+    /// minutes of held assertions after an agent dies silently — and an hour
+    /// of configured grace stretches it to seventy-five. Finite either way,
+    /// and cheaper than sleeping on top of live work, but an earlier version
+    /// of this comment claimed the sweeper's fifteen minutes were the ceiling
+    /// and that was simply wrong.
     private var hasWorkingAgents: Bool {
         sessionStore.sessions.contains {
             switch $0.displayStatus {
