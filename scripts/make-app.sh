@@ -49,14 +49,23 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 # ad-hoc still produces a working app, and asking someone to create a root
 # certificate just to try a menu-bar app would be a rude thing to require.
 SIGN_IDENTITY="${VIBENOTCH_SIGN_IDENTITY:-}"
-# `find-identity -v -p codesigning`, NOT `find-certificate`. A certificate is
-# only half of an identity: the other half is the private key. find-certificate
-# happily matches one whose key is missing, expired, or untrusted — and then
-# codesign FAILS outright instead of taking the ad-hoc path below, so a stray
-# certificate in someone's keychain would break their build rather than leave
-# them where they started. `-v` reports only identities that actually sign.
+# `find-identity -p codesigning`, NOT `find-certificate`. A certificate is only
+# half of an identity: the other half is the private key. find-certificate
+# happily matches one whose key is missing — and then codesign FAILS outright
+# instead of taking the ad-hoc path below, so a stray certificate in someone's
+# keychain would break their build rather than leave them where they started.
+# find-identity lists only real cert+key pairs.
+#
+# WITHOUT `-v`, deliberately. `-v` means "valid", and a self-signed certificate
+# is never trusted by default — Keychain Access reports it as
+# CSSMERR_TP_NOT_TRUSTED until someone marks it Always Trust. codesign does not
+# care: it signs with an untrusted certificate perfectly well. Filtering on
+# `-v` therefore skipped the one certificate this block exists to find, fell
+# back to ad-hoc, and silently changed the app's identity — which is precisely
+# what costs the user their Keychain grants on the next rebuild. Trust is a
+# question for whoever VERIFIES a signature; we only need a stable one.
 if [ -z "$SIGN_IDENTITY" ] \
-  && security find-identity -v -p codesigning 2>/dev/null | grep -q '"Vibenotch Signing"'; then
+  && security find-identity -p codesigning 2>/dev/null | grep -q '"Vibenotch Signing"'; then
   SIGN_IDENTITY="Vibenotch Signing"
 fi
 if [ -n "$SIGN_IDENTITY" ]; then
