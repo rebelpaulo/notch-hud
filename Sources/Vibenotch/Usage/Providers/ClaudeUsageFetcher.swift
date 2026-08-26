@@ -10,18 +10,42 @@ struct ClaudeUsageFetcher: UsageFetching {
 
     private static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
+    private let cache: any ClaudeUsageCacheReading
     private let credentials: ClaudeCredentialReading
     private let http: UsageHTTPPerforming
 
+    /// Production path: prefer the official statusLine cache, then use the
+    /// fixed Apple security helper for Desktop sessions that do not emit it.
+    init() {
+        cache = FileClaudeStatusLineCache()
+        credentials = SecurityToolClaudeCredentialReader()
+        http = URLSessionUsageHTTP()
+    }
+
+    /// Keeps explicitly injected callers deterministic and network-only.
+    /// In particular, tests written before the cache existed must not depend
+    /// on whether the developer running them happens to have a fresh cache.
+    init(credentials: ClaudeCredentialReading, http: UsageHTTPPerforming) {
+        cache = EmptyClaudeUsageCache()
+        self.credentials = credentials
+        self.http = http
+    }
+
     init(
-        credentials: ClaudeCredentialReading = KeychainClaudeCredentialReader(),
-        http: UsageHTTPPerforming = URLSessionUsageHTTP()
+        cache: any ClaudeUsageCacheReading,
+        credentials: ClaudeCredentialReading,
+        http: UsageHTTPPerforming
     ) {
+        self.cache = cache
         self.credentials = credentials
         self.http = http
     }
 
     func fetch(now: Date) async throws -> UsageSnapshot {
+        if let cached = cache.snapshot(now: now) {
+            return cached
+        }
+
         let token = try credentials.accessToken()
 
         var request = URLRequest(url: Self.endpoint)

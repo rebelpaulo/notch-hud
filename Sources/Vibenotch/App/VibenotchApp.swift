@@ -135,10 +135,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installStatusItem() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let image = NSImage(
-                systemSymbolName: "checkmark.shield",
-                accessibilityDescription: "Vibenotch"
-            )
+            let image = Bundle.module
+                .url(forResource: "VibenotchMenuBarTemplate", withExtension: "png")
+                .flatMap(NSImage.init(contentsOf:))
+                ?? NSImage(
+                    systemSymbolName: "checkmark.shield",
+                    accessibilityDescription: "Vibenotch"
+                )
+            image?.size = NSSize(width: 18, height: 18)
             image?.isTemplate = true
             button.image = image
             button.toolTip = "Vibenotch"

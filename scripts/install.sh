@@ -268,7 +268,7 @@ restart_app() {
 
 install_runtime_scripts() {
     mkdir -p "$install_bin" || exit 1
-    for name in vibenotch-emit vibenotch-claude-hook vibenotch-codex-notify vibenotch-sleepguard vibenotch-sleepguard-watchdog vibenotch-remote-push; do
+    for name in vibenotch-emit vibenotch-claude-hook vibenotch-claude-statusline vibenotch-codex-notify vibenotch-sleepguard vibenotch-sleepguard-watchdog vibenotch-remote-push; do
         cp "$script_dir/$name" "$install_bin/$name" || exit 1
         chmod +x "$install_bin/$name" || exit 1
     done
