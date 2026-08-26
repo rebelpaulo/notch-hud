@@ -147,14 +147,16 @@ provider and its first window; the rest and the daily chart are a click away.
 Three providers each with a month of history is not something you take in at a
 glance.
 
-The numbers come from endpoints the CLIs already authenticate against. For
-Claude, Vibenotch reads the OAuth token that Claude Code stores in the macOS
-Keychain item `Claude Code-credentials`, then calls Claude's OAuth usage
-endpoint. macOS may ask for Keychain authorisation the first time. For Codex,
-it reads `~/.codex/auth.json` and calls the ChatGPT backend usage endpoint. For
-Grok, it reads `~/.grok/auth.json` and calls the Grok CLI's billing endpoint;
-that one also needs an `x-xai-token-auth` header, and answers 401 without
-explanation if you omit it.
+The numbers come from data the CLIs already authenticate. For Claude,
+Vibenotch primarily caches the documented `rate_limits` emitted by Claude
+Code's `statusLine`; it preserves and calls an existing status-line command
+once. If that cache is absent or stale, the fallback runs the fixed macOS
+`/usr/bin/security` helper to obtain Claude Code's OAuth credential in memory
+and calls the usage endpoint. Vibenotch no longer accesses the Keychain API
+directly. For Codex, it reads `~/.codex/auth.json` and calls the ChatGPT backend
+usage endpoint. For Grok, it reads `~/.grok/auth.json` and calls the Grok CLI's
+billing endpoint; that one also needs an `x-xai-token-auth` header, and answers
+401 without explanation if you omit it.
 
 None of the three endpoints is documented, and any of them can change shape
 without notice. For Claude and Codex, Vibenotch drops a window when a field is
@@ -449,10 +451,13 @@ engage on battery unless you turn off *Only on AC power*.
 one: System Settings → General → Language & Region → Applications → add
 Vibenotch.
 
-**A quota gauge is missing.** Sign in through that provider's CLI first. The
-Claude gauge may trigger a one-time Keychain prompt. Vibenotch also hides a
-window when the undocumented endpoint omits a field or returns an implausible
-value, rather than turning suspect data into 0%.
+**A quota gauge is missing.** Sign in through that provider's CLI first. Run a
+Claude Code turn once so its documented `statusLine` can refresh the local
+quota cache; Claude Desktop alone may not emit it. If the cache is unavailable,
+Vibenotch falls back through macOS's signed `/usr/bin/security` helper rather
+than accessing the Keychain API directly. Vibenotch also hides a window when a
+provider omits a field or returns an implausible value, rather than turning
+suspect data into 0%.
 
 ---
 

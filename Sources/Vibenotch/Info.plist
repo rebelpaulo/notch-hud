@@ -6,10 +6,14 @@
     <string>com.rebelpaulo.vibenotch</string>
     <key>CFBundleName</key>
     <string>Vibenotch</string>
+    <key>CFBundleIconFile</key>
+    <string>Vibenotch</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleVersion</key>
-    <string>1.0.1</string>
+    <string>1.0.2</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.1</string>
+    <string>1.0.2</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NSAppleEventsUsageDescription</key>

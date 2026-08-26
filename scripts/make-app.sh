@@ -10,6 +10,11 @@ cp .build/release/Vibenotch "$APP/Contents/MacOS/Vibenotch"
 # Localizations live in the SPM resource bundle; Bundle.module finds it under
 # Contents/Resources, so without this copy the app is English-only.
 cp -R .build/release/Vibenotch_Vibenotch.bundle "$APP/Contents/Resources/"
+# Finder, notifications and LaunchServices read the app icon from the main
+# bundle, not from SwiftPM's nested resource bundle. Keep the traditional
+# .icns fallback as well as the modern compiled asset catalog.
+cp Sources/Vibenotch/Resources/Vibenotch.icns "$APP/Contents/Resources/Vibenotch.icns"
+cp Sources/Vibenotch/Resources/Assets.car "$APP/Contents/Resources/Assets.car"
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -18,8 +23,10 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Vibenotch</string>
   <key>CFBundleDisplayName</key><string>Vibenotch</string>
   <key>CFBundleIdentifier</key><string>com.rebelpaulo.vibenotch</string>
-  <key>CFBundleVersion</key><string>1.0.1</string>
-  <key>CFBundleShortVersionString</key><string>1.0.1</string>
+  <key>CFBundleIconFile</key><string>Vibenotch</string>
+  <key>CFBundleIconName</key><string>AppIcon</string>
+  <key>CFBundleVersion</key><string>1.0.2</string>
+  <key>CFBundleShortVersionString</key><string>1.0.2</string>
   <key>CFBundleExecutable</key><string>Vibenotch</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>

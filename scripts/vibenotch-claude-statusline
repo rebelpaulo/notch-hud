@@ -1,0 +1,338 @@
+#!/usr/bin/env python3
+"""Claude Code status-line bridge for Vibenotch.
+
+Claude sends one JSON document on stdin for every status-line refresh.  This
+bridge keeps only the documented rate-limit fields in a small local cache and
+then gives the original document to the status line that existed before
+Vibenotch was installed.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import fcntl
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from typing import Any, Dict, Optional, Union
+
+
+BRIDGE_NAME = "vibenotch-claude-statusline"
+CACHE_NAME = "claude-usage.json"
+CHAIN_NAME = "claude-statusline-chain.json"
+MAX_RESET_DISTANCE_SECONDS = 2 * 365 * 24 * 60 * 60
+RESET_CLOCK_SKEW_SECONDS = 5 * 60
+GUARD_BUCKET_HEX_CHARACTERS = 3
+
+
+def warn(message: str) -> None:
+    print(f"vibenotch: Claude statusLine {message}", file=sys.stderr)
+
+
+def vibenotch_home() -> Path:
+    override = os.environ.get("VIBENOTCH_HOME")
+    if override:
+        return Path(override).expanduser()
+
+    # Installed helpers live in <prefix>/bin.  Deriving the prefix keeps the
+    # documented installer override useful without putting test data in the
+    # user's real home directory.
+    script_parent = Path(__file__).resolve().parent
+    if script_parent.name == "bin":
+        return script_parent.parent
+    return Path.home() / ".vibenotch"
+
+
+def atomic_json_write(path: Path, value: Any) -> None:
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.tmp.",
+    )
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, separators=(",", ":"), sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+        os.chmod(path, 0o600)
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def epoch_seconds(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and math.isfinite(value) and value >= 0:
+        return int(value)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    timestamp = parsed.timestamp()
+    if not math.isfinite(timestamp) or timestamp < 0:
+        return None
+    return int(timestamp)
+
+
+def valid_window(
+    value: Any,
+    captured_at: int,
+) -> Optional[Dict[str, Union[int, float]]]:
+    if not isinstance(value, dict):
+        return None
+    percentage = value.get("used_percentage")
+    if (
+        isinstance(percentage, bool)
+        or not isinstance(percentage, (int, float))
+        or not math.isfinite(percentage)
+        or percentage < 0
+        or percentage > 100
+    ):
+        return None
+    resets_at = epoch_seconds(value.get("resets_at"))
+    if (
+        resets_at is None
+        or resets_at < captured_at - RESET_CLOCK_SKEW_SECONDS
+        or resets_at > captured_at + MAX_RESET_DISTANCE_SECONDS
+    ):
+        return None
+    return {"used_percentage": percentage, "resets_at": resets_at}
+
+
+def cache_rate_limits(payload: bytes, home: Path) -> None:
+    try:
+        document = json.loads(payload)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return
+    if not isinstance(document, dict):
+        return
+    source = document.get("rate_limits")
+    if not isinstance(source, dict):
+        return
+
+    captured_at = int(time.time())
+    windows: Dict[str, Dict[str, Union[int, float]]] = {}
+    for name in ("five_hour", "seven_day"):
+        if name not in source:
+            continue
+        raw_window = source[name]
+        window = valid_window(raw_window, captured_at)
+        if window is None:
+            # A documented window that is present but corrupt makes the whole
+            # sample untrustworthy. Preserve the complete last-good cache
+            # instead of publishing a partial snapshot that hides a quota.
+            return
+        if window is not None:
+            windows[name] = window
+    if not windows:
+        return
+
+    atomic_json_write(
+        home / CACHE_NAME,
+        {
+            "schema_version": 1,
+            "captured_at": captured_at,
+            "rate_limits": windows,
+        },
+    )
+
+
+def command_executable(command: str, recursion: int = 0) -> Optional[str]:
+    if recursion > 4:
+        return None
+    try:
+        words = shlex.split(command)
+    except ValueError:
+        return None
+    index = 0
+    while index < len(words) and "=" in words[index] and not words[index].startswith("/"):
+        name = words[index].split("=", 1)[0]
+        if not name.replace("_", "a").isalnum() or name[:1].isdigit():
+            break
+        index += 1
+    if index >= len(words):
+        return None
+    executable = words[index]
+    basename = os.path.basename(executable)
+    if basename in ("command", "exec", "nohup"):
+        nested = " ".join(shlex.quote(word) for word in words[index + 1:])
+        return command_executable(nested, recursion + 1)
+    if basename == "env":
+        index += 1
+        while index < len(words):
+            word = words[index]
+            if word in ("-i", "--ignore-environment"):
+                index += 1
+                continue
+            if word in ("-u", "--unset") and index + 1 < len(words):
+                index += 2
+                continue
+            if word.startswith("--unset=") or ("=" in word and not word.startswith("/")):
+                index += 1
+                continue
+            break
+        return words[index] if index < len(words) else None
+    if basename in ("sh", "bash", "zsh"):
+        try:
+            command_index = words.index("-c", index + 1) + 1
+        except (ValueError, IndexError):
+            return executable
+        return command_executable(words[command_index], recursion + 1)
+    return executable
+
+
+def invokes_bridge(command: str) -> bool:
+    executable = command_executable(command)
+    if executable is None:
+        return False
+    if os.path.basename(executable) == BRIDGE_NAME:
+        return True
+    if os.path.sep not in executable:
+        executable = shutil.which(executable) or executable
+    try:
+        return os.path.realpath(executable) == os.path.realpath(__file__)
+    except OSError:
+        return False
+
+
+def previous_command(home: Path) -> Optional[str]:
+    path = home / CHAIN_NAME
+    try:
+        with path.open(encoding="utf-8") as handle:
+            chain = json.load(handle)
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as error:
+        warn(f"ignored an unreadable previous-command file ({type(error).__name__})")
+        return None
+    if not isinstance(chain, dict) or chain.get("schema_version") != 1:
+        return None
+    if not chain.get("present"):
+        return None
+    status_line = chain.get("status_line")
+    if not isinstance(status_line, dict):
+        return None
+    command = status_line.get("command")
+    if not isinstance(command, str) or not command.strip():
+        return None
+    if invokes_bridge(command):
+        warn("blocked a circular previous command")
+        return None
+    return command
+
+
+def depth() -> int:
+    try:
+        return max(0, int(os.environ.get("VIBENOTCH_STATUSLINE_DEPTH", "0")))
+    except ValueError:
+        return 0
+
+
+def acquire_payload_guard(payload: bytes, home: Path) -> Optional[int]:
+    """Hold a bounded, per-payload lock across the predecessor invocation.
+
+    The environment depth is the fast path, but a shell wrapper can erase an
+    environment variable. A recursive bridge receives the same stdin and is
+    therefore stopped by the same kernel lock even after doing so. The short
+    hash prefix deliberately bounds the directory to 4096 persistent files;
+    an extremely rare concurrent bucket collision is safely treated as a
+    duplicate refresh.
+    """
+    guard_root = home / "claude-statusline-guards"
+    guard_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    digest = hashlib.sha256(payload).hexdigest()
+    guard_path = guard_root / f"{digest[:GUARD_BUCKET_HEX_CHARACTERS]}.lock"
+    descriptor = os.open(guard_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        os.fchmod(descriptor, 0o600)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(descriptor)
+        return None
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def release_payload_guard(descriptor: int) -> None:
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+    finally:
+        os.close(descriptor)
+
+
+def main() -> int:
+    current_depth = depth()
+    if current_depth >= 1:
+        warn("blocked recursive execution (VIBENOTCH_STATUSLINE_DEPTH >= 1)")
+        return 0
+
+    payload = sys.stdin.buffer.read()
+    home = vibenotch_home()
+    try:
+        guard = acquire_payload_guard(payload, home)
+    except OSError as error:
+        warn(f"could not establish the recursion guard ({type(error).__name__})")
+        return 0
+    if guard is None:
+        warn("blocked duplicate or recursive execution")
+        return 0
+
+    try:
+        try:
+            cache_rate_limits(payload, home)
+        except OSError as error:
+            warn(f"could not update the usage cache ({type(error).__name__})")
+
+        command = previous_command(home)
+        if command is None:
+            return 0
+
+        environment = os.environ.copy()
+        environment["VIBENOTCH_STATUSLINE_DEPTH"] = str(current_depth + 1)
+        try:
+            completed = subprocess.run(
+                ["/bin/sh", "-c", command],
+                input=payload,
+                stdout=sys.stdout.buffer,
+                stderr=sys.stderr.buffer,
+                env=environment,
+                check=False,
+            )
+        except OSError as error:
+            warn(f"could not run the previous command ({type(error).__name__})")
+            return 0
+        return completed.returncode
+    finally:
+        release_payload_guard(guard)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

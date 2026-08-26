@@ -11,6 +11,171 @@ bin_summary=skipped
 config_summary=skipped
 path_summary=skipped
 
+warn() {
+    printf '%s\n' "vibenotch: warning: $*" >&2
+}
+
+# Keep this filter in sync with scripts/vibenotch-codex-notify.  It removes
+# only callbacks which lead back to a Vibenotch notifier; the surrounding
+# notifier (for example Codex Computer Use) remains enabled.
+sanitize_notify_command() {
+    jq -ce --arg target "$notify_target" '
+        def is_vibenotch($target):
+            type == "string"
+            and (
+                . == $target
+                or endswith("/vibenotch-codex-notify")
+                or endswith("/notch-codex-notify")
+            );
+
+        def mentions_vibenotch_executable:
+            type == "string"
+            and (
+                contains("vibenotch-codex-notify")
+                or contains("notch-codex-notify")
+            );
+
+        def decoded_command:
+            if type == "array" then .
+            elif type == "string" then (try fromjson catch null)
+            else null
+            end;
+
+        def valid_command:
+            type == "array"
+            and length > 0
+            and all(.[]; type == "string")
+            and .[0] != "";
+
+        def is_shell:
+            type == "string"
+            and test("(^|/)(ba|z|da|k)?sh$");
+
+        def directly_calls_vibenotch($target):
+            (length > 0 and (.[0] | is_vibenotch($target)))
+            or (
+                length > 1
+                and (.[0] | is_shell)
+                and (.[1] | is_vibenotch($target))
+            )
+            or (
+                length > 1
+                and (.[0] | type == "string")
+                and (.[0] | test("(^|/)env$"))
+                # env has options with and without operands. Conservatively
+                # reject explicit paths and split-string/variable operands
+                # which mention the executable after this known launcher.
+                and any(.[1:][];
+                    is_vibenotch($target) or mentions_vibenotch_executable
+                )
+            );
+
+        def sanitize_command($target; $depth):
+            if $depth >= 16 then []
+            elif (valid_command | not) then []
+            elif directly_calls_vibenotch($target) then
+                if (.[0] | is_vibenotch($target)) then
+                    # Compatibility with the pre-rename array format, where a
+                    # second notifier could follow our old executable.
+                    map(select((is_vibenotch($target)) | not))
+                    | sanitize_command($target; $depth + 1)
+                else []
+                end
+            else . as $command
+            | reduce range(0; $command | length) as $index (
+                {output: [], skip_until: 0};
+                if $index < .skip_until then .
+                elif $command[$index] == "--previous-notify"
+                     and ($index + 1) < ($command | length)
+                then ($command[$index + 1] | decoded_command) as $nested
+                | if ($nested | valid_command) then
+                    ($nested | sanitize_command($target; $depth + 1)) as $clean
+                    | if ($clean | length) == 0 then
+                        .skip_until = ($index + 2)
+                      elif $clean == $nested then
+                        .output += ["--previous-notify", $command[$index + 1]]
+                        | .skip_until = ($index + 2)
+                      else
+                        .output += ["--previous-notify", ($clean | tojson)]
+                        | .skip_until = ($index + 2)
+                      end
+                  else .output += [$command[$index]]
+                  end
+                elif ($command[$index] | startswith("--previous-notify="))
+                then (
+                    $command[$index]
+                    | ltrimstr("--previous-notify=")
+                    | decoded_command
+                ) as $nested
+                | if ($nested | valid_command) then
+                    ($nested | sanitize_command($target; $depth + 1)) as $clean
+                    | if ($clean | length) == 0 then .
+                      elif $clean == $nested then .output += [$command[$index]]
+                      else .output += ["--previous-notify=" + ($clean | tojson)]
+                      end
+                  else .output += [$command[$index]]
+                  end
+                else .output += [$command[$index]]
+                end
+            )
+            | .output
+            end;
+
+        if type != "array"
+           or length == 0
+           or (all(.[]; type == "string") | not)
+           or .[0] == ""
+        then error("invalid notify command")
+        else sanitize_command($target; 0)
+        end
+    '
+}
+
+chain_file=$install_prefix/codex-notify-chain.json
+
+write_chain_atomic() {
+    chain_json=$1
+    chain_temporary=$chain_file.tmp.$$
+    if ! (umask 077 && printf '%s\n' "$chain_json" > "$chain_temporary"); then
+        rm -f "$chain_temporary"
+        return 1
+    fi
+    if ! jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
+        "$chain_temporary" >/dev/null 2>&1
+    then
+        rm -f "$chain_temporary"
+        return 1
+    fi
+    if ! mv -f "$chain_temporary" "$chain_file"; then
+        rm -f "$chain_temporary"
+        return 1
+    fi
+}
+
+remove_chain() {
+    if [ -f "$chain_file" ]; then
+        rm -f "$chain_file" || exit 1
+        config_summary=changed
+    fi
+}
+
+reconcile_saved_chain() {
+    [ -f "$chain_file" ] || return 0
+
+    original_compact=$(jq -c . "$chain_file" 2>/dev/null) || original_compact=
+    sanitized=$(sanitize_notify_command < "$chain_file" 2>/dev/null) || sanitized=
+    if [ -z "$sanitized" ] || [ "$sanitized" = "[]" ]; then
+        remove_chain
+        warn "removed an invalid or circular Codex notify chain from $chain_file"
+        return 0
+    fi
+    if [ "$sanitized" != "$original_compact" ]; then
+        write_chain_atomic "$sanitized" || exit 1
+        config_summary=changed
+        warn "removed a circular --previous-notify callback from $chain_file"
+    fi
+}
+
 mkdir -p "$install_bin" || exit 1
 
 install_file() {
@@ -42,6 +207,10 @@ notify_line=$(sed -n '/^[[:space:]]*notify[[:space:]]*=/p' "$codex_config" | sed
 notify_value=$(printf '%s\n' "$notify_line" | sed 's/^[[:space:]]*notify[[:space:]]*=[[:space:]]*//')
 notify_target=$install_bin/vibenotch-codex-notify
 
+# Reconcile on every install/update, including when Codex already points at
+# Vibenotch. This migrates installations affected by the old circular chain.
+reconcile_saved_chain
+
 already_installed=0
 if [ -n "$notify_value" ] && printf '%s\n' "$notify_value" | \
     jq -e --arg target "$notify_target" \
@@ -58,17 +227,16 @@ if [ "$already_installed" -eq 0 ]; then
             jq -e 'type == "array" and length > 0 and all(.[]; type == "string")' \
                 >/dev/null 2>&1
         then
-            # An upgrade finds notify pointing at OUR pre-rename notifier.
-            # Chaining that would keep the obsolete wrapper running forever,
-            # writing into a spool the app no longer reads — so drop it
-            # instead of adopting it as somebody else's notifier.
-            # Historical literal: must survive future renames.
-            chain_value=$(printf '%s\n' "$notify_value" | \
-                jq -c 'map(select(test("/\\.notch-hud/bin/notch-codex-notify$") | not))') || exit 1
+            original_notify_compact=$(printf '%s\n' "$notify_value" | jq -c .) || exit 1
+            chain_value=$(printf '%s\n' "$notify_value" | sanitize_notify_command) || exit 1
             if [ "$chain_value" = "[]" ]; then
-                rm -f "$install_prefix/codex-notify-chain.json" || exit 1
+                remove_chain
+                warn "removed a Codex notify command which called Vibenotch recursively"
             else
-                printf '%s\n' "$chain_value" > "$install_prefix/codex-notify-chain.json" || exit 1
+                write_chain_atomic "$chain_value" || exit 1
+                if [ "$chain_value" != "$original_notify_compact" ]; then
+                    warn "removed a circular --previous-notify callback while preserving the previous notifier"
+                fi
             fi
         else
             # Refuse loudly rather than silently dropping an existing notify
@@ -80,7 +248,7 @@ if [ "$already_installed" -eq 0 ]; then
             exit 1
         fi
     else
-        rm -f "$install_prefix/codex-notify-chain.json" || exit 1
+        remove_chain
     fi
 
     notify_json=$(printf '%s' "$notify_target" | jq -Rs .) || exit 1

@@ -1,5 +1,15 @@
 #!/bin/sh
 
+# A chained notifier inherits this variable. Any route back into Vibenotch is
+# therefore stopped before it emits or starts another child, even when an
+# opaque wrapper escaped the static chain validation.
+notify_depth=${VIBENOTCH_NOTIFY_DEPTH:-0}
+if [ "$notify_depth" != 0 ]; then
+    printf '%s\n' \
+        "vibenotch: warning: blocked recursive Codex notification at depth $notify_depth" >&2
+    exit 0
+fi
+
 payload=
 for argument do
     payload=$argument
@@ -7,6 +17,40 @@ done
 
 script_dir=$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd)
 notch_home=${VIBENOTCH_HOME:-"$HOME/.vibenotch"}
+
+# Environment variables alone are not a sufficient recursion boundary: an
+# opaque relay can clear them. Hold an atomic, per-payload shlock while the
+# notification is active so a descendant with the same event is still denied.
+# Different payloads use different keys and continue to run concurrently.
+guard_root=$notch_home/codex-notify-guards
+guard_key=$(printf '%s' "$payload" | /usr/bin/shasum -a 256 2>/dev/null | /usr/bin/awk '{ print $1 }')
+guard_file=$guard_root/$guard_key.lock
+guard_acquired=0
+
+if [ -n "$guard_key" ] \
+   && (umask 077 && mkdir -p "$guard_root") 2>/dev/null \
+   && /usr/bin/shlock -p "$$" -f "$guard_file" 2>/dev/null
+then
+    guard_acquired=1
+fi
+
+if [ "$guard_acquired" -ne 1 ]; then
+    printf '%s\n' \
+        "vibenotch: warning: blocked duplicate or recursive Codex notification" >&2
+    exit 0
+fi
+
+cleanup_notify_guard() {
+    current_guard_owner=$(sed -n '1p' "$guard_file" 2>/dev/null | tr -d '[:space:]')
+    if [ "$current_guard_owner" = "$$" ]; then
+        rm -f "$guard_file" 2>/dev/null || :
+    fi
+}
+trap cleanup_notify_guard EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 emitter=$script_dir/vibenotch-emit
 if [ ! -x "$emitter" ]; then
     emitter=$notch_home/bin/vibenotch-emit
@@ -75,14 +119,115 @@ fi
 
 chain_file=$notch_home/codex-notify-chain.json
 if [ -f "$chain_file" ] && command -v jq >/dev/null 2>&1; then
-    chain_arguments=$(jq -r '
-        if type == "array"
-           and length > 0
-           and all(.[]; type == "string")
-        then @sh
-        else empty
+    # Keep this filter in sync with scripts/install-codex-adapter.sh. Runtime
+    # validation is deliberately repeated here because users can edit the
+    # chain after installation.
+    sanitized_chain=$(jq -ce --arg target "$script_dir/vibenotch-codex-notify" '
+        def is_vibenotch($target):
+            type == "string"
+            and (
+                . == $target
+                or endswith("/vibenotch-codex-notify")
+                or endswith("/notch-codex-notify")
+            );
+        def mentions_vibenotch_executable:
+            type == "string"
+            and (
+                contains("vibenotch-codex-notify")
+                or contains("notch-codex-notify")
+            );
+        def decoded_command:
+            if type == "array" then .
+            elif type == "string" then (try fromjson catch null)
+            else null
+            end;
+        def valid_command:
+            type == "array"
+            and length > 0
+            and all(.[]; type == "string")
+            and .[0] != "";
+        def is_shell:
+            type == "string" and test("(^|/)(ba|z|da|k)?sh$");
+        def directly_calls_vibenotch($target):
+            (length > 0 and (.[0] | is_vibenotch($target)))
+            or (length > 1 and (.[0] | is_shell) and (.[1] | is_vibenotch($target)))
+            or (
+                length > 1
+                and (.[0] | type == "string")
+                and (.[0] | test("(^|/)env$"))
+                and any(.[1:][];
+                    is_vibenotch($target) or mentions_vibenotch_executable
+                )
+            );
+        def sanitize_command($target; $depth):
+            if $depth >= 16 then []
+            elif (valid_command | not) then []
+            elif directly_calls_vibenotch($target) then
+                if (.[0] | is_vibenotch($target)) then
+                    map(select((is_vibenotch($target)) | not))
+                    | sanitize_command($target; $depth + 1)
+                else []
+                end
+            else . as $command
+            | reduce range(0; $command | length) as $index (
+                {output: [], skip_until: 0};
+                if $index < .skip_until then .
+                elif $command[$index] == "--previous-notify"
+                     and ($index + 1) < ($command | length)
+                then ($command[$index + 1] | decoded_command) as $nested
+                | if ($nested | valid_command) then
+                    ($nested | sanitize_command($target; $depth + 1)) as $clean
+                    | if ($clean | length) == 0 then
+                        .skip_until = ($index + 2)
+                      elif $clean == $nested then
+                        .output += ["--previous-notify", $command[$index + 1]]
+                        | .skip_until = ($index + 2)
+                      else
+                        .output += ["--previous-notify", ($clean | tojson)]
+                        | .skip_until = ($index + 2)
+                      end
+                  else .output += [$command[$index]]
+                  end
+                elif ($command[$index] | startswith("--previous-notify="))
+                then (
+                    $command[$index]
+                    | ltrimstr("--previous-notify=")
+                    | decoded_command
+                ) as $nested
+                | if ($nested | valid_command) then
+                    ($nested | sanitize_command($target; $depth + 1)) as $clean
+                    | if ($clean | length) == 0 then .
+                      elif $clean == $nested then .output += [$command[$index]]
+                      else .output += ["--previous-notify=" + ($clean | tojson)]
+                      end
+                  else .output += [$command[$index]]
+                  end
+                else .output += [$command[$index]]
+                end
+            )
+            | .output
+            end;
+        if type != "array"
+           or length == 0
+           or (all(.[]; type == "string") | not)
+           or .[0] == ""
+        then error("invalid notify command")
+        else sanitize_command($target; 0)
         end
-    ' "$chain_file" 2>/dev/null)
+    ' "$chain_file" 2>/dev/null) || sanitized_chain=
+
+    if [ -z "$sanitized_chain" ] || [ "$sanitized_chain" = "[]" ]; then
+        printf '%s\n' \
+            "vibenotch: warning: blocked invalid or circular Codex notify chain in $chain_file" >&2
+        chain_arguments=
+    else
+        original_chain=$(jq -c . "$chain_file" 2>/dev/null) || original_chain=
+        if [ "$sanitized_chain" != "$original_chain" ]; then
+            printf '%s\n' \
+                "vibenotch: warning: blocked circular --previous-notify callback in $chain_file" >&2
+        fi
+        chain_arguments=$(printf '%s\n' "$sanitized_chain" | jq -r '@sh' 2>/dev/null)
+    fi
     if [ -n "$chain_arguments" ]; then
         # jq @sh supplies the quoting needed to restore each JSON array element.
         # shellcheck disable=SC2294
@@ -90,7 +235,7 @@ if [ -f "$chain_file" ] && command -v jq >/dev/null 2>&1; then
         if [ -n "$payload" ]; then
             set -- "$@" "$payload"
         fi
-        "$@" || :
+        VIBENOTCH_NOTIFY_DEPTH=1 "$@" || :
     fi
 fi
 

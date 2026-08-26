@@ -1,37 +1,91 @@
 import Foundation
-import Security
 
-/// Reads the OAuth token the Claude Code CLI already has, from the same
-/// keychain item the CLI itself writes and reads.
+/// Reads the OAuth token the Claude Code CLI already has.
 protocol ClaudeCredentialReading: Sendable {
     func accessToken() throws -> String
 }
 
-struct KeychainClaudeCredentialReader: ClaudeCredentialReading {
-    /// Exact service name the Claude Code CLI writes its keychain item under.
-    static let service = "Claude Code-credentials"
+struct ClaudeSecurityCommandOutput: Sendable {
+    let terminationStatus: Int32
+    let standardOutput: Data
+}
+
+/// Small process seam so tests can verify the exact executable and arguments
+/// without ever reading the real login keychain.
+protocol ClaudeSecurityCommandRunning: Sendable {
+    func run(executableURL: URL, arguments: [String]) throws -> ClaudeSecurityCommandOutput
+}
+
+struct FoundationClaudeSecurityCommandRunner: ClaudeSecurityCommandRunning {
+    func run(executableURL: URL, arguments: [String]) throws -> ClaudeSecurityCommandOutput {
+        let process = Process()
+        let standardOutput = Pipe()
+        process.executableURL = executableURL
+        process.arguments = arguments
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = standardOutput
+        // `security` diagnostics can contain keychain metadata. They are not
+        // useful to the app and must not escape into a parent process or log.
+        process.standardError = FileHandle.nullDevice
+
+        try process.run()
+        let data = standardOutput.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        return ClaudeSecurityCommandOutput(
+            terminationStatus: process.terminationStatus,
+            standardOutput: data
+        )
+    }
+}
+
+/// Uses the fixed Apple-signed keychain utility instead of asking Security.framework
+/// to authorize the frequently rebuilt Vibenotch executable itself.
+///
+/// The command is deliberately not configurable in production and is launched
+/// directly through `Process` (never through a shell). Its stdout is parsed in
+/// memory and is never interpolated into an error or log message.
+struct SecurityToolClaudeCredentialReader: ClaudeCredentialReading {
+    static let executableURL = URL(fileURLWithPath: "/usr/bin/security")
+    static let arguments = [
+        "find-generic-password",
+        "-s", "Claude Code-credentials",
+        "-w"
+    ]
+
+    private let runner: any ClaudeSecurityCommandRunning
+
+    init(runner: any ClaudeSecurityCommandRunning = FoundationClaudeSecurityCommandRunner()) {
+        self.runner = runner
+    }
 
     func accessToken() throws -> String {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var item: CFTypeRef?
-        let status = SecItemCopyMatching(query as CFDictionary, &item)
-        guard status == errSecSuccess, let data = item as? Data else {
+        let output: ClaudeSecurityCommandOutput
+        do {
+            output = try runner.run(
+                executableURL: Self.executableURL,
+                arguments: Self.arguments
+            )
+        } catch {
+            // Never include the underlying process error: a custom process
+            // environment could put sensitive command output in it.
+            throw UsageUnavailable.unexpectedResponse(
+                "could not execute the Claude credential helper"
+            )
+        }
+
+        guard output.terminationStatus == 0 else {
             throw UsageUnavailable.notLoggedIn
         }
         guard
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let object = try? JSONSerialization.jsonObject(with: output.standardOutput) as? [String: Any],
             let oauth = object["claudeAiOauth"] as? [String: Any],
-            let token = oauth["accessToken"] as? String
+            let token = oauth["accessToken"] as? String,
+            !token.isEmpty
         else {
             // The item exists but its shape changed — that is our bug to fix,
             // not something "log in again" would resolve.
             throw UsageUnavailable.unexpectedResponse(
-                "Claude Code-credentials keychain item did not contain claudeAiOauth.accessToken"
+                "Claude credential helper output did not contain claudeAiOauth.accessToken"
             )
         }
         return token
