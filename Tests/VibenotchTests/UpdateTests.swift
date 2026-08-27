@@ -102,6 +102,65 @@ import Testing
     #expect(!FileManager.default.fileExists(atPath: marker.path))
 }
 
+@Test func updateScriptStopsBeforeDownloadWhenTargetIsAlreadyInstalled() throws {
+    let result = try runUpdaterVersionPreflight(
+        installedVersion: "1.0.2",
+        targetTag: "v1.0.2"
+    )
+
+    #expect(result.status == 0)
+    #expect(result.output.contains("Checking installed Vibenotch version"))
+    #expect(result.output.contains("Vibenotch 1.0.2 is already installed. Nothing to do."))
+    #expect(!result.output.contains("Downloading Vibenotch"))
+}
+
+@Test func updateScriptRefusesToDowngradeANewerInstalledVersion() throws {
+    let result = try runUpdaterVersionPreflight(
+        installedVersion: "1.10.0",
+        targetTag: "v1.9.99"
+    )
+
+    #expect(result.status == 0)
+    #expect(result.output.contains("Vibenotch 1.10.0 is newer than 1.9.99. Nothing to do."))
+    #expect(!result.output.contains("Downloading Vibenotch"))
+}
+
+@Test func packagedAppAndRuntimeAgreeOnTheSwiftPMResourceBundlePath() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let script = try String(
+        contentsOf: root.appendingPathComponent("scripts/make-app.sh"),
+        encoding: .utf8
+    )
+
+    #expect(script.contains(
+        #"cp -R .build/release/Vibenotch_Vibenotch.bundle "$APP/Contents/Resources/""#
+    ))
+
+    let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Vibenotch packaged resources-\(UUID().uuidString)")
+    let app = scratch.appendingPathComponent("Vibenotch.app")
+    let resources = app.appendingPathComponent("Contents/Resources")
+    let resourceBundle = resources.appendingPathComponent("Vibenotch_Vibenotch.bundle")
+    try FileManager.default.createDirectory(at: resourceBundle, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    try writeBundlePlist(
+        identifier: "com.rebelpaulo.vibenotch.fixture",
+        to: app.appendingPathComponent("Contents/Info.plist")
+    )
+    try writeBundlePlist(
+        identifier: "com.rebelpaulo.vibenotch.fixture.resources",
+        to: resourceBundle.appendingPathComponent("Info.plist")
+    )
+
+    let packagedApp = try #require(Bundle(url: app))
+    let resolved = try #require(VibenotchResources.packagedBundle(in: packagedApp))
+    #expect(resolved.bundleURL.standardizedFileURL == resourceBundle.standardizedFileURL)
+}
+
 @Test func updateScriptVerifiesTheSignedArtifactBeforeExtraction() throws {
     let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -119,7 +178,10 @@ import Testing
     let signatureCheck = try #require(script.range(of: "openssl dgst -sha256 -verify"))
     let checksumCheck = try #require(script.range(of: "actual_hash=$(/usr/bin/shasum -a 256"))
     let extraction = try #require(script.range(of: "/usr/bin/tar -xzf"))
+    let versionCheck = try #require(script.range(of: "Checking installed Vibenotch version"))
+    let download = try #require(script.range(of: "Downloading Vibenotch"))
 
+    #expect(versionCheck.lowerBound < download.lowerBound)
     #expect(signatureCheck.lowerBound < checksumCheck.lowerBound)
     #expect(checksumCheck.lowerBound < extraction.lowerBound)
     #expect(script.contains("releases/download/$tag"))
@@ -207,4 +269,63 @@ private actor RecordingUpdateHTTP: UpdateHTTPPerforming {
         )!
         return (data, response)
     }
+}
+
+private func runUpdaterVersionPreflight(
+    installedVersion: String,
+    targetTag: String
+) throws -> (status: Int32, output: String) {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let scratch = FileManager.default.temporaryDirectory
+        .appendingPathComponent("Vibenotch updater path with spaces-\(UUID().uuidString)")
+    let plist = scratch.appendingPathComponent("Vibenotch.app/Contents/Info.plist")
+    try FileManager.default.createDirectory(
+        at: plist.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+    )
+    defer { try? FileManager.default.removeItem(at: scratch) }
+
+    let data = try PropertyListSerialization.data(
+        fromPropertyList: ["CFBundleShortVersionString": installedVersion],
+        format: .xml,
+        options: 0
+    )
+    try data.write(to: plist)
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = [
+        root.appendingPathComponent("scripts/vibenotch-update").path,
+        targetTag,
+    ]
+    var environment = ProcessInfo.processInfo.environment
+    environment["VIBENOTCH_UPDATE_INFO_PLIST"] = plist.path
+    process.environment = environment
+    process.standardInput = FileHandle.nullDevice
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = output
+
+    try process.run()
+    process.waitUntilExit()
+    let outputData = output.fileHandleForReading.readDataToEndOfFile()
+    return (process.terminationStatus, String(decoding: outputData, as: UTF8.self))
+}
+
+private func writeBundlePlist(identifier: String, to url: URL) throws {
+    let data = try PropertyListSerialization.data(
+        fromPropertyList: [
+            "CFBundleIdentifier": identifier,
+            "CFBundleName": "Vibenotch fixture",
+            "CFBundlePackageType": "BNDL",
+            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleVersion": "1",
+        ],
+        format: .xml,
+        options: 0
+    )
+    try data.write(to: url)
 }
