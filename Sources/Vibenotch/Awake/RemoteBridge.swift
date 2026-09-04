@@ -115,6 +115,7 @@ final class RemoteBridge {
     private let usageStore: any RemoteUsageStoring
     private let commandRunner: any CommandRunning
     private let powerSourceProvider: any PowerSourceProviding
+    private let vitalsProvider: any MachineVitalsProviding
     private let pairingURL: URL
     private let userDefaults: UserDefaults
     private let conversationIndex: ClaudeConversationIndex
@@ -158,6 +159,7 @@ final class RemoteBridge {
         usageStore: any RemoteUsageStoring = UsageStore(),
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
+        vitalsProvider: any MachineVitalsProviding = SystemMachineVitalsProvider(),
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         userDefaults: UserDefaults = .standard,
         conversationIndex: ClaudeConversationIndex? = nil,
@@ -172,6 +174,7 @@ final class RemoteBridge {
         self.usageStore = usageStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
         self.powerSourceProvider = powerSourceProvider
+        self.vitalsProvider = vitalsProvider
         self.userDefaults = userDefaults
         pairingURL = homeURL.appendingPathComponent(".vibenotch/remote.json", isDirectory: false)
         previousMode = engine.mode
@@ -279,6 +282,12 @@ final class RemoteBridge {
     // write; ten identical readings a minute are not.
     private var lastPublishedBattery: PublishedBattery?
     private var lastPublishedThermal: String?
+    /// The QUANTISED vitals, not the raw ones. CPU and memory move on every
+    /// tick, so caching the exact reading would publish every ten seconds
+    /// forever — the same runaway that once wrote the pace field ~8,600 times a
+    /// day. The digest rounds each gauge to a step a person would notice, and
+    /// only a crossed step is news.
+    private var lastPublishedVitalsDigest: String?
     private var isPublishingMachineState = false
     private var machineStateChangedWhilePublishing = false
 
@@ -647,6 +656,15 @@ final class RemoteBridge {
         if thermal != lastPublishedThermal {
             fields.append(#""thermal_state":"\#(thermal)""#)
         }
+
+        // Vitals ride the same write. They move on the same timescale as heat
+        // and matter for the same reason: nobody is at the machine to notice
+        // it swapping.
+        let vitals = vitalsProvider.vitals()
+        let vitalsDigest = vitalsDigest(vitals)
+        if vitalsDigest != lastPublishedVitalsDigest {
+            fields.append("\"vitals\":" + renderedVitals(vitals))
+        }
         guard !fields.isEmpty else { return }
 
         // Battery and heat ONLY. Sending the on/off flag alongside would write
@@ -656,6 +674,72 @@ final class RemoteBridge {
         guard await run(["--state-put"], stdin: body).exitCode == 0 else { return }
         if let battery { lastPublishedBattery = battery }
         lastPublishedThermal = thermal
+        lastPublishedVitalsDigest = vitalsDigest
+    }
+
+    /// What counts as a CHANGE worth a write.
+    ///
+    /// Each gauge is rounded to a step big enough that crossing it means
+    /// something to a person looking at a phone: five points of CPU, two of
+    /// memory, a quarter-gig of swap, a gigabyte of disk, an hour of uptime.
+    /// Without this the raw readings differ on every single tick and the Mac
+    /// would POST forever.
+    ///
+    /// `topMemory` is deliberately ABSENT from the digest. The heaviest
+    /// processes shuffle constantly, and letting them drive the write would
+    /// undo every rounding above. The list therefore rides along with whatever
+    /// publish a gauge earns, and is as old as `vitals_updated_at` says it is —
+    /// which is exactly when it is safe to be stale, because a Mac whose
+    /// gauges have not moved is a Mac where nothing is happening.
+    private func vitalsDigest(_ vitals: MachineVitals) -> String {
+        func step(_ value: Int?, _ size: Int) -> String {
+            value.map { String($0 / size) } ?? "-"
+        }
+        return [
+            step(vitals.cpuPercent, 5),
+            step(vitals.memory?.usedPercent, 2),
+            vitals.memory?.pressure?.rawValue ?? "-",
+            step(vitals.swapUsedMB, 256),
+            step(vitals.disk?.freeGB, 1),
+            step(vitals.uptimeHours, 1),
+            vitals.isLowPowerMode ? "low" : "-",
+        ].joined(separator: "|")
+    }
+
+    /// A field the Mac could not read is OMITTED, never sent as null or zero.
+    /// The phone draws nothing for a missing gauge, which is the truthful
+    /// rendering of "we do not know" — and the reason every field here is
+    /// optional in the first place.
+    private func renderedVitals(_ vitals: MachineVitals) -> String {
+        var parts: [String] = []
+        if let cpu = vitals.cpuPercent {
+            parts.append("\"cpu_percent\":\(cpu)")
+        }
+        if let memory = vitals.memory {
+            var fields = "\"used_mb\":\(memory.usedMB),\"total_mb\":\(memory.totalMB)"
+            if let pressure = memory.pressure {
+                fields += ",\"pressure\":" + jsonString(pressure.rawValue)
+            }
+            parts.append("\"memory\":{" + fields + "}")
+        }
+        if let swap = vitals.swapUsedMB {
+            parts.append("\"swap_used_mb\":\(swap)")
+        }
+        if let disk = vitals.disk {
+            parts.append("\"disk\":{\"free_gb\":\(disk.freeGB),\"total_gb\":\(disk.totalGB)}")
+        }
+        if let uptime = vitals.uptimeHours {
+            parts.append("\"uptime_hours\":\(uptime)")
+        }
+        parts.append("\"low_power\":\(vitals.isLowPowerMode)")
+        if !vitals.topMemory.isEmpty {
+            let processes = vitals.topMemory.map {
+                "{\"name\":" + jsonString($0.name)
+                    + ",\"mb\":\($0.megabytes),\"instances\":\($0.instances)}"
+            }
+            parts.append("\"top_memory\":[" + processes.joined(separator: ",") + "]")
+        }
+        return "{" + parts.joined(separator: ",") + "}"
     }
 
     /// Publishes the session list so the phone can show which agent needs you,
@@ -1224,6 +1308,7 @@ final class RemoteBridge {
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
         lastPublishedThermal = nil
+        lastPublishedVitalsDigest = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastPublishedUsageDigest = nil
