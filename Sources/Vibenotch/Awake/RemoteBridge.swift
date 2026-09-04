@@ -115,6 +115,7 @@ final class RemoteBridge {
     private let usageStore: any RemoteUsageStoring
     private let commandRunner: any CommandRunning
     private let powerSourceProvider: any PowerSourceProviding
+    private let vitalsProvider: any MachineVitalsProviding
     private let pairingURL: URL
     private let userDefaults: UserDefaults
     private let conversationIndex: ClaudeConversationIndex
@@ -158,6 +159,7 @@ final class RemoteBridge {
         usageStore: any RemoteUsageStoring = UsageStore(),
         commandRunner: (any CommandRunning)? = nil,
         powerSourceProvider: any PowerSourceProviding = SystemPowerSourceProvider(),
+        vitalsProvider: any MachineVitalsProviding = SystemMachineVitalsProvider(),
         homeURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         userDefaults: UserDefaults = .standard,
         conversationIndex: ClaudeConversationIndex? = nil,
@@ -172,6 +174,7 @@ final class RemoteBridge {
         self.usageStore = usageStore
         self.commandRunner = commandRunner ?? RemoteScriptCommandRunner(homeURL: homeURL)
         self.powerSourceProvider = powerSourceProvider
+        self.vitalsProvider = vitalsProvider
         self.userDefaults = userDefaults
         pairingURL = homeURL.appendingPathComponent(".vibenotch/remote.json", isDirectory: false)
         previousMode = engine.mode
@@ -279,6 +282,11 @@ final class RemoteBridge {
     // write; ten identical readings a minute are not.
     private var lastPublishedBattery: PublishedBattery?
     private var lastPublishedThermal: String?
+    /// The vitals as last SENT, so the next reading is compared against what
+    /// the phone actually holds. CPU and memory move on every tick, and caching
+    /// nothing would publish every ten seconds forever — the same runaway that
+    /// once wrote the pace field ~8,600 times a day.
+    private var lastPublishedVitals: MachineVitals?
     private var isPublishingMachineState = false
     private var machineStateChangedWhilePublishing = false
 
@@ -647,6 +655,14 @@ final class RemoteBridge {
         if thermal != lastPublishedThermal {
             fields.append(#""thermal_state":"\#(thermal)""#)
         }
+
+        // Vitals ride the same write. They move on the same timescale as heat
+        // and matter for the same reason: nobody is at the machine to notice
+        // it swapping.
+        let vitals = vitalsProvider.vitals()
+        if vitalsAreNews(vitals, comparedTo: lastPublishedVitals) {
+            fields.append("\"vitals\":" + renderedVitals(vitals))
+        }
         guard !fields.isEmpty else { return }
 
         // Battery and heat ONLY. Sending the on/off flag alongside would write
@@ -656,6 +672,110 @@ final class RemoteBridge {
         guard await run(["--state-put"], stdin: body).exitCode == 0 else { return }
         if let battery { lastPublishedBattery = battery }
         lastPublishedThermal = thermal
+        if vitalsAreNews(vitals, comparedTo: lastPublishedVitals) {
+            lastPublishedVitals = vitals
+        }
+    }
+
+    /// What counts as a CHANGE worth a write.
+    ///
+    /// Compared against the reading the phone is ALREADY HOLDING, not against
+    /// a bucket number. The first version of this rounded each gauge into
+    /// fixed steps and compared the steps — which looks equivalent and is not:
+    /// a value hovering on a boundary (47.4 °C, then 47.6, then 47.4) lands in
+    /// a different bucket every time and publishes on every single tick, which
+    /// is the exact write storm the rounding was added to prevent. Measuring
+    /// the distance from what was last sent gives the hysteresis for free: once
+    /// 47.1 has gone up, nothing goes up again until 45.1 or 49.1.
+    ///
+    /// Thresholds are what a person would notice on a phone screen: five points
+    /// of CPU, two degrees, two points of memory, a quarter-gig of swap, a
+    /// gigabyte of disk, an hour of uptime.
+    ///
+    /// `topMemory` is deliberately ABSENT from this comparison. The heaviest
+    /// processes shuffle constantly, and letting them drive the write would
+    /// undo every threshold above. The list therefore rides along with whatever
+    /// publish a gauge earns, and is as old as `vitals_updated_at` says it is —
+    /// which is exactly when it is safe to be stale, because a Mac whose gauges
+    /// have not moved is a Mac where nothing is happening.
+    private func vitalsAreNews(_ new: MachineVitals, comparedTo old: MachineVitals?) -> Bool {
+        guard let old else { return true }
+
+        // An appearing or disappearing reading is always news: it is the
+        // difference between a gauge being drawn and not being drawn.
+        func moved(_ new: Double?, _ old: Double?, by threshold: Double) -> Bool {
+            switch (new, old) {
+            case let (new?, old?): abs(new - old) >= threshold
+            case (nil, nil): false
+            default: true
+            }
+        }
+        func moved(_ new: Int?, _ old: Int?, by threshold: Int) -> Bool {
+            moved(new.map(Double.init), old.map(Double.init), by: Double(threshold))
+        }
+
+        return moved(new.cpuPercent, old.cpuPercent, by: 5)
+            || moved(new.cpuTemperatureC, old.cpuTemperatureC, by: 2)
+            || moved(new.memory?.usedPercent, old.memory?.usedPercent, by: 2)
+            || new.memory?.pressure != old.memory?.pressure
+            || moved(new.swapUsedMB, old.swapUsedMB, by: 256)
+            || moved(new.disk?.freeGB, old.disk?.freeGB, by: 1)
+            || moved(new.uptimeHours, old.uptimeHours, by: 1)
+            || new.isLowPowerMode != old.isLowPowerMode
+            // Two whole runnable threads. The load average is a smoothed
+            // number already, but it still wanders by fractions, and this is
+            // the gauge whose interesting range is 0 to well over a hundred.
+            || moved(new.loadAverage, old.loadAverage, by: 2)
+    }
+
+    /// A field the Mac could not read is OMITTED, never sent as null or zero.
+    /// The phone draws nothing for a missing gauge, which is the truthful
+    /// rendering of "we do not know" — and the reason every field here is
+    /// optional in the first place.
+    private func renderedVitals(_ vitals: MachineVitals) -> String {
+        var parts: [String] = []
+        if let cpu = vitals.cpuPercent {
+            parts.append("\"cpu_percent\":\(cpu)")
+        }
+        if let temperature = vitals.cpuTemperatureC {
+            parts.append("\"cpu_temperature_c\":\(String(format: "%.1f", temperature))")
+        }
+        if let memory = vitals.memory {
+            var fields = "\"used_mb\":\(memory.usedMB),\"total_mb\":\(memory.totalMB)"
+            if let pressure = memory.pressure {
+                fields += ",\"pressure\":" + jsonString(pressure.rawValue)
+            }
+            parts.append("\"memory\":{" + fields + "}")
+        }
+        if let swap = vitals.swapUsedMB {
+            parts.append("\"swap_used_mb\":\(swap)")
+        }
+        if let disk = vitals.disk {
+            parts.append("\"disk\":{\"free_gb\":\(disk.freeGB),\"total_gb\":\(disk.totalGB)}")
+        }
+        if let uptime = vitals.uptimeHours {
+            parts.append("\"uptime_hours\":\(uptime)")
+        }
+        if let load = vitals.loadAverage {
+            parts.append("\"load_average\":\(String(format: "%.2f", load))")
+        }
+        parts.append("\"low_power\":\(vitals.isLowPowerMode)")
+        if !vitals.topMemory.isEmpty {
+            let processes = vitals.topMemory.map {
+                "{\"name\":" + jsonString($0.name)
+                    + ",\"mb\":\($0.megabytes),\"instances\":\($0.instances)}"
+            }
+            parts.append("\"top_memory\":[" + processes.joined(separator: ",") + "]")
+        }
+        if !vitals.topCPU.isEmpty {
+            let processes = vitals.topCPU.map {
+                "{\"name\":" + jsonString($0.name)
+                    + ",\"percent\":\(String(format: "%.1f", $0.percent))"
+                    + ",\"instances\":\($0.instances)}"
+            }
+            parts.append("\"top_cpu\":[" + processes.joined(separator: ",") + "]")
+        }
+        return "{" + parts.joined(separator: ",") + "}"
     }
 
     /// Publishes the session list so the phone can show which agent needs you,
@@ -1224,6 +1344,7 @@ final class RemoteBridge {
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
         lastPublishedThermal = nil
+        lastPublishedVitals = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastPublishedUsageDigest = nil

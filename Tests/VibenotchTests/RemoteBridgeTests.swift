@@ -652,7 +652,7 @@ final class Stopped: @unchecked Sendable {
 
     let bodies = await fixture.runner.statePutBodies()
     #expect(bodies.filter { $0.contains("\"battery\"") } == [
-        #"{"battery":{"percent":80,"on_ac":false},"thermal_state":"nominal"}"#,
+        #"{"battery":{"percent":80,"on_ac":false},"thermal_state":"nominal","vitals":{"low_power":false}}"#,
         #"{"battery":{"percent":79,"on_ac":false}}"#
     ])
 }
@@ -667,7 +667,10 @@ final class Stopped: @unchecked Sendable {
     // A Mac with no battery reading still has a temperature, and heat is the
     // half of this write that matters with the lid shut.
     let bodies = await fixture.runner.statePutBodies()
-    #expect(bodies == [#"{"thermal_state":"nominal"}"#])
+    // The default fake reads nothing off the machine, so every vitals gauge is
+    // OMITTED rather than sent as zero — the shape a Mac that failed its
+    // syscalls would produce.
+    #expect(bodies == [#"{"thermal_state":"nominal","vitals":{"low_power":false}}"#])
 }
 
 @MainActor
@@ -802,6 +805,7 @@ private final class RemoteBridgeFixture {
 
     let runner: FakeRemoteCommandRunner
     let power: FakeRemotePowerSource
+    let vitals: FakeMachineVitalsProvider
     let resumer = FakeConversationResumer()
     let bridge: RemoteBridge
 
@@ -829,6 +833,7 @@ private final class RemoteBridgeFixture {
         engine = FakeRemoteEngine(mode: mode, isOnACPower: onAC, config: config)
         runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
         power = FakeRemotePowerSource(percent: percent, isOnACPower: onAC)
+        vitals = FakeMachineVitalsProvider()
         suiteName = "RemoteBridgeTests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
         bridge = RemoteBridge(
@@ -837,6 +842,7 @@ private final class RemoteBridgeFixture {
             usageStore: FakeUsageStore(),
             commandRunner: runner,
             powerSourceProvider: power,
+            vitalsProvider: vitals,
             homeURL: scratch,
             userDefaults: defaults,
             resumer: resumer,
@@ -853,6 +859,7 @@ private final class RemoteBridgeFixture {
         engine = other.engine
         runner = FakeRemoteCommandRunner(stateOutput: stateOutput)
         power = other.power
+        vitals = other.vitals
         suiteName = other.suiteName
         defaults = other.defaults
         bridge = RemoteBridge(
@@ -861,6 +868,7 @@ private final class RemoteBridgeFixture {
             usageStore: FakeUsageStore(),
             commandRunner: runner,
             powerSourceProvider: power,
+            vitalsProvider: vitals,
             homeURL: scratch,
             userDefaults: defaults,
             resumer: resumer,
@@ -1035,4 +1043,239 @@ private func remoteSession(id: String, project: String, status: SessionStatus) -
         ),
         updatedAt: Date(timeIntervalSince1970: 1_000_000)
     )
+}
+
+/// Reads nothing off the real machine.
+///
+/// The default is every gauge ABSENT, which is both the deterministic choice
+/// and the interesting one: it is the shape a Mac whose syscalls failed
+/// produces, and it must never render as a row of zeros. Tests that care about
+/// a specific reading set `current` themselves.
+final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = MachineVitals(
+        cpuPercent: nil,
+        cpuTemperatureC: nil,
+        memory: nil,
+        swapUsedMB: nil,
+        disk: nil,
+        uptimeHours: nil,
+        isLowPowerMode: false,
+        loadAverage: nil,
+        topMemory: [],
+        topCPU: []
+    )
+
+    var current: MachineVitals {
+        get { lock.withLock { storage } }
+        set { lock.withLock { storage = newValue } }
+    }
+
+    func vitals() -> MachineVitals { current }
+}
+
+@MainActor
+@Test func vitalsPublishOnlyWhenAGaugeCrossesAStepWorthNoticing() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, memoryUsedMB: 8000)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    // Drift WITHIN a step. Left ungated, this is the reading that arrives on
+    // every single tick and would POST every ten seconds forever.
+    fixture.vitals.current = machineVitals(cpu: 42, memoryUsedMB: 8100)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+
+    // Across it.
+    fixture.vitals.current = machineVitals(cpu: 46, memoryUsedMB: 8000)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let body = try #require(await fixture.runner.statePutBodies().last)
+    #expect(body.contains("\"cpu_percent\":46"))
+}
+
+@MainActor
+@Test func aReshuffledProcessListDoesNotEarnItsOwnWrite() async throws {
+    // top_memory is the one field that never settles: the heaviest processes
+    // trade places constantly. If it fed the change check it would defeat every
+    // rounding in the digest and restore the write storm on its own.
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, top: [("Chrome", 4000, 9)])
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    fixture.vitals.current = machineVitals(cpu: 40, top: [("node", 7000, 3), ("Chrome", 10, 1)])
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+}
+
+@MainActor
+@Test func aGaugeTheMacCouldNotReadIsOmittedRatherThanSentAsZero() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    // Swap readable and genuinely zero; CPU unreadable. The two must not look
+    // the same on the wire, or the phone draws an idle machine either way.
+    fixture.vitals.current = MachineVitals(
+        cpuPercent: nil,
+        cpuTemperatureC: nil,
+        memory: nil,
+        swapUsedMB: 0,
+        disk: nil,
+        uptimeHours: nil,
+        isLowPowerMode: false,
+        loadAverage: nil,
+        topMemory: [],
+        topCPU: []
+    )
+    await fixture.bridge.checkNow(pollRemoteState: true)
+
+    let body = try #require(await fixture.runner.statePutBodies().last)
+    #expect(body.contains("\"swap_used_mb\":0"))
+    #expect(!body.contains("cpu_percent"))
+    #expect(!body.contains("\"memory\""))
+    #expect(!body.contains("\"disk\""))
+}
+
+@MainActor
+@Test func anUnrecognisedMemoryPressureLevelIsNotReportedAsNormal() {
+    // 1/2/4 are the documented levels. A kernel that grows a fifth one must
+    // leave the field absent: "we do not recognise this" is not "all is well",
+    // and this app has already shipped that exact bug twice.
+    #expect(MachineVitals.MemoryPressure(sysctlLevel: 1) == .normal)
+    #expect(MachineVitals.MemoryPressure(sysctlLevel: 4) == .critical)
+    #expect(MachineVitals.MemoryPressure(sysctlLevel: 3) == nil)
+    #expect(MachineVitals.MemoryPressure(sysctlLevel: 0) == nil)
+}
+
+@Test func theFirstCPUSampleHasNothingToSubtractFromAndSaysSo() async throws {
+    // A rate needs two readings. Reporting 0% on the first one would be a lie
+    // told at launch, on the gauge most likely to be looked at first.
+    //
+    // Only the FIRST sample is asserted absent. Whether the one straight after
+    // it produces a number depends on whether any tick accrued in between,
+    // which depends on how busy the machine running the test happens to be —
+    // an earlier version of this test asserted nil there and passed on an idle
+    // Mac while failing on a loaded one.
+    let provider = SystemMachineVitalsProvider()
+    #expect(provider.vitals().cpuPercent == nil)
+
+    try await Task.sleep(for: .milliseconds(250))
+    #expect(provider.vitals().cpuPercent != nil)
+}
+
+private func machineVitals(
+    cpu: Int?,
+    temperature: Double? = nil,
+    memoryUsedMB: Int = 8000,
+    top: [(String, Int, Int)] = []
+) -> MachineVitals {
+    MachineVitals(
+        cpuPercent: cpu,
+        cpuTemperatureC: temperature,
+        memory: MachineVitals.MemoryReading(
+            usedMB: memoryUsedMB,
+            totalMB: 16384,
+            pressure: .normal
+        ),
+        swapUsedMB: 0,
+        disk: MachineVitals.DiskReading(freeGB: 100, totalGB: 460),
+        uptimeHours: 3,
+        isLowPowerMode: false,
+        loadAverage: nil,
+        topMemory: top.map {
+            MachineVitals.ProcessMemory(name: $0.0, megabytes: $0.1, instances: $0.2)
+        },
+        topCPU: []
+    )
+}
+
+@MainActor
+@Test func theDieTemperaturePublishesInWholeishDegreesAndNotOnEveryFlicker() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.1)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let first = try #require(await fixture.runner.statePutBodies().last)
+    #expect(first.contains("\"cpu_temperature_c\":47.1"))
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    // The dies wander by tenths without stopping. Left ungated this is the
+    // field that would POST every ten seconds on a machine doing nothing.
+    // Under two degrees from what the phone holds. The bucket version of this
+    // check published here: 47.1 and 47.9 round into different two-degree
+    // buckets even though nothing moved, and a die hovering on a boundary did
+    // that on every tick.
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.9)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 46.4)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 52.0)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let last = try #require(await fixture.runner.statePutBodies().last)
+    #expect(last.contains("\"cpu_temperature_c\":52.0"))
+}
+
+@Test func theDieTemperatureIsReadWithoutRootOrIsHonestlyAbsent() {
+    // The claim this replaced a wrong comment with: the PMU sensors answer an
+    // unprivileged process. Asserting a RANGE rather than a value, because the
+    // only alternative is asserting whatever this machine happens to be doing.
+    //
+    // nil is a legitimate pass: an Intel Mac has no PMU sensors, and the day
+    // Apple withdraws the private interface every reading here goes with it.
+    // What must never happen is a zero dressed up as a temperature.
+    let reader = AppleSiliconTemperatureReader()
+    guard let celsius = reader.dieTemperatureCelsius() else { return }
+    #expect(celsius > 5)
+    #expect(celsius < 120)
+}
+
+@MainActor
+@Test func aGaugeThatDisappearsIsNewsEvenThoughNoNumberMoved() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.0)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    // Apple withdraws the private interface, or the Mac is an Intel one that
+    // never had it. Comparing only magnitudes would leave the phone showing a
+    // temperature that no longer exists, forever.
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: nil)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst + 1)
+    let body = try #require(await fixture.runner.statePutBodies().last)
+    #expect(!body.contains("cpu_temperature_c"))
+}
+
+@Test func busiestProcessesAreARateAndTheFirstPollHasNone() async throws {
+    // The CPU numbers libproc hands over are cumulative since each process
+    // started. Reporting those directly would put whatever has been running
+    // longest at the top forever, which is a fact about uptime and not about
+    // what is busy now.
+    let provider = SystemMachineVitalsProvider()
+    #expect(provider.vitals().topCPU.isEmpty)
+
+    try await Task.sleep(for: .milliseconds(600))
+    let second = provider.vitals()
+
+    // Machine-independent: whatever is busy, a rate cannot exceed the cores
+    // available, and the list is capped. An empty list is a legitimate pass on
+    // a genuinely idle machine.
+    for process in second.topCPU {
+        #expect(process.percent >= 0.1)
+        #expect(process.percent <= Double(ProcessInfo.processInfo.processorCount) * 100)
+    }
+    #expect(second.topCPU.count <= 5)
+    #expect(second.loadAverage != nil)
 }

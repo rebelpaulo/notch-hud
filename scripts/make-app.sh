@@ -7,8 +7,10 @@ swift build -c release
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/Vibenotch "$APP/Contents/MacOS/Vibenotch"
-# Localizations live in the SPM resource bundle; Bundle.module finds it under
-# Contents/Resources, so without this copy the app is English-only.
+# A signed macOS app seals resources under Contents/Resources. The app uses
+# VibenotchResources.bundle to look there before falling back to Bundle.module
+# in SwiftPM test/development processes; Bundle.module alone also probes the
+# build checkout and crashes once an updater removes its temporary checkout.
 cp -R .build/release/Vibenotch_Vibenotch.bundle "$APP/Contents/Resources/"
 # Finder, notifications and LaunchServices read the app icon from the main
 # bundle, not from SwiftPM's nested resource bundle. Keep the traditional
@@ -25,8 +27,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.rebelpaulo.vibenotch</string>
   <key>CFBundleIconFile</key><string>Vibenotch</string>
   <key>CFBundleIconName</key><string>AppIcon</string>
-  <key>CFBundleVersion</key><string>1.0.2</string>
-  <key>CFBundleShortVersionString</key><string>1.0.2</string>
+  <key>CFBundleVersion</key><string>1.0.3</string>
+  <key>CFBundleShortVersionString</key><string>1.0.3</string>
   <key>CFBundleExecutable</key><string>Vibenotch</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
