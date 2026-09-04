@@ -18,6 +18,9 @@ struct MachineVitals: Sendable, Equatable {
     /// nil until a second sample exists — there is no such thing as an
     /// instantaneous CPU percentage.
     let cpuPercent: Int?
+    /// Average die temperature in Celsius, off the PMU sensors. nil on Intel,
+    /// and nil the day Apple withdraws the private interface it comes from.
+    let cpuTemperatureC: Double?
     let memory: MemoryReading?
     let swapUsedMB: Int?
     let disk: DiskReading?
@@ -87,26 +90,30 @@ protocol MachineVitalsProviding: Sendable {
     func vitals() -> MachineVitals
 }
 
-/// Reads the machine through public APIs only.
+/// Reads the machine.
 ///
-/// Deliberately NOT the CPU temperature in degrees, which is the first thing
-/// anyone asks for. macOS exposes no unprivileged way to read it: the sensors
-/// live behind SMC keys and a private IOKit HID page, and `powermetrics`
-/// refuses without root. `ProcessInfo.thermalState` — already published beside
-/// the battery — is the supported reading, and it is the one macOS itself acts
-/// on. A number scraped out of a private API would be more precise and less
-/// true, and would put this app in the category of software that reads things
-/// it was not offered.
+/// Everything here is a public API except the temperature, which comes from
+/// `AppleSiliconTemperatureReader` and is private — see that file for why that
+/// was a deliberate choice and what it costs. An earlier version of this
+/// comment claimed a degrees reading was impossible without root. It is not;
+/// only `powermetrics` needs root, and the sensors it reads are published to
+/// everyone.
+///
+/// `ProcessInfo.thermalState`, already published beside the battery, stays: it
+/// is what macOS itself acts on, so it says whether the machine is about to
+/// throttle, which no absolute number can.
 final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendable {
     /// The previous CPU tick sample. CPU percentage is a rate, so it needs two
     /// readings and a lock: the bridge polls from the main actor but nothing
     /// promises that forever.
     private let lock = NSLock()
     private var previousTicks: (busy: Double, total: Double)?
+    private let temperatureReader = AppleSiliconTemperatureReader()
 
     func vitals() -> MachineVitals {
         MachineVitals(
             cpuPercent: cpuPercent(),
+            cpuTemperatureC: temperatureReader.dieTemperatureCelsius(),
             memory: memoryReading(),
             swapUsedMB: swapUsedMB(),
             disk: diskReading(),

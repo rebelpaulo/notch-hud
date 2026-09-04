@@ -1055,6 +1055,7 @@ final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendab
     private let lock = NSLock()
     private var storage = MachineVitals(
         cpuPercent: nil,
+        cpuTemperatureC: nil,
         memory: nil,
         swapUsedMB: nil,
         disk: nil,
@@ -1119,6 +1120,7 @@ final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendab
     // the same on the wire, or the phone draws an idle machine either way.
     fixture.vitals.current = MachineVitals(
         cpuPercent: nil,
+        cpuTemperatureC: nil,
         memory: nil,
         swapUsedMB: 0,
         disk: nil,
@@ -1164,11 +1166,13 @@ final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendab
 
 private func machineVitals(
     cpu: Int?,
+    temperature: Double? = nil,
     memoryUsedMB: Int = 8000,
     top: [(String, Int, Int)] = []
 ) -> MachineVitals {
     MachineVitals(
         cpuPercent: cpu,
+        cpuTemperatureC: temperature,
         memory: MachineVitals.MemoryReading(
             usedMB: memoryUsedMB,
             totalMB: 16384,
@@ -1182,4 +1186,68 @@ private func machineVitals(
             MachineVitals.ProcessMemory(name: $0.0, megabytes: $0.1, instances: $0.2)
         }
     )
+}
+
+@MainActor
+@Test func theDieTemperaturePublishesInWholeishDegreesAndNotOnEveryFlicker() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.1)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let first = try #require(await fixture.runner.statePutBodies().last)
+    #expect(first.contains("\"cpu_temperature_c\":47.1"))
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    // The dies wander by tenths without stopping. Left ungated this is the
+    // field that would POST every ten seconds on a machine doing nothing.
+    // Under two degrees from what the phone holds. The bucket version of this
+    // check published here: 47.1 and 47.9 round into different two-degree
+    // buckets even though nothing moved, and a die hovering on a boundary did
+    // that on every tick.
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.9)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 46.4)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst)
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 52.0)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let last = try #require(await fixture.runner.statePutBodies().last)
+    #expect(last.contains("\"cpu_temperature_c\":52.0"))
+}
+
+@Test func theDieTemperatureIsReadWithoutRootOrIsHonestlyAbsent() {
+    // The claim this replaced a wrong comment with: the PMU sensors answer an
+    // unprivileged process. Asserting a RANGE rather than a value, because the
+    // only alternative is asserting whatever this machine happens to be doing.
+    //
+    // nil is a legitimate pass: an Intel Mac has no PMU sensors, and the day
+    // Apple withdraws the private interface every reading here goes with it.
+    // What must never happen is a zero dressed up as a temperature.
+    let reader = AppleSiliconTemperatureReader()
+    guard let celsius = reader.dieTemperatureCelsius() else { return }
+    #expect(celsius > 5)
+    #expect(celsius < 120)
+}
+
+@MainActor
+@Test func aGaugeThatDisappearsIsNewsEvenThoughNoNumberMoved() async throws {
+    let fixture = try RemoteBridgeFixture(mode: .manual, percent: 80, onAC: true)
+    defer { fixture.remove() }
+
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: 47.0)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    let afterFirst = await fixture.runner.statePutBodies().count
+
+    // Apple withdraws the private interface, or the Mac is an Intel one that
+    // never had it. Comparing only magnitudes would leave the phone showing a
+    // temperature that no longer exists, forever.
+    fixture.vitals.current = machineVitals(cpu: 40, temperature: nil)
+    await fixture.bridge.checkNow(pollRemoteState: true)
+    #expect(await fixture.runner.statePutBodies().count == afterFirst + 1)
+    let body = try #require(await fixture.runner.statePutBodies().last)
+    #expect(!body.contains("cpu_temperature_c"))
 }

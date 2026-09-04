@@ -282,12 +282,11 @@ final class RemoteBridge {
     // write; ten identical readings a minute are not.
     private var lastPublishedBattery: PublishedBattery?
     private var lastPublishedThermal: String?
-    /// The QUANTISED vitals, not the raw ones. CPU and memory move on every
-    /// tick, so caching the exact reading would publish every ten seconds
-    /// forever — the same runaway that once wrote the pace field ~8,600 times a
-    /// day. The digest rounds each gauge to a step a person would notice, and
-    /// only a crossed step is news.
-    private var lastPublishedVitalsDigest: String?
+    /// The vitals as last SENT, so the next reading is compared against what
+    /// the phone actually holds. CPU and memory move on every tick, and caching
+    /// nothing would publish every ten seconds forever — the same runaway that
+    /// once wrote the pace field ~8,600 times a day.
+    private var lastPublishedVitals: MachineVitals?
     private var isPublishingMachineState = false
     private var machineStateChangedWhilePublishing = false
 
@@ -661,8 +660,7 @@ final class RemoteBridge {
         // and matter for the same reason: nobody is at the machine to notice
         // it swapping.
         let vitals = vitalsProvider.vitals()
-        let vitalsDigest = vitalsDigest(vitals)
-        if vitalsDigest != lastPublishedVitalsDigest {
+        if vitalsAreNews(vitals, comparedTo: lastPublishedVitals) {
             fields.append("\"vitals\":" + renderedVitals(vitals))
         }
         guard !fields.isEmpty else { return }
@@ -674,36 +672,56 @@ final class RemoteBridge {
         guard await run(["--state-put"], stdin: body).exitCode == 0 else { return }
         if let battery { lastPublishedBattery = battery }
         lastPublishedThermal = thermal
-        lastPublishedVitalsDigest = vitalsDigest
+        if vitalsAreNews(vitals, comparedTo: lastPublishedVitals) {
+            lastPublishedVitals = vitals
+        }
     }
 
     /// What counts as a CHANGE worth a write.
     ///
-    /// Each gauge is rounded to a step big enough that crossing it means
-    /// something to a person looking at a phone: five points of CPU, two of
-    /// memory, a quarter-gig of swap, a gigabyte of disk, an hour of uptime.
-    /// Without this the raw readings differ on every single tick and the Mac
-    /// would POST forever.
+    /// Compared against the reading the phone is ALREADY HOLDING, not against
+    /// a bucket number. The first version of this rounded each gauge into
+    /// fixed steps and compared the steps — which looks equivalent and is not:
+    /// a value hovering on a boundary (47.4 °C, then 47.6, then 47.4) lands in
+    /// a different bucket every time and publishes on every single tick, which
+    /// is the exact write storm the rounding was added to prevent. Measuring
+    /// the distance from what was last sent gives the hysteresis for free: once
+    /// 47.1 has gone up, nothing goes up again until 45.1 or 49.1.
     ///
-    /// `topMemory` is deliberately ABSENT from the digest. The heaviest
+    /// Thresholds are what a person would notice on a phone screen: five points
+    /// of CPU, two degrees, two points of memory, a quarter-gig of swap, a
+    /// gigabyte of disk, an hour of uptime.
+    ///
+    /// `topMemory` is deliberately ABSENT from this comparison. The heaviest
     /// processes shuffle constantly, and letting them drive the write would
-    /// undo every rounding above. The list therefore rides along with whatever
+    /// undo every threshold above. The list therefore rides along with whatever
     /// publish a gauge earns, and is as old as `vitals_updated_at` says it is —
-    /// which is exactly when it is safe to be stale, because a Mac whose
-    /// gauges have not moved is a Mac where nothing is happening.
-    private func vitalsDigest(_ vitals: MachineVitals) -> String {
-        func step(_ value: Int?, _ size: Int) -> String {
-            value.map { String($0 / size) } ?? "-"
+    /// which is exactly when it is safe to be stale, because a Mac whose gauges
+    /// have not moved is a Mac where nothing is happening.
+    private func vitalsAreNews(_ new: MachineVitals, comparedTo old: MachineVitals?) -> Bool {
+        guard let old else { return true }
+
+        // An appearing or disappearing reading is always news: it is the
+        // difference between a gauge being drawn and not being drawn.
+        func moved(_ new: Double?, _ old: Double?, by threshold: Double) -> Bool {
+            switch (new, old) {
+            case let (new?, old?): abs(new - old) >= threshold
+            case (nil, nil): false
+            default: true
+            }
         }
-        return [
-            step(vitals.cpuPercent, 5),
-            step(vitals.memory?.usedPercent, 2),
-            vitals.memory?.pressure?.rawValue ?? "-",
-            step(vitals.swapUsedMB, 256),
-            step(vitals.disk?.freeGB, 1),
-            step(vitals.uptimeHours, 1),
-            vitals.isLowPowerMode ? "low" : "-",
-        ].joined(separator: "|")
+        func moved(_ new: Int?, _ old: Int?, by threshold: Int) -> Bool {
+            moved(new.map(Double.init), old.map(Double.init), by: Double(threshold))
+        }
+
+        return moved(new.cpuPercent, old.cpuPercent, by: 5)
+            || moved(new.cpuTemperatureC, old.cpuTemperatureC, by: 2)
+            || moved(new.memory?.usedPercent, old.memory?.usedPercent, by: 2)
+            || new.memory?.pressure != old.memory?.pressure
+            || moved(new.swapUsedMB, old.swapUsedMB, by: 256)
+            || moved(new.disk?.freeGB, old.disk?.freeGB, by: 1)
+            || moved(new.uptimeHours, old.uptimeHours, by: 1)
+            || new.isLowPowerMode != old.isLowPowerMode
     }
 
     /// A field the Mac could not read is OMITTED, never sent as null or zero.
@@ -714,6 +732,9 @@ final class RemoteBridge {
         var parts: [String] = []
         if let cpu = vitals.cpuPercent {
             parts.append("\"cpu_percent\":\(cpu)")
+        }
+        if let temperature = vitals.cpuTemperatureC {
+            parts.append("\"cpu_temperature_c\":\(String(format: "%.1f", temperature))")
         }
         if let memory = vitals.memory {
             var fields = "\"used_mb\":\(memory.usedMB),\"total_mb\":\(memory.totalMB)"
@@ -1308,7 +1329,7 @@ final class RemoteBridge {
         // move — and at 100% on AC that can be hours.
         lastPublishedBattery = nil
         lastPublishedThermal = nil
-        lastPublishedVitalsDigest = nil
+        lastPublishedVitals = nil
         lastPublishedSessions = nil
         lastPublishedResumable = nil
         lastPublishedUsageDigest = nil
