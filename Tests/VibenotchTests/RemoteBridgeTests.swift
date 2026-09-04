@@ -1061,7 +1061,9 @@ final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendab
         disk: nil,
         uptimeHours: nil,
         isLowPowerMode: false,
-        topMemory: []
+        loadAverage: nil,
+        topMemory: [],
+        topCPU: []
     )
 
     var current: MachineVitals {
@@ -1126,7 +1128,9 @@ final class FakeMachineVitalsProvider: MachineVitalsProviding, @unchecked Sendab
         disk: nil,
         uptimeHours: nil,
         isLowPowerMode: false,
-        topMemory: []
+        loadAverage: nil,
+        topMemory: [],
+        topCPU: []
     )
     await fixture.bridge.checkNow(pollRemoteState: true)
 
@@ -1182,9 +1186,11 @@ private func machineVitals(
         disk: MachineVitals.DiskReading(freeGB: 100, totalGB: 460),
         uptimeHours: 3,
         isLowPowerMode: false,
+        loadAverage: nil,
         topMemory: top.map {
             MachineVitals.ProcessMemory(name: $0.0, megabytes: $0.1, instances: $0.2)
-        }
+        },
+        topCPU: []
     )
 }
 
@@ -1250,4 +1256,26 @@ private func machineVitals(
     #expect(await fixture.runner.statePutBodies().count == afterFirst + 1)
     let body = try #require(await fixture.runner.statePutBodies().last)
     #expect(!body.contains("cpu_temperature_c"))
+}
+
+@Test func busiestProcessesAreARateAndTheFirstPollHasNone() async throws {
+    // The CPU numbers libproc hands over are cumulative since each process
+    // started. Reporting those directly would put whatever has been running
+    // longest at the top forever, which is a fact about uptime and not about
+    // what is busy now.
+    let provider = SystemMachineVitalsProvider()
+    #expect(provider.vitals().topCPU.isEmpty)
+
+    try await Task.sleep(for: .milliseconds(600))
+    let second = provider.vitals()
+
+    // Machine-independent: whatever is busy, a rate cannot exceed the cores
+    // available, and the list is capped. An empty list is a legitimate pass on
+    // a genuinely idle machine.
+    for process in second.topCPU {
+        #expect(process.percent >= 0.1)
+        #expect(process.percent <= Double(ProcessInfo.processInfo.processorCount) * 100)
+    }
+    #expect(second.topCPU.count <= 5)
+    #expect(second.loadAverage != nil)
 }

@@ -722,6 +722,10 @@ final class RemoteBridge {
             || moved(new.disk?.freeGB, old.disk?.freeGB, by: 1)
             || moved(new.uptimeHours, old.uptimeHours, by: 1)
             || new.isLowPowerMode != old.isLowPowerMode
+            // Two whole runnable threads. The load average is a smoothed
+            // number already, but it still wanders by fractions, and this is
+            // the gauge whose interesting range is 0 to well over a hundred.
+            || moved(new.loadAverage, old.loadAverage, by: 2)
     }
 
     /// A field the Mac could not read is OMITTED, never sent as null or zero.
@@ -752,6 +756,9 @@ final class RemoteBridge {
         if let uptime = vitals.uptimeHours {
             parts.append("\"uptime_hours\":\(uptime)")
         }
+        if let load = vitals.loadAverage {
+            parts.append("\"load_average\":\(String(format: "%.2f", load))")
+        }
         parts.append("\"low_power\":\(vitals.isLowPowerMode)")
         if !vitals.topMemory.isEmpty {
             let processes = vitals.topMemory.map {
@@ -759,6 +766,14 @@ final class RemoteBridge {
                     + ",\"mb\":\($0.megabytes),\"instances\":\($0.instances)}"
             }
             parts.append("\"top_memory\":[" + processes.joined(separator: ",") + "]")
+        }
+        if !vitals.topCPU.isEmpty {
+            let processes = vitals.topCPU.map {
+                "{\"name\":" + jsonString($0.name)
+                    + ",\"percent\":\(String(format: "%.1f", $0.percent))"
+                    + ",\"instances\":\($0.instances)}"
+            }
+            parts.append("\"top_cpu\":[" + processes.joined(separator: ",") + "]")
         }
         return "{" + parts.joined(separator: ",") + "}"
     }

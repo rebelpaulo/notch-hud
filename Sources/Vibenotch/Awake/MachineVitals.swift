@@ -28,10 +28,27 @@ struct MachineVitals: Sendable, Equatable {
     /// no other reading here can.
     let uptimeHours: Int?
     let isLowPowerMode: Bool
+    /// The one-minute load average: how many threads are runnable or stuck
+    /// waiting, averaged over the last minute.
+    ///
+    /// Kept ALONGSIDE `cpuPercent` rather than instead of it, because they
+    /// answer different questions and the gap between them is the interesting
+    /// part. The Mac this was written on read 100% CPU and a load average of
+    /// 132 at the same moment: the first says every core is occupied, the
+    /// second says a hundred and thirty things were queued behind them. A
+    /// machine at 100% with a load of 8 is working; the same machine at 100%
+    /// with a load of 132 is drowning, and nothing else on this screen
+    /// distinguishes the two.
+    let loadAverage: Double?
     /// Heaviest processes by memory, aggregated by name. Empty when the scan
     /// found nothing readable rather than nil: an empty list and a failed scan
     /// look the same to a reader, and neither is worth a separate state.
     let topMemory: [ProcessMemory]
+    /// Busiest processes by CPU over the interval between two polls, as a
+    /// percentage of ONE core — so a process using four cores reads 400%, the
+    /// same convention Activity Monitor uses. Empty on the first poll, which
+    /// has no interval to divide by.
+    let topCPU: [ProcessCPU]
 
     struct MemoryReading: Sendable, Equatable {
         let usedMB: Int
@@ -62,6 +79,14 @@ struct MachineVitals: Sendable, Equatable {
     struct ProcessMemory: Sendable, Equatable {
         let name: String
         let megabytes: Int
+        let instances: Int
+    }
+
+    struct ProcessCPU: Sendable, Equatable {
+        let name: String
+        /// Percent of one core. Above 100 for a process spanning several, which
+        /// is a fact about the process and not an error to clamp away.
+        let percent: Double
         let instances: Int
     }
 
@@ -109,9 +134,15 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
     private let lock = NSLock()
     private var previousTicks: (busy: Double, total: Double)?
     private let temperatureReader = AppleSiliconTemperatureReader()
+    /// Per-process CPU totals from the previous walk, with the uptime they
+    /// were read at. Rates need two samples; this is the first one.
+    private var previousProcessCPU: (byPID: [pid_t: UInt64], at: TimeInterval)?
 
     func vitals() -> MachineVitals {
-        MachineVitals(
+        // One walk of the process table feeds both lists, and it must happen
+        // before the struct is built: it also advances the CPU-rate sample.
+        let walked = processes()
+        return MachineVitals(
             cpuPercent: cpuPercent(),
             cpuTemperatureC: temperatureReader.dieTemperatureCelsius(),
             memory: memoryReading(),
@@ -119,8 +150,17 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
             disk: diskReading(),
             uptimeHours: Int(ProcessInfo.processInfo.systemUptime / 3600),
             isLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,
-            topMemory: topMemory()
+            loadAverage: loadAverage(),
+            topMemory: walked.memory,
+            topCPU: walked.cpu
         )
+    }
+
+    /// `getloadavg`, which is in libc and needs no Mach dance at all.
+    private func loadAverage() -> Double? {
+        var averages = [Double](repeating: 0, count: 3)
+        guard getloadavg(&averages, 3) > 0 else { return nil }
+        return averages[0]
     }
 
     // MARK: CPU
@@ -241,7 +281,7 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
 
     // MARK: Processes
 
-    /// The five heaviest process names by memory footprint.
+    /// One walk of the process table, both answers.
     ///
     /// `libproc` rather than shelling out to `ps`: no subprocess per poll, and
     /// `ri_phys_footprint` is the number Activity Monitor shows, which includes
@@ -252,7 +292,14 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
     /// Processes owned by other users answer EPERM and are skipped. That leaves
     /// the user's own, which is where anything worth killing lives; the system
     /// daemons that stay hidden are not ones anybody would act on anyway.
-    private func topMemory(limit: Int = 5) -> [MachineVitals.ProcessMemory] {
+    ///
+    /// Aggregated by NAME, not listed per pid, because the honest answer to
+    /// "what is eating my Mac" is "Chrome, 10.4 GB across 43 helpers" and not
+    /// forty-three rows that each look modest.
+    private func processes(limit: Int = 5) -> (
+        memory: [MachineVitals.ProcessMemory],
+        cpu: [MachineVitals.ProcessCPU]
+    ) {
         var pids = [pid_t](repeating: 0, count: 8192)
         let byteCount = proc_listpids(
             UInt32(PROC_ALL_PIDS),
@@ -260,9 +307,12 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
             &pids,
             Int32(pids.count * MemoryLayout<pid_t>.size)
         )
-        guard byteCount > 0 else { return [] }
+        guard byteCount > 0 else { return ([], []) }
 
-        var totals: [String: (bytes: UInt64, instances: Int)] = [:]
+        let now = ProcessInfo.processInfo.systemUptime
+        var totals: [String: (bytes: UInt64, cpuNanoseconds: UInt64, instances: Int)] = [:]
+        var cpuByPID: [pid_t: UInt64] = [:]
+
         for pid in pids.prefix(Int(byteCount) / MemoryLayout<pid_t>.size) where pid > 0 {
             var usage = rusage_info_v4()
             let read = withUnsafeMutablePointer(to: &usage) {
@@ -277,11 +327,31 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
             let name = String(cString: nameBuffer)
             guard !name.isEmpty else { continue }
 
-            let existing = totals[name] ?? (0, 0)
-            totals[name] = (existing.bytes + usage.ri_phys_footprint, existing.instances + 1)
+            // Cumulative since the process started, so only the DIFFERENCE
+            // between two polls means anything. A process that burned an hour
+            // of CPU yesterday and is idle now would otherwise top the list
+            // forever.
+            let cpuTotal = usage.ri_user_time + usage.ri_system_time
+            cpuByPID[pid] = cpuTotal
+
+            let previousTotal = previousProcessCPU?.byPID[pid]
+            // A pid absent from the previous sample is either new or recycled;
+            // either way there is no interval for it and it contributes zero
+            // rather than its whole lifetime's CPU in one go.
+            let burned = previousTotal.map { cpuTotal >= $0 ? cpuTotal - $0 : 0 } ?? 0
+
+            let existing = totals[name] ?? (0, 0, 0)
+            totals[name] = (
+                existing.bytes + usage.ri_phys_footprint,
+                existing.cpuNanoseconds + burned,
+                existing.instances + 1
+            )
         }
 
-        return totals
+        let elapsed = previousProcessCPU.map { now - $0.at }
+        previousProcessCPU = (byPID: cpuByPID, at: now)
+
+        let memory = totals
             .map {
                 MachineVitals.ProcessMemory(
                     name: $0.key,
@@ -294,5 +364,24 @@ final class SystemMachineVitalsProvider: MachineVitalsProviding, @unchecked Send
             .sorted { ($0.megabytes, $1.name) > ($1.megabytes, $0.name) }
             .prefix(limit)
             .filter { $0.megabytes > 0 }
+
+        // No interval, no rate — the first poll after launch reports no busy
+        // processes rather than dividing by a number it does not have.
+        guard let elapsed, elapsed > 0.5 else { return (Array(memory), []) }
+
+        let cpu = totals
+            .map { name, value in
+                MachineVitals.ProcessCPU(
+                    name: name,
+                    percent: Double(value.cpuNanoseconds) / 1_000_000_000 / elapsed * 100,
+                    instances: value.instances
+                )
+            }
+            .sorted { ($0.percent, $1.name) > ($1.percent, $0.name) }
+            .prefix(limit)
+            // Below a tenth of a percent is noise dressed as a measurement.
+            .filter { $0.percent >= 0.1 }
+
+        return (Array(memory), Array(cpu))
     }
 }
