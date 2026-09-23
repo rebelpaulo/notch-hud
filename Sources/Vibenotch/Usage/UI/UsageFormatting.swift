@@ -8,8 +8,13 @@ enum UsageFormatting {
     /// "2h 53m", "5d 4h", "45m" — the largest two non-second units, no
     /// zero-padding. Seconds never appear: at the resolution this UI polls,
     /// showing them would just be noise that reflows every tick.
+    ///
+    /// A value under a minute rounds UP to "1m" rather than down to "0m".
+    /// Zero minutes reads as "now", which is the opposite of what a countdown
+    /// with time left on it means — and on a rate-limit deadline it is the
+    /// difference between waiting and tapping a button that cannot succeed.
     static func duration(_ seconds: TimeInterval) -> String {
-        let totalMinutes = max(0, Int(seconds / 60))
+        let totalMinutes = seconds > 0 ? max(1, Int((seconds / 60).rounded(.up))) : 0
         let days = totalMinutes / (24 * 60)
         let hours = (totalMinutes % (24 * 60)) / 60
         let minutes = totalMinutes % 60

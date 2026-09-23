@@ -178,20 +178,53 @@ final class UsageStore {
     /// exists to save.
     static let backgroundMaxAge: TimeInterval = 300
 
+    /// When each provider is allowed to be asked again, set from the 429 the
+    /// service itself sent back.
+    ///
+    /// Anthropic's documentation is explicit that `retry-after` is not advice:
+    /// "The number of seconds to wait until you can retry the request. EARLIER
+    /// RETRIES WILL FAIL." Our own cadence is 120s and the deadline measured
+    /// here was 331s, so without this the app spends two guaranteed-failed
+    /// requests per block, forever, and the card flickers between a stale
+    /// number and an error for no gain.
+    ///
+    /// Per provider, not global: Codex and Grok have nothing to do with a
+    /// limit Anthropic imposed.
+    private var blockedUntil: [UsageProviderKind: Date] = [:]
+
+    /// The wait when a 429 arrives with NO `Retry-After`.
+    ///
+    /// Deliberately long, and NOT the ordinary refresh interval. The docs
+    /// describe exactly one 429 that omits the header — the spend cap — and
+    /// say of it that retrying "fails until access resumes", which can be the
+    /// first of next month. Treating a missing header as "wait the usual two
+    /// minutes" would turn the one case we cannot recover from into the one we
+    /// hammer hardest.
+    static let rateLimitFallbackWait: TimeInterval = 900
+
     func refresh(now: Date = .now) {
         // One refresh at a time. Two overlapping passes would race to write
         // the same entries and the loser's answer would win at random.
         guard inFlight == nil else { return }
 
-        for fetcher in fetchers where entries[fetcher.kind] == nil {
+        // Asking anyway would not just waste the request: the answer comes
+        // back as a failure and overwrites nothing, but the log fills with
+        // errors that look like a problem and are only us ignoring a deadline.
+        let due = fetchers.filter { fetcher in
+            guard let until = blockedUntil[fetcher.kind] else { return true }
+            return now >= until
+        }
+        guard !due.isEmpty else { return }
+
+        for fetcher in due where entries[fetcher.kind] == nil {
             entries[fetcher.kind] = .loading
         }
 
-        inFlight = Task { [weak self, fetchers] in
+        inFlight = Task { [weak self, due] in
             // Concurrently: two independent hosts, and the slower one should
             // not decide when the faster one appears.
             await withTaskGroup(of: (UsageProviderKind, Entry).self) { group in
-                for fetcher in fetchers {
+                for fetcher in due {
                     group.addTask {
                         do {
                             return (fetcher.kind, .loaded(try await fetcher.fetch(now: now)))
@@ -203,19 +236,30 @@ final class UsageStore {
                     }
                 }
                 for await (kind, entry) in group {
-                    await self?.apply(entry, for: kind)
+                    await self?.apply(entry, for: kind, at: now)
                 }
             }
             await self?.finish(at: now)
         }
     }
 
-    private func apply(_ entry: Entry, for kind: UsageProviderKind) {
+    private func apply(_ entry: Entry, for kind: UsageProviderKind, at now: Date) {
         // Logged because a quota that never appears is otherwise indis-
         // tinguishable from one that is simply not published yet: the panel
         // shows nothing either way, by design. Without this the only way to
         // tell a signed-out account from a broken endpoint is a rebuild.
         // The reason only — never the token, never the account.
+        // Record the deadline BEFORE the early return below, which keeps the
+        // last good numbers on screen: a provider whose previous reading is
+        // still valid is exactly the one that would otherwise keep asking.
+        if case let .failed(.rateLimited(retryAfter)) = entry {
+            blockedUntil[kind] = now.addingTimeInterval(
+                retryAfter ?? Self.rateLimitFallbackWait
+            )
+        } else if case .loaded = entry {
+            blockedUntil[kind] = nil
+        }
+
         if case let .failed(reason) = entry {
             // Plain %@: NSLog does not understand os_log's %{public}@ and
             // prints the specifier verbatim. The unified log redacts this to

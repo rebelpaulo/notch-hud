@@ -17,6 +17,9 @@ struct UsageCardView: View {
     /// whole tab may be expanded at a time, which only the parent can enforce.
     private let isExpanded: Bool
     private let onToggleExpanded: () -> Void
+    /// What to do when the user taps "Sign in". nil on cards that have nothing
+    /// to fix — a network blip is not something a login solves.
+    private let onSignIn: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHoveringHeader = false
@@ -35,11 +38,17 @@ struct UsageCardView: View {
         self.now = now
         self.isExpanded = isExpanded
         self.onToggleExpanded = onToggleExpanded
+        onSignIn = nil
     }
 
     /// Unavailable cards have no windows to hide, so they are never
     /// collapsible — `isExpanded` always reads true and the header ignores taps.
-    init(provider: UsageProviderKind, unavailable: UsageUnavailable, now: Date = .now) {
+    init(
+        provider: UsageProviderKind,
+        unavailable: UsageUnavailable,
+        now: Date = .now,
+        onSignIn: (() -> Void)? = nil
+    ) {
         self.provider = provider
         snapshot = nil
         self.unavailable = unavailable
@@ -47,6 +56,7 @@ struct UsageCardView: View {
         self.now = now
         isExpanded = true
         onToggleExpanded = {}
+        self.onSignIn = onSignIn
     }
 
     var body: some View {
@@ -290,8 +300,29 @@ struct UsageCardView: View {
             Text(unavailableMessage)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.5))
+
+            // Only where signing in is actually the fix. Offering it on a
+            // network error would send the user to re-authenticate a login
+            // that was never the problem.
+            if canSignIn, let onSignIn {
+                Spacer(minLength: 8)
+                Button(action: onSignIn) {
+                    Text(t("Sign in"))
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(provider.tint)
+                }
+                .buttonStyle(.plain)
+                .help(CLISignInLauncher.command(for: provider))
+            }
         }
         .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+    }
+
+    private var canSignIn: Bool {
+        switch unavailable {
+        case .notLoggedIn, .credentialExpired: true
+        case .rateLimited, .network, .unexpectedResponse, nil: false
+        }
     }
 
     private var unavailableMessage: String {
@@ -299,7 +330,23 @@ struct UsageCardView: View {
         case .notLoggedIn:
             t("Not logged in")
         case .credentialExpired:
-            t("Login expired")
+            // NOT "Login expired", which is what this said and which is a
+            // different and more alarming claim: the account is fine and the
+            // CLI still reports itself signed in. What ran out is the stored
+            // access token, which only the CLI can renew — measured on a Mac
+            // whose token died at 07:19 with a refresh token good for another
+            // two days, while the card announced an expired login.
+            t("Stored token expired")
+        case .rateLimited(let retryAfter):
+            // The wait, when the service named one. "Try again later" with no
+            // later in it is the kind of message that makes people tap a
+            // button repeatedly, which here is the one thing guaranteed to
+            // fail.
+            if let retryAfter {
+                t("Rate limited — retry in %@", UsageFormatting.duration(retryAfter))
+            } else {
+                t("Rate limited")
+            }
         case .network:
             t("Couldn't reach %@", provider.displayName)
         case .unexpectedResponse:

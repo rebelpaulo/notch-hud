@@ -4,6 +4,10 @@
 # The app passes only the GitHub release tag shown in the update card. Release
 # assets are accepted only when their checksum manifest verifies against the
 # public key embedded below.
+#
+# Env override (used by tests and non-standard app locations):
+#   VIBENOTCH_UPDATE_INFO_PLIST  default
+#       /Applications/Vibenotch.app/Contents/Info.plist
 
 set -eu
 
@@ -11,6 +15,57 @@ tag=${1:-}
 if ! printf '%s\n' "$tag" | /usr/bin/grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
     printf '%s\n' "vibenotch-update: expected a release tag such as v0.4.0" >&2
     exit 64
+fi
+
+version=${tag#v}
+installed_plist=${VIBENOTCH_UPDATE_INFO_PLIST:-/Applications/Vibenotch.app/Contents/Info.plist}
+
+version_is_newer_than() {
+    candidate_version=$1
+    baseline_version=$2
+
+    candidate_major=${candidate_version%%.*}
+    candidate_tail=${candidate_version#*.}
+    candidate_minor=${candidate_tail%%.*}
+    candidate_patch=${candidate_tail#*.}
+
+    baseline_major=${baseline_version%%.*}
+    baseline_tail=${baseline_version#*.}
+    baseline_minor=${baseline_tail%%.*}
+    baseline_patch=${baseline_tail#*.}
+
+    [ "$candidate_major" -gt "$baseline_major" ] && return 0
+    [ "$candidate_major" -lt "$baseline_major" ] && return 1
+    [ "$candidate_minor" -gt "$baseline_minor" ] && return 0
+    [ "$candidate_minor" -lt "$baseline_minor" ] && return 1
+    [ "$candidate_patch" -gt "$baseline_patch" ]
+}
+
+printf '%s\n' "Checking installed Vibenotch version..."
+installed_version=
+if [ -f "$installed_plist" ]; then
+    installed_version=$(
+        /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            "$installed_plist" 2>/dev/null || :
+    )
+fi
+
+if printf '%s\n' "$installed_version" | \
+    /usr/bin/grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+then
+    if [ "$installed_version" = "$version" ]; then
+        printf '%s\n' "Vibenotch $version is already installed. Nothing to do."
+        exit 0
+    fi
+    if version_is_newer_than "$installed_version" "$version"; then
+        printf '%s\n' \
+            "Vibenotch $installed_version is newer than $version. Nothing to do."
+        exit 0
+    fi
+    printf '%s\n' "Installed Vibenotch $installed_version; updating to $version."
+else
+    printf '%s\n' \
+        "Could not determine the installed version; continuing with the verified update."
 fi
 
 [ -x /usr/bin/curl ] || {
@@ -38,7 +93,6 @@ cleanup() {
 }
 trap cleanup EXIT HUP INT TERM
 
-version=${tag#v}
 archive_name=Vibenotch-$version.tar.gz
 manifest_name=$archive_name.sha256
 signature_name=$manifest_name.sig

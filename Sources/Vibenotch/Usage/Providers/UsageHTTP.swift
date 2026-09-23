@@ -23,9 +23,26 @@ enum UsageHTTPStatus {
         if http.statusCode == 401 {
             return .credentialExpired
         }
+        // 429 is an answer, not a failure to arrive. It also passes on its own
+        // deadline in Retry-After, which is the only number here the user can
+        // act on — measured at 331 seconds on the Mac this was written on.
+        if http.statusCode == 429 {
+            return .rateLimited(retryAfter: retryAfter(http))
+        }
         if !(200...299).contains(http.statusCode) {
             return .network("HTTP \(http.statusCode)")
         }
         return nil
+    }
+
+    /// Seconds only. RFC 9110 also allows an HTTP-date, which this endpoint
+    /// does not send; an unparseable value returns nil rather than a guess,
+    /// and nil means "wait the default", never "retry now".
+    private static func retryAfter(_ response: HTTPURLResponse) -> TimeInterval? {
+        guard let raw = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = TimeInterval(raw.trimmingCharacters(in: .whitespaces)),
+              seconds > 0
+        else { return nil }
+        return seconds
     }
 }

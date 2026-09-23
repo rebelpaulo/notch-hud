@@ -135,7 +135,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
     private func installStatusItem() {
         let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let button = statusItem.button {
-            let image = Bundle.module
+            let image = VibenotchResources.bundle
                 .url(forResource: "VibenotchMenuBarTemplate", withExtension: "png")
                 .flatMap(NSImage.init(contentsOf:))
                 ?? NSImage(

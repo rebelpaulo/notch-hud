@@ -132,3 +132,54 @@ import Testing
     store.applyCacheOnlyLocal(lateArrivingSeries)
     #expect(store.localSeries == firstSeries)
 }
+
+/// Counts how many times the store actually went out and asked.
+///
+/// An actor rather than a class with a lock because the store fetches inside a
+/// task group: the counter is written from whichever thread the group happens
+/// to run that fetcher on.
+private actor CountingUsageFetcher: UsageFetching {
+    nonisolated let kind: UsageProviderKind
+    private let result: Result<UsageSnapshot, UsageUnavailable>
+    private(set) var calls = 0
+
+    init(kind: UsageProviderKind, result: Result<UsageSnapshot, UsageUnavailable>) {
+        self.kind = kind
+        self.result = result
+    }
+
+    func fetch(now: Date) async throws -> UsageSnapshot {
+        calls += 1
+        return try result.get()
+    }
+}
+
+@MainActor
+@Test func aRateLimitedProviderIsNotAskedAgainBeforeItsDeadline() async {
+    // The docs are explicit that `retry-after` is binding: "Earlier retries
+    // will fail." Our refresh cadence is 120s and the measured deadline was
+    // 331s, so without a gate the app spends two guaranteed-failed requests
+    // per block, forever.
+    let claude = CountingUsageFetcher(kind: .claude, result: .failure(.rateLimited(retryAfter: 300)))
+    let codex = CountingUsageFetcher(kind: .codex, result: .failure(.network("offline")))
+    let store = UsageStore(fetchers: [claude, codex])
+
+    let start = Date(timeIntervalSince1970: 1_000_000)
+    store.refresh(now: start)
+    while store.lastRefresh != start { await Task.yield() }
+    #expect(await claude.calls == 1)
+
+    let tooSoon = start.addingTimeInterval(120)
+    store.refresh(now: tooSoon)
+    while store.lastRefresh != tooSoon { await Task.yield() }
+    #expect(await claude.calls == 1)
+    // Anthropic's limit says nothing about Codex, which must keep being asked.
+    #expect(await codex.calls == 2)
+
+    // Past the deadline it goes again — a block that never lifts is a provider
+    // that silently stops updating.
+    let after = start.addingTimeInterval(301)
+    store.refresh(now: after)
+    while store.lastRefresh != after { await Task.yield() }
+    #expect(await claude.calls == 2)
+}

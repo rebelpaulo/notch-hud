@@ -295,6 +295,20 @@ struct UsageSnapshot: Sendable, Equatable {
 enum UsageUnavailable: Error, Sendable, Equatable {
     case notLoggedIn
     case credentialExpired
+    /// The service answered, and what it said was "not so fast".
+    ///
+    /// Its own case because every other reading of it is wrong and one of them
+    /// was shipped: folded into `.network` it drew "Couldn't reach Claude",
+    /// which is the opposite of what happened — we reached it perfectly and it
+    /// replied. The user is then told to check a connection that is fine, on a
+    /// card that hides the sign-in button because a 429 is not an auth
+    /// failure, so the screen offers nothing and explains nothing.
+    ///
+    /// Carries `Retry-After` in seconds when the service sent one, which it
+    /// does. Throwing that away and then asking the user to guess — or worse,
+    /// retrying underneath it every two minutes and renewing the block — is
+    /// discarding the one number in the whole exchange they could act on.
+    case rateLimited(retryAfter: TimeInterval?)
     case network(String)
     case unexpectedResponse(String)
 }
