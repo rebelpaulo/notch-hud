@@ -14,9 +14,15 @@ struct UsageFormattingTests {
     }
 
     @Test func durationDropsSecondsAndNeverZeroPads() {
-        // 59 seconds rounds down to 0 minutes, not "0m" with a leading pad
-        // and not a fractional minute.
-        #expect(UsageFormatting.duration(59) == "0m")
+        // Under a minute rounds UP, and this assertion used to say "0m".
+        // Nothing about that was deliberate: the old comment argued against a
+        // leading pad and a fractional minute, both still true, and took the
+        // value from whatever the code did. "0m" reads as "now" — on a reset
+        // countdown that is merely wrong, and on the rate-limit deadline this
+        // formatter now also prints it invites the one retry guaranteed to
+        // fail. Never a fractional minute, and never zero while time remains.
+        #expect(UsageFormatting.duration(59) == "1m")
+        #expect(UsageFormatting.duration(1) == "1m")
         // A third unit (minutes, once days is the leading unit) is dropped
         // entirely rather than shown as "5d 4h 0m".
         #expect(UsageFormatting.duration(5 * 86_400 + 4 * 3_600 + 30 * 60) == "5d 4h")

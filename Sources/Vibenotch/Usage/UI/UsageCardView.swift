@@ -337,8 +337,16 @@ struct UsageCardView: View {
             // whose token died at 07:19 with a refresh token good for another
             // two days, while the card announced an expired login.
             t("Stored token expired")
-        case .rateLimited:
-            t("Too many requests — retrying")
+        case .rateLimited(let retryAfter):
+            // The wait, when the service named one. "Try again later" with no
+            // later in it is the kind of message that makes people tap a
+            // button repeatedly, which here is the one thing guaranteed to
+            // fail.
+            if let retryAfter {
+                t("Rate limited — retry in %@", UsageFormatting.duration(retryAfter))
+            } else {
+                t("Rate limited")
+            }
         case .network:
             t("Couldn't reach %@", provider.displayName)
         case .unexpectedResponse:

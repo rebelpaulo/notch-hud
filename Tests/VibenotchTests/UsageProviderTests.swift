@@ -442,7 +442,7 @@ private let codexFixture = Data("""
         return nil
     }
     #expect(launcher.launch(.claude).isSuccess)
-    let script = try? #require(scripts.first)
+    let script = scripts.first
     #expect(script?.contains("do script \"claude auth login\"") == true)
     #expect(script?.contains("tell application \"Terminal\"") == true)
 }
@@ -469,12 +469,47 @@ private extension Result {
     // correctly, since this is not an auth failure — so it offered nothing and
     // explained nothing.
     let url = URL(string: "https://api.anthropic.com/api/oauth/usage")!
-    func response(_ code: Int) -> URLResponse {
-        HTTPURLResponse(url: url, statusCode: code, httpVersion: nil, headerFields: nil)!
+    func response(_ code: Int, headers: [String: String] = [:]) -> URLResponse {
+        HTTPURLResponse(url: url, statusCode: code, httpVersion: nil, headerFields: headers)!
     }
 
-    #expect(UsageHTTPStatus.failure(for: response(429)) == .rateLimited)
     #expect(UsageHTTPStatus.failure(for: response(401)) == .credentialExpired)
     #expect(UsageHTTPStatus.failure(for: response(503)) == .network("HTTP 503"))
     #expect(UsageHTTPStatus.failure(for: response(200)) == nil)
+
+    // The deadline the service sends, which the docs say is binding rather
+    // than advisory: "Earlier retries will fail." Measured at 331 then 270
+    // seconds on the real endpoint.
+    #expect(
+        UsageHTTPStatus.failure(for: response(429, headers: ["Retry-After": "331"]))
+            == .rateLimited(retryAfter: 331)
+    )
+    #expect(
+        UsageHTTPStatus.failure(for: response(429, headers: ["Retry-After": " 270 "]))
+            == .rateLimited(retryAfter: 270)
+    )
+
+    // A 429 with NO Retry-After is the shape the docs give the spend cap,
+    // where retrying fails until access resumes. It must not decode as a
+    // number, and above all not as zero — which would mean "retry now" on the
+    // one case that cannot recover.
+    #expect(UsageHTTPStatus.failure(for: response(429)) == .rateLimited(retryAfter: nil))
+    #expect(
+        UsageHTTPStatus.failure(for: response(429, headers: ["Retry-After": "0"]))
+            == .rateLimited(retryAfter: nil)
+    )
+    // RFC 9110 also allows an HTTP-date. This endpoint does not send one, and
+    // a half-parsed date must be absent rather than a guess.
+    #expect(
+        UsageHTTPStatus.failure(for: response(429, headers: ["Retry-After": "Wed, 23 Sep 2026 13:00:00 GMT"]))
+            == .rateLimited(retryAfter: nil)
+    )
+}
+
+@Test func aSubMinuteWaitRoundsUpBecauseZeroMinutesReadsAsNow() {
+    #expect(UsageFormatting.duration(45) == "1m")
+    #expect(UsageFormatting.duration(1) == "1m")
+    #expect(UsageFormatting.duration(0) == "0m")
+    #expect(UsageFormatting.duration(270) == "5m")
+    #expect(UsageFormatting.duration(3600) == "1h 0m")
 }

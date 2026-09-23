@@ -303,7 +303,12 @@ enum UsageUnavailable: Error, Sendable, Equatable {
     /// replied. The user is then told to check a connection that is fine, on a
     /// card that hides the sign-in button because a 429 is not an auth
     /// failure, so the screen offers nothing and explains nothing.
-    case rateLimited
+    ///
+    /// Carries `Retry-After` in seconds when the service sent one, which it
+    /// does. Throwing that away and then asking the user to guess — or worse,
+    /// retrying underneath it every two minutes and renewing the block — is
+    /// discarding the one number in the whole exchange they could act on.
+    case rateLimited(retryAfter: TimeInterval?)
     case network(String)
     case unexpectedResponse(String)
 }
