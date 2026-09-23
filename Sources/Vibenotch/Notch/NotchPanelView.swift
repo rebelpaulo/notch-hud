@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 struct NotchPanelView: View {
+    var signInLauncher = CLISignInLauncher()
     let store: SessionStore
     let pendingStore: PendingStore
     let focusDispatcher: FocusDispatcher
@@ -314,7 +315,9 @@ struct NotchPanelView: View {
                         .background(Color.notchBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                     case .unavailable(let reason):
-                        UsageCardView(provider: provider, unavailable: reason)
+                        UsageCardView(provider: provider, unavailable: reason) {
+                            _ = signInLauncher.launch(provider)
+                        }
                     }
                 }
             }

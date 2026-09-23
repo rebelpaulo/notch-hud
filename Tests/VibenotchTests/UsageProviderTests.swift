@@ -426,3 +426,39 @@ private let codexFixture = Data("""
     #expect(weekly.severity == .critical)
     #expect(snapshot.worstSeverity == .critical)
 }
+
+@MainActor
+@Test func signInOpensEachCLIsOwnLoginCommand() {
+    // Verified against each CLI's `--help`, not assumed: Claude nests it under
+    // a subcommand and the other two do not. A wrong command here sends the
+    // user to a shell error at the exact moment they are already stuck.
+    #expect(CLISignInLauncher.command(for: .claude) == "claude auth login")
+    #expect(CLISignInLauncher.command(for: .codex) == "codex login")
+    #expect(CLISignInLauncher.command(for: .grok) == "grok login")
+
+    var scripts: [String] = []
+    let launcher = CLISignInLauncher { script in
+        scripts.append(script)
+        return nil
+    }
+    #expect(launcher.launch(.claude).isSuccess)
+    let script = try? #require(scripts.first)
+    #expect(script?.contains("do script \"claude auth login\"") == true)
+    #expect(script?.contains("tell application \"Terminal\"") == true)
+}
+
+@MainActor
+@Test func aFailingAppleScriptIsReportedRatherThanSwallowed() {
+    // Terminal can be missing, scripted-automation permission can be denied.
+    // Returning success there would leave the user tapping a button that
+    // silently does nothing.
+    let launcher = CLISignInLauncher { _ in throw FocusError.scriptFailed("denied") }
+    #expect(!launcher.launch(.codex).isSuccess)
+}
+
+private extension Result {
+    var isSuccess: Bool {
+        if case .success = self { return true }
+        return false
+    }
+}

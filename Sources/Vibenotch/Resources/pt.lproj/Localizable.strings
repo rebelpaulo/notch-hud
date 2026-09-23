@@ -168,7 +168,8 @@
 "Behind pace" = "Abaixo do ritmo";
 "Lasts until reset" = "Dura até reiniciar";
 "Not logged in" = "Sem sessão iniciada";
-"Login expired" = "Sessão expirada";
+"Stored token expired" = "Token guardado expirou";
+"Sign in" = "Entrar";
 "Couldn't reach %@" = "Não foi possível contactar %@";
 "Couldn't read %@ usage" = "Não foi possível ler o uso do %@";
 "No usage data" = "Sem dados de uso";
