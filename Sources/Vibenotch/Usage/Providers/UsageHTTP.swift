@@ -23,6 +23,12 @@ enum UsageHTTPStatus {
         if http.statusCode == 401 {
             return .credentialExpired
         }
+        // 429 is an answer, not a failure to arrive. It also passes on its own
+        // deadline in Retry-After, which is the only number here the user can
+        // act on.
+        if http.statusCode == 429 {
+            return .rateLimited
+        }
         if !(200...299).contains(http.statusCode) {
             return .network("HTTP \(http.statusCode)")
         }

@@ -321,7 +321,7 @@ struct UsageCardView: View {
     private var canSignIn: Bool {
         switch unavailable {
         case .notLoggedIn, .credentialExpired: true
-        case .network, .unexpectedResponse, nil: false
+        case .rateLimited, .network, .unexpectedResponse, nil: false
         }
     }
 
@@ -337,6 +337,8 @@ struct UsageCardView: View {
             // whose token died at 07:19 with a refresh token good for another
             // two days, while the card announced an expired login.
             t("Stored token expired")
+        case .rateLimited:
+            t("Too many requests — retrying")
         case .network:
             t("Couldn't reach %@", provider.displayName)
         case .unexpectedResponse:

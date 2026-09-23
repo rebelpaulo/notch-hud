@@ -462,3 +462,19 @@ private extension Result {
         return false
     }
 }
+
+@Test func aRateLimitIsNotAFailureToReachTheService() throws {
+    // Shipped as "Couldn't reach Claude", which is the opposite of what a 429
+    // means: the service answered. The card then hid the sign-in button —
+    // correctly, since this is not an auth failure — so it offered nothing and
+    // explained nothing.
+    let url = URL(string: "https://api.anthropic.com/api/oauth/usage")!
+    func response(_ code: Int) -> URLResponse {
+        HTTPURLResponse(url: url, statusCode: code, httpVersion: nil, headerFields: nil)!
+    }
+
+    #expect(UsageHTTPStatus.failure(for: response(429)) == .rateLimited)
+    #expect(UsageHTTPStatus.failure(for: response(401)) == .credentialExpired)
+    #expect(UsageHTTPStatus.failure(for: response(503)) == .network("HTTP 503"))
+    #expect(UsageHTTPStatus.failure(for: response(200)) == nil)
+}

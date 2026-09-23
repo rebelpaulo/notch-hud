@@ -170,6 +170,7 @@
 "Not logged in" = "Sem sessão iniciada";
 "Stored token expired" = "Token guardado expirou";
 "Sign in" = "Entrar";
+"Too many requests — retrying" = "Demasiados pedidos — a tentar de novo";
 "Couldn't reach %@" = "Não foi possível contactar %@";
 "Couldn't read %@ usage" = "Não foi possível ler o uso do %@";
 "No usage data" = "Sem dados de uso";
